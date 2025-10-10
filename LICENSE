@@ -1,0 +1,31 @@
+### Open Source License (AGPL v3)
+For open-source projects, SmartMemory is licensed under the **GNU Affero General Public License v3.0**. This ensures that any derivative works or applications using SmartMemory must also be open-sourced under compatible terms.
+
+- ✅ **Free for open-source projects**
+- ✅ **Full access to source code**
+- ⚠️ **Requires open-sourcing your application**
+- ⚠️ **AGPL copyleft provisions apply**
+
+### Commercial License
+For commercial and proprietary applications, we offer commercial licenses that remove the copyleft restrictions:
+
+- ✅ **Use in proprietary applications**
+- ✅ **No source code disclosure required**
+- ✅ **Flexible licensing terms**
+- ✅ **Commercial support available**
+
+**Contact us for commercial licensing**: help@smartmemory.ai
+
+### Which License Do I Need?
+
+| Use Case | License Required |
+|----------|------------------|
+| Open-source project | AGPL v3 (free) |
+| Academic research | AGPL v3 (free) |
+| Internal company tools | AGPL v3 (free) |
+| Commercial SaaS product | Commercial license |
+| Proprietary software distribution | Commercial license |
+| White-label solutions | Commercial license |
+
+See [LICENSE](LICENSE.agpl-v3) for AGPL v3 terms.
+For a commercial license [email](info@smartmemory.ai) us.

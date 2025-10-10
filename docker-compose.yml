@@ -1,0 +1,52 @@
+# SmartMemory Docker Compose
+# Main configuration file that runs all services by default
+
+services:
+  # === CORE INFRASTRUCTURE ===
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: smartmemory-falkordb
+    ports:
+      - "9010:9010"  # Unified FalkorDB port (external:internal)
+      - "${FALKORDB_WEB_PORT:-3000}:3000"  # FalkorDB browser interface
+    environment:
+      - FALKORDB_ARGS=${FALKORDB_ARGS:--port 9010 --bind 0.0.0.0 --protected-mode no}
+    volumes:
+      - falkordb_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "9010", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - smartmemory-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartmemory-redis
+    ports:
+      - "9012:9012"  # Unified Redis port (external:internal)
+    command: redis-server --bind 0.0.0.0 --port 9012 --protected-mode no --maxmemory ${REDIS_MAXMEMORY:-512mb} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru} --requirepass ""
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "9012", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - smartmemory-network
+
+volumes:
+  redis_data:
+    driver: ${VOLUME_DRIVER:-local}
+  falkordb_data:
+    driver: ${VOLUME_DRIVER:-local}
+
+networks:
+  smartmemory-network:
+    driver: ${NETWORK_DRIVER:-bridge}

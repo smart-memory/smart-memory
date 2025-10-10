@@ -1,0 +1,161 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smartmemory"
+version = "0.1.5"
+description = "Multi-layered AI memory system with graph databases, vector stores, and intelligent processing pipelines"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "AGPL-3.0"}
+authors = [
+    {name = "SmartMemory Team"}
+]
+keywords = [
+    "ai",
+    "memory",
+    "graph-database",
+    "vector-database",
+    "llm",
+    "knowledge-graph",
+    "semantic-memory",
+    "episodic-memory",
+    "rag",
+    "embeddings"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+dependencies = [
+    "falkordb>=1.0.0",
+    "python-dateutil>=2.8.0",
+    "spacy>=3.0.0",
+    "vaderSentiment>=3.3.0",
+    "jinja2>=3.0.0",
+    "litellm>=1.0.0",
+    "openai>=1.0.0",
+    "scikit-learn>=1.0.0",
+    "pydantic>=2.0.0",
+    "redis>=4.0.0"
+]
+
+[project.optional-dependencies]
+# Vector store backends
+chromadb = ["chromadb>=0.4.0"]
+
+# Optional dependencies for specific extractors
+gliner = ["gliner>=0.1.0"]
+rebel = ["transformers>=4.0.0"]
+relik = ["relik>=0.1.0"]
+
+# Optional dependencies for integrations
+slack = ["slack-sdk>=3.0.0"]
+aws = ["boto3>=1.26.0"]
+wikipedia = ["wikipedia-api>=0.6.0"]
+smolagents = ["smolagents>=0.1.0"]
+
+# CLI tools
+cli = [
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "tabulate>=0.9.0"
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "build>=0.10.0",
+    "twine>=4.0.0"
+]
+
+# All optional dependencies
+all = [
+    "chromadb>=0.4.0",
+    "gliner>=0.1.0",
+    "transformers>=4.0.0",
+    "relik>=0.1.0",
+    "slack-sdk>=3.0.0",
+    "boto3>=1.26.0",
+    "wikipedia-api>=0.6.0",
+    "smolagents>=0.1.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "tabulate>=0.9.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "build>=0.10.0",
+    "twine>=4.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/smart-memory/smart-memory"
+Documentation = "https://docs.smartmemory.ai"
+Repository = "https://github.com/smart-memory/smart-memory"
+"Bug Tracker" = "https://github.com/smart-memory/smart-memory/issues"
+
+# Entry points for external plugins
+[project.entry-points."smartmemory.plugins.enrichers"]
+# External plugins can register here
+
+[project.entry-points."smartmemory.plugins.evolvers"]
+# External plugins can register here
+
+[project.entry-points."smartmemory.plugins.extractors"]
+# External plugins can register here
+
+[project.entry-points."smartmemory.plugins.grounders"]
+# External plugins can register here
+
+[project.scripts]
+smartmemory = "smartmemory.cli:main"
+
+[tool.setuptools]
+packages = {find = {}}  # Auto-discover all packages
+
+[tool.setuptools.package-data]
+smartmemory = [
+    "py.typed",
+    "**/*.json",
+    "**/*.yaml",
+    "**/*.yml"
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

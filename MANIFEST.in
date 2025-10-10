@@ -1,0 +1,31 @@
+# Include documentation
+include README.md
+include LICENSE
+include LICENSE.agpl-v3
+include CLA.md
+
+# Include configuration examples
+include .env.example
+include config.json
+
+# Include package data
+recursive-include smartmemory *.json
+recursive-include smartmemory *.yaml
+recursive-include smartmemory *.yml
+recursive-include smartmemory py.typed
+
+# Exclude development and test files
+exclude .gitignore
+exclude pytest.ini
+exclude docker-compose.yml
+exclude add_license_headers.py
+recursive-exclude tests *
+recursive-exclude examples *
+recursive-exclude docs *
+recursive-exclude .git *
+recursive-exclude .idea *
+recursive-exclude .pytest_cache *
+recursive-exclude __pycache__ *
+global-exclude *.pyc
+global-exclude *.pyo
+recursive-exclude *.egg-info *
