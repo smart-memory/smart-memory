@@ -1,0 +1,14 @@
+# chromadb - now optional, install with: pip install smartmemory[chromadb]
+smolagents
+wikipedia-api
+python-dateutil
+slack-sdk
+spacy
+vaderSentiment
+falkordb
+jinja2
+litellm
+openai
+scikit-learn
+slack_sdk
+boto3
