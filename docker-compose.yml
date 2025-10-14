@@ -8,7 +8,7 @@ services:
     container_name: smartmemory-falkordb
     ports:
       - "9010:9010"  # Unified FalkorDB port (external:internal)
-      - "${FALKORDB_WEB_PORT:-3000}:3000"  # FalkorDB browser interface
+      # - "${FALKORDB_WEB_PORT:-3000}:3000"  # FalkorDB browser interface
     environment:
       - FALKORDB_ARGS=${FALKORDB_ARGS:--port 9010 --bind 0.0.0.0 --protected-mode no}
     volumes:
