@@ -59,7 +59,9 @@ class WikipediaEnricher(EnricherPlugin):
         wiki_data = {}
         provenance_candidates = []
         for entity, article in wiki_articles.items():
-            if article.get('exists'):
+            # Check if article exists (either 'exists' is True or article has content)
+            exists = article.get('exists', True) if article.get('exists') is not None else bool(article.get('summary'))
+            if exists:
                 wikipedia_node_id = f"wikipedia:{entity.replace(' ', '_').lower()}"
                 node_properties = {
                     'entity': entity,
@@ -71,6 +73,7 @@ class WikipediaEnricher(EnricherPlugin):
                 if hasattr(self, 'graph') and self.graph is not None:
                     self.graph.add_node(item_id=wikipedia_node_id, properties=node_properties)
                 wiki_data[entity] = {
+                    'exists': True,
                     'summary': node_properties['summary'],
                     'categories': node_properties['categories'],
                     'url': node_properties['url'],

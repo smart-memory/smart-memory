@@ -78,6 +78,9 @@ class LLMExtractorConfig(MemoryBaseModel):
     use_allowed_edge_types: bool = False  # default: open-set predicates with recall-maximizing guidance
     # Control whether to inject the full ENTITY_TYPES list into prompts (can be very long)
     include_entity_types_in_prompt: bool = False
+    # NOTE: Entity type validation has been moved to pipeline stages (EntityValidationStage)
+    # This allows validation to be applied to ANY extractor, not just LLM
+    # See: smartmemory/memory/pipeline/stages/validation.py
     # Hint to provider/models that support reasoning controls
     reasoning_effort: Optional[str] = "minimal"
     # Prompt keys for the prompt provider
@@ -319,9 +322,8 @@ class LLMExtractor(ExtractorPlugin):
                 if isinstance(e, dict):
                     ename = (e.get('name') or '').strip()
                     etype = (e.get('entity_type') or 'concept').strip().lower()
-                    if etype not in ENTITY_TYPES:
-                        logger.warning(f"Unknown entity_type '{etype}' from LLM; defaulting to 'concept'")
-                        etype = 'concept'
+                    # No validation here - trust the LLM
+                    # Validation is now handled by EntityValidationStage in the pipeline
                     conf = e.get('confidence')
                     attrs = e.get('attrs') or {}
                     if ename:
