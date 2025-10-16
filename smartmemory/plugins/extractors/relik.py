@@ -55,7 +55,7 @@ class RelikExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            dict: Dictionary with 'entities' and 'triples' keys
+            dict: Dictionary with 'entities' and 'relations' keys
         """
         self._load_model()
         output = self.model(text)
@@ -63,11 +63,4 @@ class RelikExtractor(ExtractorPlugin):
         entities = list(set([t[0] for t in triples_raw] + [t[2] for t in triples_raw]))
         relations = [(t[0], t[1], t[2]) for t in triples_raw]
         
-        triples = []
-        for rel in relations:
-            if isinstance(rel, dict) and {'subject', 'predicate', 'object'} <= set(rel):
-                triples.append((rel['subject'], rel['predicate'], rel['object']))
-            elif isinstance(rel, (list, tuple)) and len(rel) == 3:
-                triples.append(tuple(rel))
-        
-        return {'entities': entities, 'relationships': triples}
+        return {'entities': entities, 'relations': relations}

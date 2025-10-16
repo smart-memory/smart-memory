@@ -177,8 +177,8 @@ def run_ontology_llm(
         json_only_instruction=json_only_instruction
                               or (
                                       (user_content or "")
-                                      + "\n\nReturn ONLY a JSON object with keys 'entities' and 'relationships'. "
-                                        "Do not include markdown fences or commentary. If none found, return {\"entities\": [], \"relationships\": []}."
+                                      + "\n\nReturn ONLY a JSON object with keys 'entities' and 'relations'. "
+                                        "Do not include markdown fences or commentary. If none found, return {\"entities\": [], \"relations\": []}."
                               ),
         response_format=rf,
         max_output_tokens=max_output_tokens,

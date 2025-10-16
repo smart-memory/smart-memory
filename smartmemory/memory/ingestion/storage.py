@@ -68,31 +68,31 @@ class StoragePipeline:
         # Graph storage is handled separately by the memory system
         # No need to duplicate storage here
 
-    def process_extracted_triples(self, context: Dict[str, Any], item_id: str, triples: List[Any]):
+    def process_extracted_relations(self, context: Dict[str, Any], item_id: str, relations: List[Any]):
         """
-        Process extracted triples to create relationships in the graph.
+        Process extracted relations to create relationships in the graph.
         This method is always active regardless of ontology settings.
         """
-        if not triples:
+        if not relations:
             return
 
         # Use SmartGraph API for relationship creation (handles validation/caching)
         graph = self.memory._graph
 
-        for triple in triples:
+        for relation in relations:
             try:
-                # Handle different triple formats
-                if isinstance(triple, (list, tuple)) and len(triple) == 3:
-                    subject, predicate, object_node = triple
-                elif isinstance(triple, dict):
-                    subject = triple.get('subject') or triple.get('source')
-                    predicate = triple.get('predicate') or triple.get('relation') or triple.get('type')
-                    object_node = triple.get('object') or triple.get('target')
+                # Handle different relation formats
+                if isinstance(relation, dict):
+                    subject = relation.get('source_id') or relation.get('subject') or relation.get('source')
+                    predicate = relation.get('relation_type') or relation.get('predicate') or relation.get('type')
+                    object_node = relation.get('target_id') or relation.get('object') or relation.get('target')
+                elif isinstance(relation, (list, tuple)) and len(relation) == 3:
+                    subject, predicate, object_node = relation
                 else:
-                    continue  # Skip invalid triples
+                    continue  # Skip invalid relations
 
                 if not all([subject, predicate, object_node]):
-                    continue  # Skip incomplete triples
+                    continue  # Skip incomplete relations
 
                 # Sanitize relationship type
                 predicate = ingestion_utils.sanitize_relation_type(predicate)

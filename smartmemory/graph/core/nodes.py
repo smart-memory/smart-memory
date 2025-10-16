@@ -116,7 +116,7 @@ class SmartGraphNodes:
                 try:
                     if entity_nodes:
                         for en in entity_nodes:
-                            rels = en.get('relationships', []) if isinstance(en, dict) else []
+                            rels = en.get('relations', []) if isinstance(en, dict) else []
                             try:
                                 sem_rel_count += len(rels)
                             except Exception:

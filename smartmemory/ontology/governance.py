@@ -347,8 +347,8 @@ class OntologyGovernor:
         relationships = []
 
         if hasattr(item, 'metadata') and item.metadata:
-            if 'relationships' in item.metadata:
-                relationships = item.metadata['relationships']
+            if 'relations' in item.metadata:
+                relationships = item.metadata['relations']
 
         return relationships
 

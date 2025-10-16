@@ -7,11 +7,14 @@ This module handles all enrichment operations including:
 - Creating derivative items
 - Wikipedia grounding operations
 """
+import logging
 from datetime import datetime
 from typing import Dict, Any
 
 from smartmemory.memory.ingestion import utils as ingestion_utils
 from smartmemory.models.memory_item import MemoryItem
+
+logger = logging.getLogger(__name__)
 
 
 class EnrichmentPipeline:
@@ -69,13 +72,18 @@ class EnrichmentPipeline:
                     properties=edge_props,
                 )
 
-                # If the new item has relations/triples, add them to the graph
-                if hasattr(mem_item, 'relations') and mem_item.relations:
-                    new_context = {'item': mem_item, 'semantic_relations': mem_item.relations}
-                    if 'enrichment_result' in context:
-                        new_context['enrichment_result'] = enrichment_result
-                    # Note: This would need to be handled by the storage pipeline
-                    # self._add_triples(new_context)
+        # Process relations returned by enrichers
+        if enrichment_result and 'relations' in enrichment_result:
+            for rel in enrichment_result['relations']:
+                try:
+                    self.memory._graph.add_edge(
+                        source_id=rel.get('source_id'),
+                        target_id=rel.get('target_id'),
+                        edge_type=ingestion_utils.sanitize_relation_type(rel.get('relation_type', 'RELATED')),
+                        properties=rel.get('properties', {})
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to add enrichment relation: {e}")
 
         return enrichment_result
 

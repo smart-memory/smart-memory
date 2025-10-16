@@ -125,13 +125,13 @@ class SpacyExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            dict: Dictionary with 'entities' and 'triples' keys
+            dict: Dictionary with 'entities' and 'relations' keys
         """
         import re
         
         nlp = self.nlp
         entities = []  # list[dict{name, type}]
-        triples = []
+        relations = []
         if nlp is not None:
             try:
                 doc = nlp(text)
@@ -153,7 +153,7 @@ class SpacyExtractor(ExtractorPlugin):
                             'end': ent.end_char
                         })
                 entities = typed_entities
-                # Build relations/triples using dependency parse when tags are available
+                # Build relations/relations using dependency parse when tags are available
                 if entities and any(getattr(t, 'pos_', None) for t in doc):
                     try:
                         entity_tokens = {token.i for ent in ents for token in ent}
@@ -171,17 +171,17 @@ class SpacyExtractor(ExtractorPlugin):
                                         if getattr(child, 'dep_', '') in ('dobj', 'attr', 'oprd', 'pobj') and child.i in entity_tokens:
                                             obj = child
                                     if subj and obj:
-                                        triples.append((subj.text, token.lemma_, obj.text))
+                                        relations.append((subj.text, token.lemma_, obj.text))
                                         svo_found = True
                             if not svo_found and len(sent_ents) > 1:
                                 for i in range(len(sent_ents) - 1):
-                                    triples.append((sent_ents[i].text, 'related_to', sent_ents[i + 1].text))
+                                    relations.append((sent_ents[i].text, 'related_to', sent_ents[i + 1].text))
                     except Exception:
                         pass
             except Exception:
                 # If spaCy pipeline fails at runtime, we'll fallback to regex below
                 entities = []
-                triples = []
+                relations = []
 
         # If spaCy didn't run or didn't produce entities, fall back to regex-based entities and co-occurrence
         if not entities:
@@ -201,6 +201,6 @@ class SpacyExtractor(ExtractorPlugin):
                 sent_ents = [e['text'] for e in entities if e['text'] in sent]
                 if len(sent_ents) > 1:
                     for i in range(len(sent_ents) - 1):
-                        triples.append((sent_ents[i], 'related_to', sent_ents[i + 1]))
+                        relations.append((sent_ents[i], 'related_to', sent_ents[i + 1]))
 
-        return {'entities': entities, 'relationships': triples}
+        return {'entities': entities, 'relations': relations}

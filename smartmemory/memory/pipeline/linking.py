@@ -107,7 +107,7 @@ class LinkingEngine(PipelineComponent[LinkingConfig]):
         Execute LinkingEngine with given storage state and configuration.
         
         Args:
-            storage_state: StorageState from previous stage with stored nodes/triples
+            storage_state: StorageState from previous stage with stored nodes/relations
             config: Linking configuration dict
         
         Returns:
@@ -123,7 +123,7 @@ class LinkingEngine(PipelineComponent[LinkingConfig]):
                 'entity_ids': storage_state.data.get('entity_ids', {}),
                 'edges_created': storage_state.data.get('edges_created', 0),
                 'stored_nodes': storage_state.data.get('stored_nodes', []),
-                'stored_triples': storage_state.data.get('stored_triples', []),
+                'stored_relations': storage_state.data.get('stored_relations', []),
                 'storage_metadata': storage_state.data.get('storage_metadata', {})
             }
 
@@ -158,7 +158,7 @@ class LinkingEngine(PipelineComponent[LinkingConfig]):
             # semantic_relations
             if 'semantic_relations' not in entity_ids:
                 semantic_relations = []
-                for e in context.get('stored_triples', []) or []:
+                for e in context.get('stored_relations', []) or []:
                     if isinstance(e, dict):
                         src = e.get('source') or e.get('src') or e.get('from')
                         tgt = e.get('target') or e.get('tgt') or e.get('to')

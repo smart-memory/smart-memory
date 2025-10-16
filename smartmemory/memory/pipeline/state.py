@@ -45,7 +45,7 @@ class ExtractionState(ComponentResult):
 class StorageState(ComponentResult):
     """State after StorageEngine stage"""
     stored_nodes: List[Dict[str, Any]] = field(default_factory=list)
-    stored_triples: List[Dict[str, Any]] = field(default_factory=list)
+    stored_relations: List[Dict[str, Any]] = field(default_factory=list)
     storage_metadata: Dict[str, Any] = field(default_factory=dict)
 
 

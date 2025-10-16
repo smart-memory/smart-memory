@@ -22,11 +22,13 @@ from smartmemory.utils.llm import run_ontology_llm
 logger = logging.getLogger(__name__)
 
 
-class LLMExtractor:
+class OntologyExtractor:
     """
-    Advanced LLM-based extractor that can use the rich ontology schema
-    for intelligent entity classification and semantic relationship
-    extraction (or not).
+    Ontology-aware LLM-based extractor that uses the rich ontology schema
+    for intelligent entity classification and semantic relationship extraction.
+    
+    This extractor produces typed entities (OntologyNode) with semantic relationships.
+    For simpler extraction without ontology, use LLMExtractor from plugins.extractors.
     """
 
     def __init__(self):
@@ -151,7 +153,7 @@ class LLMExtractor:
                 logger.debug(f"LLM extraction response: {raw_response}")
 
                 # Robust JSON parsing with safe fallbacks
-                llm_data = {"entities": [], "relationships": []}
+                llm_data = {"entities": [], "relations": []}
                 try:
                     if isinstance(raw_response, str) and raw_response.strip():
                         llm_data = json.loads(raw_response)
@@ -165,11 +167,11 @@ class LLMExtractor:
                         llm_data = self._parse_function_style_response(raw_response or "")
                     except Exception as fe:
                         logger.error(f"Non-JSON fallback parse also failed: {fe}; returning empty results")
-                        llm_data = {"entities": [], "relationships": []}
+                        llm_data = {"entities": [], "relations": []}
 
             # Convert LLM output to ontology nodes
             entities = self._create_ontology_nodes(llm_data.get('entities', []), user_id)
-            relations = self._process_relations(llm_data.get('relationships', []), entities)
+            relations = self._process_relations(llm_data.get('relations', []), entities)
 
             result = {
                 'entities': entities,
@@ -188,7 +190,15 @@ class LLMExtractor:
 
     # Convenience helpers to map results into Studio-friendly JSON structures
     def to_nodes_and_triples(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert the extractor result (entities + relations) into nodes/triples JSON."""
+        """Convert the extractor result (entities + relations) into nodes/triples JSON.
+        
+        Note: This returns 'triples' for backward compatibility with Studio UI.
+        Internally, the system uses 'relations'.
+        
+        TODO: This method is currently unused. If needed for API projections,
+        migrate to service layer as a presentation concern, not core extraction logic.
+        Consider deprecating or moving to a separate adapter module.
+        """
         entities = result.get('entities', [])
         relations = result.get('relations', [])
 
@@ -258,7 +268,7 @@ class LLMExtractor:
         add_entity("Apple Inc.", "organization")
         add_triple("Apple Inc.", "is_a", "technology company")
 
-        Returns a dict with 'entities' and 'relationships' keys compatible with downstream processing.
+        Returns a dict with 'entities' and 'relations keys compatible with downstream processing.
         Raises ValueError if nothing could be parsed.
         """
         entities: Dict[str, Dict[str, Any]] = {}
@@ -300,14 +310,14 @@ class LLMExtractor:
                     })
 
         if not entities and not relationships:
-            raise ValueError("LLM returned invalid JSON and non-JSON fallback parse found no entities/relationships")
+            raise ValueError("LLM returned invalid JSON and non-JSON fallback parse found no entities/relations")
 
         # Convert dict to list
         ent_list = list(entities.values())
-        return {'entities': ent_list, 'relationships': relationships}
+        return {'entities': ent_list, 'relations': relationships}
 
     def _get_response_schema(self) -> Dict[str, Any]:
-        """JSON Schema for structured outputs enforcing entities/relationships shape."""
+        """JSON Schema for structured outputs enforcing entities/relations shape."""
         return {
             "name": "ontology_response",
             "schema": {
@@ -318,16 +328,15 @@ class LLMExtractor:
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "additionalProperties": False,
                             "properties": {
                                 "name": {"type": "string"},
                                 "type": {"type": "string"},
-                                "properties": {"type": "object"}
+                                "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                             },
                             "required": ["name", "type"],
                         }
                     },
-                    "relationships": {
+                    "relations": {
                         "type": "array",
                         "items": {
                             "type": "object",
@@ -342,7 +351,7 @@ class LLMExtractor:
                         }
                     }
                 },
-                "required": ["entities", "relationships"],
+                "required": ["entities", "relations"],
             },
             "strict": False,
         }
@@ -488,4 +497,4 @@ class LLMExtractor:
 
 def create_ontology_aware_extractor():
     """Factory function to create the ontology-aware extractor (LLM-based)."""
-    return LLMExtractor()
+    return OntologyExtractor()

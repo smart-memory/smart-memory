@@ -120,7 +120,6 @@ def extract_payload_for_instrumentation(context: Dict[str, Any]) -> Dict[str, An
     try:
         return {
             'entities_count': len(context.get('entities', [])),
-            'triples_count': len(context.get('triples', [])),
             'relations_count': len(context.get('relations', [])),
             'item_id': context.get('item_id'),
             'memory_type': context.get('memory_type', 'semantic'),

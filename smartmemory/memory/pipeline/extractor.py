@@ -205,7 +205,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
 
             return {
                 'entities': entities,
-                'triples': [(r['source_id'], r['relation_type'], r['target_id']) for r in relations],
                 'relations': relations
             }
 
@@ -229,13 +228,11 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
             # Normalize different output formats
             if isinstance(fb_res, dict):
                 fb_entities = fb_res.get('entities', [])
-                fb_triples = fb_res.get('triples', [])
                 fb_relations = fb_res.get('relations', [])
             elif isinstance(fb_res, tuple) and len(fb_res) == 3:
                 _it, fb_entities, fb_relations = fb_res
-                fb_triples = [rel for rel in fb_relations if isinstance(rel, (list, tuple)) and len(rel) == 3]
             else:
-                fb_entities, fb_triples, fb_relations = [], [], []
+                fb_entities, fb_relations = [], []
 
             # Convert entities to MemoryItem objects for consistency
             converted_entities = []
@@ -274,17 +271,15 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                     ))
 
             # Return if we got any results
-            if converted_entities or fb_triples or fb_relations:
+            if converted_entities or fb_relations:
                 return {
                     'entities': converted_entities,
-                    'triples': fb_triples,
                     'relations': fb_relations
                 }
 
         # Nothing worked - return empty results
         return {
             'entities': [],
-            'triples': [],
             'relations': []
         }
 
@@ -360,7 +355,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                 'extractor_requested': extractor_name,
                 'extractor_used': extractor_name,  # TODO: track actual extractor used in fallback
                 'entities_found': len(extraction_result['entities']),
-                'triples_found': len(extraction_result['triples']),
                 'relations_found': len(extraction_result['relations']),
                 'fallback_available': len(fallback_order) > 0
             }
@@ -371,7 +365,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                     'memory_item': memory_item,  # Pass memory_item forward for storage
                     'entities': extraction_result['entities'],
                     'relations': extraction_result['relations'],
-                    'triples': extraction_result['triples'],
                     'extraction_metadata': extraction_metadata,
                     'extractor_used': extractor_name
                 },

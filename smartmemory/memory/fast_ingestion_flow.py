@@ -65,7 +65,6 @@ class FastIngestionFlow(MemoryIngestionFlow):
 
         # 2. Quick semantic extraction (cached/lightweight only)
         entities = []
-        triples = []
         relations = []
         ontology_extraction = {}
 
@@ -75,19 +74,17 @@ class FastIngestionFlow(MemoryIngestionFlow):
                 extraction = self._extract_semantics_fast(item, extractor_name)
                 if extraction:
                     entities = extraction.get('entities', [])
-                    triples = extraction.get('triples', [])
                     relations = extraction.get('relations', [])
                     ontology_extraction = {
                         'entities': entities,
                         'relations': relations,
-                        'triples': triples
                     }
             except Exception as e:
                 # Fail fast on extraction errors in fast path
                 raise
 
         context['entities'] = entities
-        context['triples'] = triples
+        context['relations'] = relations
         context['ontology_extraction'] = ontology_extraction
 
         # 3. Immediate creation via CRUD (dual-node by default)
@@ -471,9 +468,9 @@ class FastIngestionFlow(MemoryIngestionFlow):
                 except Exception as e:
                     self.logger.error(f"CRUD update failed for {memory_id}: {e}")
 
-            # Create new relationships if specified
-            if 'relationships' in enrichment_result:
-                for rel in enrichment_result['relationships']:
+            # Create new relations if specified
+            if 'relations' in enrichment_result:
+                for rel in enrichment_result['relations']:
                     self.memory.add_edge(
                         source_id=rel['source_id'],
                         target_id=rel['target_id'],

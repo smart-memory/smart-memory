@@ -275,7 +275,7 @@ class Pipeline:
                 metadata=result.metadata,
                 execution_time=result.execution_time,
                 stored_nodes=result.data.get('stored_nodes', []),
-                stored_triples=result.data.get('stored_triples', []),
+                stored_relations=result.data.get('stored_relations', []),
                 storage_metadata=result.data.get('storage_metadata', {})
             )
 

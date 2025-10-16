@@ -49,7 +49,7 @@ class RegexExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            Dictionary with 'entities' and 'triples' keys
+            Dictionary with 'entities' and 'relations' keys
         """
         entities = []
         
@@ -82,7 +82,7 @@ class RegexExtractor(ExtractorPlugin):
         
         return {
             'entities': entities,
-            'triples': []  # No relationships extracted
+            'relations': []  # No relationships extracted
         }
 
 
@@ -134,7 +134,7 @@ class CustomNERExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            Dictionary with 'entities' and 'triples' keys
+            Dictionary with 'entities' and 'relations' keys
         """
         entities = []
         triples = []
@@ -174,7 +174,7 @@ class CustomNERExtractor(ExtractorPlugin):
         
         return {
             'entities': entities,
-            'triples': triples
+            'relations': triples  # Return as relations (list of tuples)
         }
 
 
@@ -204,6 +204,6 @@ if __name__ == "__main__":
     print(f"  Entities found: {len(result2['entities'])}")
     for entity in result2['entities']:
         print(f"    - {entity['type']}: {entity['name']}")
-    print(f"  Relationships found: {len(result2['triples'])}")
-    for triple in result2['triples']:
+    print(f"  Relations found: {len(result2['relations'])}")
+    for triple in result2['relations']:
         print(f"    - {triple[0]} --[{triple[1]}]--> {triple[2]}")

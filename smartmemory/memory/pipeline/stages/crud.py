@@ -176,7 +176,35 @@ class CRUD(BaseHandler):
         self._graph.add_node(item_id=key, properties=properties, memory_type=memory_type)
 
     def delete(self, item_id: str, **kwargs) -> bool:
+        """Delete memory item and cascade to vector store and Vec_* nodes."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 1. Delete from graph (DETACH DELETE removes edges automatically)
         self._graph.remove_node(item_id)
+        
+        # 2. Delete from vector store
+        try:
+            from smartmemory.stores.vector.vector_store import VectorStore
+            vector_store = VectorStore()
+            vector_store.delete(item_id)
+            logger.debug(f"Deleted vector embedding for {item_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete vector for {item_id}: {e}")
+        
+        # 3. Delete Vec_* graph nodes that reference this item_id
+        try:
+            # Query for Vec_* nodes with this item_id in metadata
+            if hasattr(self._graph, 'backend'):
+                backend = self._graph.backend
+                # FalkorDB query to find and delete Vec_* nodes
+                query = "MATCH (v) WHERE v.id = $item_id OR v.item_id = $item_id DELETE v"
+                if hasattr(backend, '_query'):
+                    backend._query(query, {'item_id': item_id})
+                    logger.debug(f"Deleted Vec_* nodes for {item_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete Vec_* nodes for {item_id}: {e}")
+        
         return True
 
     def add_tags(self, item_id: str, tags: list) -> bool:

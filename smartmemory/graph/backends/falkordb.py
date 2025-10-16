@@ -724,7 +724,7 @@ class FalkorDBBackend(SmartGraphBackend):
             for i, entity_node in enumerate(entity_nodes):
                 entity_type = entity_node.get('entity_type', 'Entity')
                 entity_props = entity_node.get('properties') or {}
-                entity_relationships = entity_node.get('relationships', [])
+                entity_relationships = entity_node.get('relations', [])
 
                 # Generate unique entity ID
                 entity_id = f"{item_id}_entity_{i}"
@@ -833,7 +833,7 @@ class FalkorDBBackend(SmartGraphBackend):
                 entity_label = entity_type.capitalize()
                 entity_id = f"{item_id}_entity_{i}"
 
-                entity_relationships = entity_node.get('relationships', [])
+                entity_relationships = entity_node.get('relations', [])
                 for rel in entity_relationships:
                     target_idx = rel.get('target_index')
                     rel_type = rel.get('relation_type', 'RELATED')

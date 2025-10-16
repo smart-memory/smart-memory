@@ -5,8 +5,9 @@ This module extracts entities and SPO triples from text using JSON-structured pr
 via the shared call_llm helper, and optionally falls back to a stricter JSON-mode prompt.
 It returns a dict with keys:
   - 'entities': List[MemoryItem] where metadata includes 'name', 'entity_type', 'confidence', optional attrs
-  - 'triples': List[Tuple[str, str, str]] normalized predicates
   - 'relations': List[Dict] with 'source_id', 'target_id', 'relation_type' matching entity MemoryItem.item_id
+  
+Note: 'triples' are derived from 'relations' at point of use, not returned by extractors.
 
 Improvements:
 - Typed configuration via LLMExtractorConfig (no getattr/dict spelunking)
@@ -120,10 +121,9 @@ class LLMExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            dict: Dictionary with 'entities', 'triples', and 'relations' keys
+            dict: Dictionary with 'entities' and 'relations' keys
         """
         content = text
-        
         # Try Redis cache first for significant performance improvement
         try:
             cache = get_cache()
@@ -131,9 +131,14 @@ class LLMExtractor(ExtractorPlugin):
             # Check cache for existing extraction results
             cached_result = cache.get_entity_extraction(content)
             if cached_result is not None:
-                if cached_result.get('entities') or cached_result.get('relationships'):
+                # Validate cache has expected structure
+                has_entities = cached_result.get('entities') or []
+                has_relations = cached_result.get('relations') or []
+                if has_entities or has_relations:
                     logger.debug(f"Cache hit for entity extraction: {content[:50]}...")
                     return cached_result
+                else:
+                    logger.debug(f"Cache hit but empty result, re-extracting: {content[:50]}...")
 
             logger.debug(f"Cache miss for entity extraction: {content[:50]}...")
         except Exception as e:
@@ -203,7 +208,6 @@ class LLMExtractor(ExtractorPlugin):
 
         # Accumulators
         entity_map = {}  # key: (name_lower, type) -> MemoryItem
-        triples = []
         relations = []
 
         def _entity_key(name: str, etype: str) -> str:
@@ -232,11 +236,11 @@ class LLMExtractor(ExtractorPlugin):
             response_model=None,
             response_format={"type": "json_object"},
             json_only_instruction=(
-                "Return ONLY a JSON object with keys 'entities' (list) and 'triples' (list).\n"
+                "Return ONLY a JSON object with keys 'entities' (list) and 'relations' (list).\n"
                 "Each entity: {name: str, entity_type: str, confidence?: number [0,1], attrs?: object}.\n"
-                "Each triple: {subject: str, predicate: str, object: str, subject_ref?: int, object_ref?: int, subject_type?: str, object_type?: str, "
+                "Each relation: {subject: str, predicate: str, object: str, subject_ref?: int, object_ref?: int, subject_type?: str, object_type?: str, "
                 "polarity?: 'positive'|'negative'}.\n"
-                "Do not include markdown or commentary. If none found, return {\"entities\": [], \"triples\": []}."
+                "Do not include markdown or commentary. If none found, return {\"entities\": [], \"relations\": []}."
             ),
             max_output_tokens=self.cfg.max_tokens,
             reasoning_effort=self.cfg.reasoning_effort,
@@ -287,10 +291,10 @@ class LLMExtractor(ExtractorPlugin):
                     response_model=None,
                     response_format={"type": "json_object"},
                     json_only_instruction=(
-                        "Return ONLY a JSON object with keys 'entities' (list) and 'triples' (list).\n"
+                        "Return ONLY a JSON object with keys 'entities' (list) and 'relations' (list).\n"
                         "Each entity: {name: str, entity_type: str, confidence?: number [0,1], attrs?: object}.\n"
                         "Each triple: {subject: str, predicate: str, object: str, subject_ref?: int, object_ref?: int, subject_type?: str, object_type?: str, polarity?: 'positive'|'negative'}.\n"
-                        "Do not include markdown or commentary. If none found, return {\"entities\": [], \"triples\": []}."
+                        "Do not include markdown or commentary. If none found, return {\"entities\": [], \"relations\": []}."
                     ),
                     max_output_tokens=self.cfg.json_max_tokens,
                     reasoning_effort=self.cfg.reasoning_effort,
@@ -340,7 +344,7 @@ class LLMExtractor(ExtractorPlugin):
                     name_type_to_id.setdefault((ename.lower(), etype), mi.item_id)
                     idx_to_id[idx] = mi.item_id
 
-            trs_in = data.get('triples') or []
+            trs_in = data.get('relations') or []
             for t in trs_in:
                 if isinstance(t, dict):
                     s_raw = (t.get('subject') or '').strip()
@@ -368,9 +372,6 @@ class LLMExtractor(ExtractorPlugin):
                 else:
                     continue
                 if s_raw and p and o_raw:
-                    # Keep triple record (strings) for compatibility
-                    triples.append((s_raw, p, o_raw))
-
                     # Resolve subject id
                     sid = None
                     if isinstance(s_ref, int) and s_ref in idx_to_id:
@@ -408,10 +409,10 @@ class LLMExtractor(ExtractorPlugin):
         # Finalize entities list after any implicit additions
         entities = list(entity_map.values())
 
-        # Path A: standardize on entities/relationships. Entities are MemoryItem objects.
+        # Return format: entities (MemoryItem objects) and relations (list of dicts)
         extraction_result = {
             'entities': entities,
-            'relationships': relations,  # Standardized key
+            'relations': relations,
         }
 
         # Cache the result for future use

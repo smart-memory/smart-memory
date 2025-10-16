@@ -67,7 +67,7 @@ class TestSpacyExtractor:
         
         assert isinstance(result, dict)
         assert 'entities' in result
-        assert 'relationships' in result
+        assert 'relations' in result
         assert len(result['entities']) == 1
         assert result['entities'][0]['text'] == "Apple"
         assert result['entities'][0]['type'] == "organization"
@@ -97,7 +97,7 @@ class TestSpacyExtractor:
         
         assert len(result['entities']) == 2
         # Relationships are extracted based on proximity
-        assert isinstance(result['relationships'], list)
+        assert isinstance(result['relations'], list)
     
     def test_extract_empty_text(self, extractor, mock_spacy_model):
         """Test extraction with empty text."""
@@ -108,7 +108,7 @@ class TestSpacyExtractor:
         result = extractor.extract("")
         
         assert result['entities'] == []
-        assert result['relationships'] == []
+        assert result['relations'] == []
     
     def test_entity_type_mapping(self, extractor):
         """Test entity type mapping."""
@@ -129,7 +129,7 @@ class TestLLMExtractor:
         mock_response = Mock()
         mock_response.choices = [Mock()]
         mock_response.choices[0].message = Mock()
-        mock_response.choices[0].message.content = '{"entities": [], "relationships": []}'
+        mock_response.choices[0].message.content = '{"entities": [], "relations": []}'
         
         mock_client = Mock()
         mock_client.chat.completions.create.return_value = mock_response
@@ -154,7 +154,7 @@ class TestLLMExtractor:
             "entities": [
                 {"text": "Python", "type": "technology", "start": 0, "end": 6}
             ],
-            "relationships": []
+            "relations": []
         }
         
         with patch('litellm.completion') as mock_completion:
@@ -164,7 +164,7 @@ class TestLLMExtractor:
             
             assert isinstance(result, dict)
             assert 'entities' in result
-            assert 'relationships' in result
+            assert 'relations' in result
     
     def test_extract_error_handling(self, extractor):
         """Test error handling in LLM extraction."""
@@ -173,7 +173,7 @@ class TestLLMExtractor:
             
             # Should return empty result on error
             assert result['entities'] == []
-            assert result['relationships'] == []
+            assert result['relations'] == []
 
 
 class TestRebelExtractor:
@@ -209,7 +209,7 @@ class TestRebelExtractor:
         
         assert isinstance(result, dict)
         assert 'entities' in result
-        assert 'relationships' in result
+        assert 'relations' in result
     
     def test_parse_triplets(self, extractor):
         """Test triplet parsing."""
@@ -258,9 +258,9 @@ class TestRelikExtractor:
         
         assert isinstance(result, dict)
         assert 'entities' in result
-        assert 'relationships' in result
+        assert 'relations' in result
         assert len(result['entities']) == 2  # Python and language
-        assert len(result['relationships']) == 1
+        assert len(result['relations']) == 1
 
 
 class TestExtractorComparison:
@@ -268,8 +268,8 @@ class TestExtractorComparison:
     
     def test_output_format_consistency(self):
         """Test all extractors return consistent format."""
-        # All extractors should return dict with 'entities' and 'relationships'
-        required_keys = {'entities', 'relationships'}
+        # All extractors should return dict with 'entities' and 'relations'
+        required_keys = {'entities', 'relations'}
         
         # This would be tested with actual extractors
         # For now, verify the interface

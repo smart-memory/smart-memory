@@ -35,7 +35,7 @@ class TestExtractionPipeline:
                     {'text': 'theory of relativity', 'type': 'concept', 'start': 34, 'end': 54},
                     {'text': '1905', 'type': 'temporal', 'start': 58, 'end': 62}
                 ],
-                'relationships': [
+                'relations': [
                     {'source': 'Albert Einstein', 'target': 'theory of relativity', 'type': 'developed'}
                 ]
             }
@@ -53,7 +53,7 @@ class TestExtractionPipeline:
             
             # Verify extraction
             assert len(extraction_result['entities']) == 3
-            assert len(extraction_result['relationships']) == 1
+            assert len(extraction_result['relations']) == 1
             
             # Verify entity types
             entity_types = [e['type'] for e in extraction_result['entities']]
@@ -72,7 +72,7 @@ class TestExtractionPipeline:
                     {'text': 'Python', 'type': 'technology', 'start': 0, 'end': 6},
                     {'text': 'Guido van Rossum', 'type': 'person', 'start': 44, 'end': 60}
                 ],
-                'relationships': [
+                'relations': [
                     {'source': 'Guido van Rossum', 'target': 'Python', 'type': 'created'}
                 ]
             }
@@ -82,7 +82,7 @@ class TestExtractionPipeline:
             
             # Verify extraction
             assert len(extraction_result['entities']) == 2
-            assert extraction_result['relationships'][0]['type'] == 'created'
+            assert extraction_result['relations'][0]['type'] == 'created'
     
     def test_extraction_error_handling(self, mock_memory):
         """Test pipeline handles extraction errors gracefully."""
@@ -116,17 +116,17 @@ class TestExtractionPipeline:
                 if "Python" in text:
                     return {
                         'entities': [{'text': 'Python', 'type': 'technology', 'start': 0, 'end': 6}],
-                        'relationships': []
+                        'relations': []
                     }
                 elif "JavaScript" in text:
                     return {
                         'entities': [{'text': 'JavaScript', 'type': 'technology', 'start': 0, 'end': 10}],
-                        'relationships': []
+                        'relations': []
                     }
                 else:
                     return {
                         'entities': [{'text': 'Java', 'type': 'technology', 'start': 0, 'end': 4}],
-                        'relationships': []
+                        'relations': []
                     }
             
             mock_extractor.extract.side_effect = mock_extract
@@ -150,7 +150,7 @@ class TestExtractionPipeline:
                     {'text': 'Python', 'type': 'technology', 'start': 14, 'end': 20},
                     {'text': 'data science', 'type': 'field', 'start': 25, 'end': 37}
                 ],
-                'relationships': []
+                'relations': []
             }
             MockExtractor.return_value = mock_extractor
             
@@ -183,7 +183,7 @@ class TestExtractionAccuracy:
                 # Mock extraction to return expected entities
                 mock_extractor.extract.return_value = {
                     'entities': case['expected_entities'],
-                    'relationships': []
+                    'relations': []
                 }
                 
                 result = mock_extractor.extract(case['text'])
@@ -211,7 +211,7 @@ class TestExtractionAccuracy:
             for case in test_cases:
                 mock_extractor.extract.return_value = {
                     'entities': [{'text': case['expected'], 'type': 'organization', 'start': 0, 'end': len(case['expected'])}],
-                    'relationships': []
+                    'relations': []
                 }
                 
                 result = mock_extractor.extract(case['text'])
@@ -239,13 +239,13 @@ class TestExtractionAccuracy:
                         {'text': 'Steve Jobs', 'type': 'person', 'start': 0, 'end': 10},
                         {'text': 'Apple', 'type': 'organization', 'start': 19, 'end': 24}
                     ],
-                    'relationships': [case['expected_relationship']]
+                    'relations': [case['expected_relationship']]
                 }
                 
                 result = mock_extractor.extract(case['text'])
                 
-                assert len(result['relationships']) == 1
-                rel = result['relationships'][0]
+                assert len(result['relations']) == 1
+                rel = result['relations'][0]
                 assert rel['source'] == case['expected_relationship']['source']
                 assert rel['target'] == case['expected_relationship']['target']
 
@@ -263,7 +263,7 @@ class TestExtractionPerformance:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [{'text': 'Python', 'type': 'technology', 'start': 0, 'end': 6}],
-                'relationships': []
+                'relations': []
             }
             MockExtractor.return_value = mock_extractor
             
@@ -283,7 +283,7 @@ class TestExtractionPerformance:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             MockExtractor.return_value = mock_extractor
             
@@ -308,7 +308,7 @@ class TestExtractionPerformance:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             MockExtractor.return_value = mock_extractor
             
