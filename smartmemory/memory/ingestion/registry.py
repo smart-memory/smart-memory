@@ -5,10 +5,13 @@ This module handles registration and management of extractors, enrichers, adapte
 and converters for the ingestion pipeline. It consolidates all registry logic and
 provides fallback mechanisms for extractor selection.
 """
+import logging
 from typing import Dict, List, Optional, Callable
 
 from smartmemory.observability.instrumentation import emit_after
 from smartmemory.utils import get_config
+
+logger = logging.getLogger(__name__)
 
 
 class IngestionRegistry:
@@ -20,65 +23,33 @@ class IngestionRegistry:
     """
 
     def __init__(self):
-        self.extractor_registry: Dict[str, Callable] = {}
+        # Store extractor classes for lazy loading
+        self.extractor_registry: Dict[str, type] = {}  # Class types
+        self.extractor_instances: Dict[str, any] = {}  # Instantiated extractors (cache)
+        
         self.enricher_registry: Dict[str, Callable] = {}
         self.adapter_registry: Dict[str, Callable] = {}
         self.converter_registry: Dict[str, Callable] = {}
         self._register_defaults()
 
     def _register_defaults(self):
-        """Register default extractors with graceful fallbacks for missing dependencies."""
-        # Register default extractors (e.g., 'spacy') which now loads config internally.
-        # Import each extractor in isolation so one missing module doesn't block others.
-
-        # spaCy
+        """Register default extractor classes for lazy loading."""
+        # Register classes instead of instances - instantiated only when first requested
+        
+        # Import classes (lightweight, no model loading)
         try:
-            from smartmemory.plugins import make_spacy_extractor
-            self.register_extractor('spacy', make_spacy_extractor())
-        except Exception:
-            pass
-
-        # GLiNER
-        try:
-            from smartmemory.plugins import make_gliner_extractor
-            self.register_extractor('gliner', make_gliner_extractor())
-        except Exception:
-            pass
-
-        # ReLiK
-        try:
-            from smartmemory.plugins.extractors.relik import make_relik_extractor
-            self.register_extractor('relik', make_relik_extractor())
-        except Exception:
-            pass
-
-        # Lightweight LLM extractor wrapper (if present)
-        try:
-            from smartmemory.plugins import make_llm_extractor
-            self.register_extractor('llm', make_llm_extractor())
-        except Exception:
-            pass
-
-        # Backward-compat: alias 'gpt4o_triple' to the consolidated 'llm' extractor
-        try:
-            from smartmemory.plugins import make_llm_extractor
-            self.register_extractor('gpt4o_triple', make_llm_extractor())
-        except Exception:
-            pass
-
-        # Ontology-aware extractor (LLM). Only register when API key configured and import succeeds.
-        try:
-            from smartmemory.extraction.extractor import create_ontology_aware_extractor
-            try:
-                llm_cfg = get_config('extractor').get('llm') or {}
-                if llm_cfg.get('openai_api_key'):
-                    self.register_extractor('ontology', create_ontology_aware_extractor())
-            except Exception:
-                # Be resilient to config import/validation errors; extractor is optional
-                pass
-        except Exception:
-            # Ontology extractor module unavailable; ignore
-            pass
+            from smartmemory.plugins.extractors import SpacyExtractor, LLMExtractor, RebelExtractor, RelikExtractor
+            from smartmemory.extraction.extractor import OntologyExtractor
+            
+            # Register extractor classes
+            self.register_extractor_class('spacy', SpacyExtractor)
+            self.register_extractor_class('llm', LLMExtractor)
+            self.register_extractor_class('gpt4o_triple', LLMExtractor)  # Alias
+            self.register_extractor_class('rebel', RebelExtractor)
+            self.register_extractor_class('relik', RelikExtractor)
+            self.register_extractor_class('ontology', OntologyExtractor)
+        except ImportError as e:
+            logger.warning(f"Failed to import some extractors: {e}")
 
     def register_adapter(self, name: str, adapter_fn: Callable):
         """Register a new input adapter by name."""
@@ -88,6 +59,11 @@ class IngestionRegistry:
         """Register a new type converter by name."""
         self.converter_registry[name] = converter_fn
 
+    def register_extractor_class(self, name: str, extractor_class: type):
+        """Register an extractor class for lazy instantiation."""
+        self.extractor_registry[name] = extractor_class
+        logger.debug(f"Registered extractor class: {name}")
+    
     def register_extractor(self, name: str, extractor_fn: Callable):
         """Register a new entity/relation extractor by name with performance instrumentation."""
         # Wrap extractor to emit performance metrics on each call without changing behavior
@@ -96,10 +72,10 @@ class IngestionRegistry:
                 try:
                     if isinstance(result, dict):
                         ents = result.get('entities', []) or []
-                        trips = result.get('triples', []) or []
+                        rels = result.get('relations', []) or []
                         return {
                             'entities_count': len(ents),
-                            'triples_count': len(trips),
+                            'relations_count': len(rels),
                             'extractor_name': name
                         }
                     # Legacy tuple format: (item, entities, relations)
@@ -121,10 +97,10 @@ class IngestionRegistry:
                 payload_fn=lambda self, args, kwargs, result: _payload_extractor(result),
                 measure_time=True,
             )(extractor_fn)
-            self.extractor_registry[name] = wrapped
+            self.extractor_instances[name] = wrapped
         except Exception:
             # Fallback: register as-is
-            self.extractor_registry[name] = extractor_fn
+            self.extractor_instances[name] = extractor_fn
 
     def register_enricher(self, name: str, enricher_fn: Callable):
         """Register a new enrichment routine by name."""
@@ -156,8 +132,8 @@ class IngestionRegistry:
         if primary:
             deduped = [n for n in deduped if n != primary]
 
-        # Keep only registered extractors
-        return [n for n in deduped if n in self.extractor_registry]
+        # Keep only registered extractors (factories or instances)
+        return [n for n in deduped if n in self.extractor_registry or n in self.extractor_instances]
 
     def select_default_extractor(self) -> Optional[str]:
         """
@@ -165,18 +141,26 @@ class IngestionRegistry:
         Prefers extractor['default'] if registered, else the first available from the fallback order,
         else 'ontology' if registered, else any registered extractor.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             cfg = get_config('extractor') or {}
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to load extractor config: {e}")
             cfg = {}
 
         default = cfg.get('default', 'llm')
-        if default and default in self.extractor_registry:
+
+        if default and (default in self.extractor_registry or default in self.extractor_instances):
             return default
+        else:
+            available = list(self.extractor_registry.keys())
+            logger.warning(f"Configured default extractor '{default}' not registered. Available: {available}")
 
         # Try fallback order
         for name in self.get_fallback_order(primary=None):
-            if name in self.extractor_registry:
+            if name in self.extractor_registry or name in self.extractor_instances:
                 return name
 
         # As a last resort, consider ontology or any registered
@@ -186,8 +170,24 @@ class IngestionRegistry:
         return next(iter(self.extractor_registry.keys()), None)
 
     def get_extractor(self, name: str) -> Optional[Callable]:
-        """Get an extractor by name."""
-        return self.extractor_registry.get(name)
+        """Get an extractor by name, instantiating lazily if needed."""
+        # Check if already instantiated
+        if name in self.extractor_instances:
+            return self.extractor_instances[name]
+        
+        # Check if we have a class registered
+        extractor_class = self.extractor_registry.get(name)
+        if extractor_class:
+            try:
+                logger.debug(f"Lazy loading extractor: {name}")
+                instance = extractor_class()  # Instantiate the class
+                self.extractor_instances[name] = instance
+                return instance
+            except Exception as e:
+                logger.error(f"Failed to instantiate extractor '{name}': {e}")
+                return None
+        
+        return None
 
     def get_enricher(self, name: str) -> Optional[Callable]:
         """Get an enricher by name."""
@@ -202,8 +202,8 @@ class IngestionRegistry:
         return self.converter_registry.get(name)
 
     def list_extractors(self) -> List[str]:
-        """List all registered extractor names."""
-        return list(self.extractor_registry.keys())
+        """List all registered extractor names (factories + instances)."""
+        return list(set(self.extractor_registry.keys()) | set(self.extractor_instances.keys()))
 
     def list_enrichers(self) -> List[str]:
         """List all registered enricher names."""
@@ -218,8 +218,8 @@ class IngestionRegistry:
         return list(self.converter_registry.keys())
 
     def is_extractor_registered(self, name: str) -> bool:
-        """Check if an extractor is registered."""
-        return name in self.extractor_registry
+        """Check if an extractor is registered (factory or instance)."""
+        return name in self.extractor_registry or name in self.extractor_instances
 
     def is_enricher_registered(self, name: str) -> bool:
         """Check if an enricher is registered."""

@@ -7,10 +7,13 @@ This module handles all entity and relation extraction logic, including:
 - Legacy extractor support
 - Entity conversion to MemoryItem objects
 """
+import logging
 from typing import Dict, List, Any, Optional
 
 from smartmemory.memory.pipeline.config import ExtractionConfig
 from smartmemory.models.memory_item import MemoryItem
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionPipeline:
@@ -43,7 +46,7 @@ class ExtractionPipeline:
             extraction_config: Configuration for extraction behavior
             
         Returns:
-            Dict with 'entities', 'triples', and 'relations' keys
+            Dict with 'entities' and 'relations' keys
         """
         # Resolve extraction configuration
         config = extraction_config or ExtractionConfig()
@@ -96,7 +99,6 @@ class ExtractionPipeline:
 
             return {
                 'entities': entities,
-                'triples': [(r['source_id'], r['relation_type'], r['target_id']) for r in relations],
                 'relations': relations
             }
         except Exception:
@@ -107,32 +109,34 @@ class ExtractionPipeline:
                              config: ExtractionConfig) -> Dict[str, Any]:
         """Handle legacy extractor with fallback support."""
         try:
-            result = extractor(item)
-        except Exception:
+            # Call extract method with content
+            content = item.content if hasattr(item, 'content') else str(item)
+            result = extractor.extract(content)
+        except Exception as e:
+            logger.error(f"Extractor failed: {e}", exc_info=True)
             result = {}
 
-        # Convert legacy extractor output to consistent format
+        # Convert extractor output to consistent format
         if isinstance(result, dict):
             entities = result.get('entities', [])
-            triples = result.get('triples', [])
             relations = result.get('relations', [])
         elif isinstance(result, tuple) and len(result) == 3:
-            # Legacy format: (item, entities, relations)
+            # Legacy tuple format: (item, entities, relations)
             _item, entities, relations = result
-            triples = [rel for rel in relations if len(rel) == 3]
         else:
-            entities, triples, relations = [], [], []
+            entities, relations = [], []
+            logger.warning(f"Unexpected extractor result format: {type(result)}")
 
         # Convert legacy entities to MemoryItem objects
         converted_entities = self._convert_entities_to_memory_items(entities)
 
         # If no results, try fallback extractors
-        if not converted_entities and not triples and not relations and config.enable_fallback_chain:
+        if not converted_entities and not relations and config.enable_fallback_chain:
+            logger.debug("No extraction results, trying fallback extractors")
             return self._try_fallback_extractors(item, fallback_order, config)
 
         return {
             'entities': converted_entities,
-            'triples': triples,
             'relations': relations
         }
 
@@ -159,30 +163,26 @@ class ExtractionPipeline:
             # Normalize fallback outputs
             if isinstance(fb_res, dict):
                 fb_entities = fb_res.get('entities', [])
-                fb_triples = fb_res.get('triples', [])
                 fb_relations = fb_res.get('relations', [])
             elif isinstance(fb_res, tuple) and len(fb_res) == 3:
                 _it, fb_entities, fb_relations = fb_res
-                fb_triples = [rel for rel in fb_relations if len(rel) == 3]
             else:
-                fb_entities, fb_triples, fb_relations = [], [], []
+                fb_entities, fb_relations = [], []
 
             # Convert entities to MemoryItem objects
             converted_entities = []
             if config.legacy_extractor_support:
                 converted_entities = self._convert_entities_to_memory_items(fb_entities)
 
-            if converted_entities or fb_triples or fb_relations:
+            if converted_entities or fb_relations:
                 return {
                     'entities': converted_entities,
-                    'triples': fb_triples,
                     'relations': fb_relations
                 }
 
         # Nothing worked - return empty results
         return {
             'entities': [],
-            'triples': [],
             'relations': []
         }
 

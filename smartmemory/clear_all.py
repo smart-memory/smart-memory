@@ -71,12 +71,8 @@ def clear_cache() -> bool:
     logging.info("Clearing Redis-backed caches (best effort)...")
     try:
         cache = get_cache()
-        # Try common attributes on wrapped redis client
-        client = None
-        for attr in ("client", "_client", "_redis", "redis"):
-            client = getattr(cache, attr, None)
-            if client:
-                break
+        # Try to get redis client from cache object
+        client = getattr(cache, 'redis', None)
         if client and hasattr(client, "flushdb"):
             client.flushdb()
             logging.info("Redis FLUSHDB successful")

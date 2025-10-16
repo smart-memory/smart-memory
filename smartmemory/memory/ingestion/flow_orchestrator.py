@@ -201,24 +201,22 @@ class MemoryIngestionFlow:
         try:
             extraction = self.extraction_pipeline.extract_semantics(item, actual_extractor, config_bundle.extraction)
             entities = extraction['entities']
-            triples = extraction['triples']
             relations = extraction.get('relations', [])
 
             # Emit extraction results
             self.observer.emit_extraction_results(
                 item_id=item.item_id,
                 entities_count=len(entities),
-                triples_count=len(triples),
+                relations_count=len(relations),
                 extractor=extractor_name or 'default'
             )
 
             # Build ontology_extraction payload
             ontology_extraction = None
-            if entities or relations or triples:
+            if entities or relations:
                 ontology_extraction = {
                     'entities': entities,
                     'relations': relations,
-                    'triples': triples,
                 }
 
         except Exception as e:
@@ -231,7 +229,7 @@ class MemoryIngestionFlow:
             raise
 
         context['entities'] = entities
-        context['triples'] = triples
+        context['relations'] = relations
         context['ontology_extraction'] = ontology_extraction
 
         # Stage 3: Item storage and entity creation
@@ -239,11 +237,11 @@ class MemoryIngestionFlow:
         entity_ids = self._process_add_result(add_result, entities, item)
         context['entity_ids'] = entity_ids
 
-        # Stage 4: Triple/relationship processing (delegated to storage pipeline)
-        if triples and len(triples) > 0:
+        # Stage 4: Relationship processing (delegated to storage pipeline)
+        if relations and len(relations) > 0:
             try:
-                self.storage_pipeline.process_extracted_triples(context, item.item_id, triples)
-                print(f"✅ Processed {len(triples)} relationships for item: {item.item_id}")
+                self.storage_pipeline.process_extracted_relations(context, item.item_id, relations)
+                print(f"✅ Processed {len(relations)} relationships for item: {item.item_id}")
             except Exception as e:
                 print(f"⚠️  Failed to process relationships: {e}")
                 raise
@@ -352,7 +350,7 @@ class MemoryIngestionFlow:
         self.observer.emit_ingestion_complete(
             item_id=context.get('item_id'),
             entities_extracted=len(context.get('entities', [])),
-            triples_extracted=len(context.get('triples', [])),
+            relations_extracted=len(context.get('relations', [])),
             total_duration_ms=total_duration_ms,
             extractor=context.get('extractor_name', extractor_name or 'default'),
             adapter=context.get('adapter_name', adapter_name or 'default')

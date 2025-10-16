@@ -47,7 +47,7 @@ class StorageConfig(MemoryBaseModel):
     """Configuration for StorageEngine stage."""
     storage_strategy: str = "dual_node"
     enable_triple_processing: bool = True
-    ontology_extraction: bool = True
+    ontology_extraction: bool = False
     relationship_creation: bool = True
 
     def __post_init__(self):
@@ -101,7 +101,7 @@ class ExtractionConfig(MemoryBaseModel):
     """Configuration for ExtractorPipeline stage."""
     extractor_name: Optional[str] = None
     enable_fallback_chain: bool = True
-    ontology_extraction: bool = True
+    ontology_extraction: bool = False
     legacy_extractor_support: bool = True
     max_extraction_attempts: int = 3
     # Studio/server DTO compatibility
@@ -156,6 +156,7 @@ class PipelineConfigBundle(MemoryBaseModel):
 
     def __post_init__(self):
         # Initialize default configs if None
+        # Pass user context to sub-configs (may be None, which is fine)
         if self.input_adapter is None:
             self.input_adapter = InputAdapterConfig(user=self.user)
         if self.classification is None:

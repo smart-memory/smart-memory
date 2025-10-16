@@ -30,7 +30,7 @@ class Relationship(MemoryBaseModel):
 @dataclass
 class OntologyExtractionResponse(MemoryBaseModel):
     entities: List[Entity] = field(default_factory=list, metadata={"description": "Extracted entities"})
-    relationships: List[Relationship] = field(default_factory=list, metadata={"description": "Extracted relationships"})
+    relations: List[Relationship] = field(default_factory=list, metadata={"description": "Extracted relations"})
 
 
 @dataclass

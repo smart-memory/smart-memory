@@ -195,24 +195,22 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
                         pass
 
                 def _process_relations_payload(payload: Dict[str, Any]):
-                    # relations: list of dicts
+                    # relations: list of dicts or tuples
                     rels = (payload.get('relations') or []) if isinstance(payload, dict) else []
                     for rel in rels:
-                        if not isinstance(rel, dict):
-                            continue
-                        src = rel.get('source') or rel.get('source_id') or rel.get('from')
-                        tgt = rel.get('target') or rel.get('target_id') or rel.get('to')
-                        rtype = rel.get('relation_type') or rel.get('type') or 'RELATED'
-                        props = rel.get('properties') or rel.get('metadata') or {}
-                        if src and tgt:
-                            _append_edge(src, rtype, tgt, props)
-                    # triples: list of (s,p,o)
-                    triples = (payload.get('triples') or []) if isinstance(payload, dict) else []
-                    for t in triples:
-                        if not isinstance(t, (list, tuple)) or len(t) != 3:
-                            continue
-                        s, p, o = t
-                        _append_edge(s, p, o, {})
+                        if isinstance(rel, dict):
+                            # Handle dict format with flexible key names
+                            src = rel.get('source') or rel.get('source_id') or rel.get('from')
+                            tgt = rel.get('target') or rel.get('target_id') or rel.get('to')
+                            rtype = rel.get('relation_type') or rel.get('type') or 'RELATED'
+                            props = rel.get('properties') or rel.get('metadata') or {}
+                            if src and tgt:
+                                _append_edge(src, rtype, tgt, props)
+                        elif isinstance(rel, (list, tuple)) and len(rel) == 3:
+                            # Handle tuple format (source, relation_type, target)
+                            src, rtype, tgt = rel
+                            if src and tgt:
+                                _append_edge(src, rtype, tgt, {})
 
                 # top-level payload
                 _process_relations_payload(enrichment_result)

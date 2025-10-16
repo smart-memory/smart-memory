@@ -53,7 +53,7 @@ class EntityNodeSpec:
     """Specification for creating an entity node."""
     entity_type: EntityNodeType
     properties: Dict[str, Any]
-    relationships: List[Dict[str, Any]]  # Relationships to other entities
+    relations: List[Dict[str, Any]]  # Relations to other entities
 
 
 @dataclass
@@ -121,7 +121,7 @@ class NodeTypeProcessor:
             entity_node = {
                 'entity_type': spec.entity_type if isinstance(spec.entity_type, str) else spec.entity_type.value,
                 'properties': dict(spec.properties),
-                'relationships': spec.relationships
+                'relations': spec.relations
             }
 
             # Add node category to properties

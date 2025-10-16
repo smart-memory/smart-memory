@@ -178,12 +178,27 @@ def get_prompt_value(path: str | list[str], default: Any = None) -> Any:
 
 
 def apply_placeholders(template: str, mapping: Dict[str, str]) -> str:
-    """Replace placeholder keys like <KEY> with their values.
-    We intentionally avoid str.format to prevent conflicts with JSON braces.
+    """Replace placeholder keys with their values.
+    
+    Supports multiple formats for compatibility:
+    - {{KEY}} - Jinja2/Mustache style (preferred)
+    - <KEY> - XML/angle bracket style
+    - {KEY} - Simple brace (use cautiously with JSON)
+    
+    Note: We use simple string replacement instead of str.format() to avoid
+    conflicts with JSON braces in prompts that contain example outputs.
     """
     if not isinstance(template, str):
         return template
+    
     out = template
     for k, v in (mapping or {}).items():
-        out = out.replace(f"<{k}>", str(v))
+        v_str = str(v)
+        # Replace in order of specificity (most specific first)
+        out = out.replace(f"{{{{{k}}}}}", v_str)  # {{KEY}}
+        out = out.replace(f"<{k}>", v_str)        # <KEY>
+        # Only replace single braces if not already replaced by double braces
+        if f"{{{{{k}}}}}" not in template:
+            out = out.replace(f"{{{k}}}", v_str)  # {KEY}
+    
     return out

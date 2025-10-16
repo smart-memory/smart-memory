@@ -248,7 +248,7 @@ class TestPluginSystemEndToEnd:
         # Should have discovered all plugins
         assert manager.registry.count('enricher') == 6
         assert manager.registry.count('evolver') == 7
-        assert manager.registry.count('extractor') >= 5
+        assert manager.registry.count('extractor') >= 4  # llm, spacy, rebel, relik
 
 
 class TestBackwardCompatibilityAfterIntegration:
