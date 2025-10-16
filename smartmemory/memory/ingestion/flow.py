@@ -261,7 +261,36 @@ class MemoryIngestionFlow:
         enrichment_result = self.enrichment_pipeline.run_enrichment(context)
         context['enrichment_result'] = enrichment_result
 
-        # Stage 8: Grounding
+        # Stage 7.5: Ground entities to Wikipedia (populate provenance_candidates)
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            from smartmemory.plugins.grounders import WikipediaGrounder
+            grounder = WikipediaGrounder()
+            entities_list = context.get('entities', [])
+            entity_ids = context.get('entity_ids', {})
+            
+            if entities_list:
+                # Update entity MemoryItems with their IDs so grounder can create edges
+                logger.info(f"Entity IDs mapping: {entity_ids}")
+                for entity in entities_list:
+                    if hasattr(entity, 'metadata') and entity.metadata:
+                        entity_name = entity.metadata.get('name')
+                        if entity_name and entity_name in entity_ids:
+                            entity.item_id = entity_ids[entity_name]
+                            logger.info(f"Set entity '{entity_name}' item_id to: {entity.item_id}")
+                
+                # Pass MemoryItems directly - grounder extracts what it needs
+                provenance_candidates = grounder.ground(item, entities_list, self.memory._graph)
+                context['provenance_candidates'] = provenance_candidates
+                logger.info(f"✅ Grounded {len(provenance_candidates)} entities to Wikipedia")
+            else:
+                context['provenance_candidates'] = []
+        except Exception as e:
+            logger.warning(f"Wikipedia grounding failed: {e}")
+            context['provenance_candidates'] = []
+
+        # Stage 8: Grounding (create GROUNDED_IN edges)
         provenance_candidates = context.get('provenance_candidates', [])
         if provenance_candidates:
             self.memory._grounding.ground(context)

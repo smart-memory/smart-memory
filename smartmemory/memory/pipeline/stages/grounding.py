@@ -67,7 +67,15 @@ class Grounding:
         if not node:
             return
         
-        entities = node.get('semantic_entities') or (node.get('metadata') or {}).get('semantic_entities', [])
+        # Extract entities from MemoryItem or dict
+        if hasattr(node, 'metadata'):
+            # MemoryItem object
+            entities = node.metadata.get('semantic_entities', [])
+        elif isinstance(node, dict):
+            # Dict
+            entities = node.get('semantic_entities') or (node.get('metadata') or {}).get('semantic_entities', [])
+        else:
+            entities = []
         if not entities:
             return
         
