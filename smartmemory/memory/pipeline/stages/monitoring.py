@@ -33,11 +33,25 @@ class Monitoring:
         return orphaned
 
     def prune(self, strategy="old", days=365, **kwargs):
+        """Prune old notes using soft delete (archival)."""
+        from datetime import datetime, timezone
+        
         if strategy == "old":
             old_notes = self.find_old_notes(days=days)
+            archived_count = 0
+            
             for note in old_notes:
-                self._graph.remove_node(note.item_id)
-            return len(old_notes)
+                # Soft delete: archive instead of removing
+                note.metadata['archived'] = True
+                note.metadata['archive_reason'] = f'pruned_old_note_age_{days}_days'
+                note.metadata['archive_timestamp'] = datetime.now(timezone.utc).isoformat()
+                
+                # Update the node in graph
+                if hasattr(self._graph, 'add_node'):
+                    self._graph.add_node(item_id=note.item_id, properties=note.metadata)
+                    archived_count += 1
+            
+            return archived_count
         else:
             raise ValueError(f"Unknown prune strategy: {strategy}")
 
