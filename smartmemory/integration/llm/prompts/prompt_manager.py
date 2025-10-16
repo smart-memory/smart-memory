@@ -190,13 +190,26 @@ class PromptManager:
 
     def get_extraction_prompt(self,
                               text: str,
-                              schema: Optional[Dict[str, Any]] = None) -> str:
+                              schema: Optional[Dict[str, Any]] = None,
+                              template_key: str = "plugins.extractors.llm.system_template") -> str:
         """
         Create entity/relationship extraction prompt.
         
-        Consolidates extraction prompt logic from utils.llm.run_ontology_llm()
+        Uses the prompt provider (prompts.json or DB) as source of truth.
+        This method adds dynamic text substitution on top of the base template.
+        
+        Args:
+            text: Text to extract from
+            schema: Optional schema to inject
+            template_key: Prompt template key (default: LLM extractor template)
         """
-        base_prompt = f"""
+        from .prompt_provider import get_prompt_value, apply_placeholders
+        
+        # Get base template from provider (prompts.json or DB)
+        base_template = get_prompt_value(template_key)
+        if not base_template:
+            # Fallback to inline prompt if template not found
+            base_template = """
         Extract entities and relationships from the following text for a knowledge graph.
         
         Text: {text}
@@ -256,13 +269,7 @@ class PromptManager:
         Do not include markdown fences or commentary.
         If none found, return {{"entities": [], "triples": []}}.
         """
-
-        if schema:
-            schema_prompt = f"""
-            
-            Use the following schema:
-            {schema}
-            """
-            base_prompt += schema_prompt
-
-        return base_prompt
+        
+        # System template is already complete from prompts.json
+        # Just return it as the system message (text substitution happens in LLM extractor)
+        return base_template

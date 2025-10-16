@@ -3,7 +3,7 @@ ENTITY_TYPES = [
     "person", "organization", "company", "department", "team", "role", "title",
 
     # Locations & Geography
-    "address", "city", "state", "country", "region", "postal_code", "coordinate",
+    "location", "address", "city", "state", "country", "region", "postal_code", "coordinate",
 
     # Temporal
     "date", "time", "datetime", "duration", "frequency",
@@ -21,7 +21,7 @@ ENTITY_TYPES = [
     "message", "identifier",
 
     # Events & Activities
-    "meeting", "appointment", "task", "milestone", "project", "event",
+    "event", "meeting", "appointment", "task", "milestone", "project",
 
     # Knowledge & Content
     "topic", "concept", "keyword", "policy", "procedure",
@@ -32,7 +32,7 @@ ENTITY_TYPES = [
     "case", "clause", "term", "party", "obligation",
 
     # Technical & Systems
-    "device", "platform", "application", "file", "database",
+    "tool", "skill", "device", "platform", "application", "file", "database",
     "api_key", "error_code", "measurement", "unit", "formula", "algorithm",
 
     # Healthcare & Life Sciences
@@ -55,7 +55,7 @@ ENTITY_TYPES = [
     "review", "loyalty_program",
 
     # Arts, Media & Culture
-    "book", "movie", "song", "artwork", "genre", "author",
+    "work_of_art", "book", "movie", "song", "artwork", "genre", "author",
     "performer", "publisher",
 
     # Sports & Recreation
