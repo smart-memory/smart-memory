@@ -55,6 +55,9 @@ class WorkingToEpisodicEvolver(Evolver, EvolverPlugin):
         if len(working_items) >= threshold:
             summary = memory.working.summarize_buffer()
             memory.episodic.add(summary)
-            memory.working.clear_buffer()
+            
+            # Archive working items with reference to the episodic summary
+            memory.working.clear_buffer(archive_reason=f"promoted_to_episodic:{summary.item_id if hasattr(summary, 'item_id') else 'unknown'}")
+            
             if logger:
-                logger.info(f"Promoted {len(working_items)} working items to episodic as summary.")
+                logger.info(f"Promoted {len(working_items)} working items to episodic as summary (archived originals).")

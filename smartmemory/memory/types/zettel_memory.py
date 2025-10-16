@@ -315,6 +315,94 @@ class ZettelMemory(GraphBackedMemory, CRUDMixin, ArchivingMixin, ValidationMixin
         self.auto_link = False
         logger.info("Automatic wikilink parsing disabled")
 
+    def get_low_quality_or_duplicates(
+        self, 
+        min_content_length: int = 50,
+        min_connections: int = 0,
+        similarity_threshold: float = 0.9
+    ) -> List[MemoryItem]:
+        """Find low quality or duplicate zettel notes for pruning.
+        
+        Args:
+            min_content_length: Minimum content length to keep (default: 50)
+            min_connections: Minimum connections to keep (default: 0)
+            similarity_threshold: Similarity threshold for duplicates (default: 0.9)
+            
+        Returns:
+            List of zettel notes that are candidates for pruning
+        """
+        candidates = []
+        
+        try:
+            # Get all notes
+            all_notes = self.structure._get_all_notes()
+            
+            # Find low quality notes (short content and/or few connections)
+            for note in all_notes:
+                # Skip already archived
+                if note.metadata.get('archived'):
+                    continue
+                
+                content_len = len(note.content) if note.content else 0
+                
+                # Check content length
+                if content_len < min_content_length:
+                    connections = self.get_bidirectional_connections(note.item_id)
+                    total_connections = sum(len(conn_list) for conn_list in connections.values())
+                    
+                    # Low quality if short AND insufficient connections
+                    if total_connections <= min_connections:
+                        candidates.append(note)
+                        continue
+            
+            # Find duplicates (high similarity)
+            seen = set()
+            for i, note1 in enumerate(all_notes):
+                if note1.item_id in seen or note1.metadata.get('archived'):
+                    continue
+                    
+                for note2 in all_notes[i+1:]:
+                    if note2.item_id in seen or note2.metadata.get('archived'):
+                        continue
+                    
+                    # Content similarity check using Jaccard index
+                    words1 = set(note1.content.lower().split())
+                    words2 = set(note2.content.lower().split())
+                    if words1 and words2:
+                        similarity = len(words1 & words2) / len(words1 | words2)
+                        if similarity >= similarity_threshold:
+                            # Mark the shorter one as duplicate
+                            if len(note2.content) <= len(note1.content):
+                                candidates.append(note2)
+                                seen.add(note2.item_id)
+                            else:
+                                candidates.append(note1)
+                                seen.add(note1.item_id)
+                            break
+            
+            logger.info(f"Found {len(candidates)} zettel candidates for pruning")
+            return candidates
+        except Exception as e:
+            logger.error(f"Failed to find low quality/duplicate zettels: {e}")
+            return []
+    
+    def prune_or_merge(self, item: MemoryItem):
+        """Prune or merge a zettel note using soft delete (archival)."""
+        from datetime import datetime, timezone
+        
+        try:
+            # Use soft delete via archiving
+            item.metadata['archived'] = True
+            item.metadata['archive_reason'] = 'zettel_pruned_low_quality_or_duplicate'
+            item.metadata['archive_timestamp'] = datetime.now(timezone.utc).isoformat()
+            
+            # Update the item
+            self.update(item)
+            
+            logger.info(f"Archived zettel {item.item_id} (soft delete)")
+        except Exception as e:
+            logger.error(f"Failed to prune/merge zettel {item.item_id}: {e}")
+
     def get_zettelkasten_overview(self) -> Dict[str, Any]:
         """Get comprehensive overview of the Zettelkasten system state."""
         try:
