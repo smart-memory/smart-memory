@@ -7,7 +7,7 @@ and entity nodes (for domain modeling) to enable flexible infrastructure changes
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 
 from smartmemory.models.memory_item import MemoryItem
 
@@ -51,7 +51,7 @@ class MemoryNodeSpec:
 @dataclass
 class EntityNodeSpec:
     """Specification for creating an entity node."""
-    entity_type: EntityNodeType
+    entity_type: Union[EntityNodeType, str]  # Accept both enum and string
     properties: Dict[str, Any]
     relations: List[Dict[str, Any]]  # Relations to other entities
 
@@ -253,7 +253,7 @@ class NodeTypeProcessor:
                 entity_spec = EntityNodeSpec(
                     entity_type=entity_type_str,
                     properties=properties,
-                    relationships=entity_relationships
+                    relations=entity_relationships
                 )
                 entity_specs.append(entity_spec)
 

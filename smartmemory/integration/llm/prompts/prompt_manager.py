@@ -197,13 +197,64 @@ class PromptManager:
         Consolidates extraction prompt logic from utils.llm.run_ontology_llm()
         """
         base_prompt = f"""
-        Extract entities and relationships from the following text:
+        Extract entities and relationships from the following text for a knowledge graph.
         
-        {text}
+        Text: {text}
         
-        Return ONLY a JSON object with keys 'entities' and 'relations'.
+        ENTITY CLASSIFICATION:
+        Classify each entity accurately using these types:
+        - person: People (real or fictional)
+        - organization: Companies, institutions, agencies, groups
+        - location: Countries, cities, geographic features (mountains, plains, rivers, regions)
+        - event: Named events, historical occurrences, meetings
+        - product: Tangible objects, products, tools, vehicles
+        - work_of_art: Books, songs, movies, paintings, creative works
+        - date: Temporal expressions, time periods
+        - concept: Abstract ideas, theories, processes, qualities
+        
+        ENTITY METADATA (optional but valuable):
+        For each entity, include additional attributes when relevant:
+        - description: Brief explanation of what this entity is
+        - aliases: Alternative names or spellings
+        - domain: Field or area (e.g., "Computer Science", "Geography", "History")
+        - confidence: Your confidence in this classification (0.0-1.0)
+        
+        RELATIONSHIPS:
+        Extract meaningful relationships between entities. Use descriptive predicates like:
+        - located_in, part_of, contains
+        - created_by, founded_by, invented_by
+        - works_for, member_of, belongs_to
+        - happened_in, occurred_at
+        - related_to, associated_with
+        
+        OUTPUT FORMAT:
+        Return ONLY a JSON object with this structure:
+        {{
+          "entities": [
+            {{
+              "name": "entity name",
+              "entity_type": "person|organization|location|event|product|work_of_art|date|concept",
+              "confidence": 0.95,
+              "attrs": {{
+                "description": "brief description",
+                "domain": "relevant field",
+                "aliases": ["alternative name"]
+              }}
+            }}
+          ],
+          "triples": [
+            {{
+              "subject": "entity1",
+              "predicate": "relationship_type",
+              "object": "entity2",
+              "subject_type": "entity_type",
+              "object_type": "entity_type"
+            }}
+          ]
+        }}
+        
         Do not include markdown fences or commentary.
-        If none found, return {{"entities": [], "relations": []}}.
+        If none found, return {{"entities": [], "triples": []}}.
         """
 
         if schema:
