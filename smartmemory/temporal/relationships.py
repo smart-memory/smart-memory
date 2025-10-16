@@ -376,7 +376,7 @@ class TemporalRelationshipQueries:
                             groups.append({
                                 'time': current_group[0].transaction_time_start.isoformat(),
                                 'count': len(current_group),
-                                'relationships': [
+                                'relations': [
                                     {
                                         'type': r.relationship_type,
                                         'target': r.target_id
@@ -391,7 +391,7 @@ class TemporalRelationshipQueries:
                 groups.append({
                     'time': current_group[0].transaction_time_start.isoformat(),
                     'count': len(current_group),
-                    'relationships': [
+                    'relations': [
                         {
                             'type': r.relationship_type,
                             'target': r.target_id

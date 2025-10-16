@@ -26,36 +26,46 @@ class StorageEngine(PipelineComponent[StorageConfig]):
             raise ValueError("StorageEngine requires a valid memory_instance")
         self.memory = memory_instance
 
-    def _process_extracted_triples(self, context: Dict[str, Any], item_id: str, triples: List) -> int:
-        """Process extracted triples to create relationships in the graph"""
+    def _process_extracted_relations(self, context: Dict[str, Any], item_id: str, relations: List) -> int:
+        """Process extracted relations to create relationships in the graph"""
         edges_created = 0
 
         try:
-            for triple in triples:
-                if len(triple) != 3:
+            for relation in relations:
+                # Handle both dict format and tuple format for backward compatibility
+                if isinstance(relation, dict):
+                    source_id = relation.get('source_id')
+                    target_id = relation.get('target_id')
+                    relation_type = relation.get('relation_type')
+                    properties = relation.get('properties', {})
+                elif isinstance(relation, (tuple, list)) and len(relation) == 3:
+                    source_id, relation_type, target_id = relation
+                    properties = {}
+                else:
                     continue
 
-                subject, predicate, obj = triple
+                if not all([source_id, target_id, relation_type]):
+                    continue
 
                 # Create relationship in graph
                 try:
-                    # Use SmartGraph's add_edge method (subject=source_id, obj=target_id, predicate=edge_type)
+                    # Use SmartGraph's add_edge method
                     self.memory._graph.add_edge(
-                        source_id=str(subject),
-                        target_id=str(obj),
-                        edge_type=str(predicate),
-                        properties={"source": "extraction"}
+                        source_id=str(source_id),
+                        target_id=str(target_id),
+                        edge_type=str(relation_type),
+                        properties={**properties, "source": "extraction"}
                     )
                     edges_created += 1
                 except Exception as e:
-                    logger.warning(f"Failed to create edge {subject} -> {predicate} -> {obj}: {e}")
+                    logger.warning(f"Failed to create edge {source_id} -> {relation_type} -> {target_id}: {e}")
                     continue
 
             context['edges_created'] = edges_created
             return edges_created
 
         except Exception as e:
-            logger.error(f"Error processing triples: {e}")
+            logger.error(f"Error processing relations: {e}")
             context['edges_created'] = 0
             return 0
 
@@ -131,7 +141,6 @@ class StorageEngine(PipelineComponent[StorageConfig]):
             # Extract data from extraction state
             entities = extraction_state.data.get('entities', [])
             relations = extraction_state.data.get('relations', [])
-            triples = extraction_state.data.get('triples', [])
 
             # Get memory item from extraction state data
             memory_item = extraction_state.data.get('memory_item')
@@ -222,14 +231,23 @@ class StorageEngine(PipelineComponent[StorageConfig]):
             except Exception as e:
                 return create_error_result('storage_engine', e, error_context='Storage failed')
 
-            # Process triples/relationships
+            # Process relations
             edges_created = 0
-            if triples and len(triples) > 0:
+            if relations and len(relations) > 0:
                 if preview_mode:
-                    for t in triples:
-                        if len(t) != 3:
+                    for rel in relations:
+                        # Handle both dict and tuple formats
+                        if isinstance(rel, dict):
+                            subject = rel.get('source_id')
+                            predicate = rel.get('relation_type')
+                            obj = rel.get('target_id')
+                        elif isinstance(rel, (tuple, list)) and len(rel) == 3:
+                            subject, predicate, obj = rel
+                        else:
                             continue
-                        subject, predicate, obj = t
+                        
+                        if not all([subject, predicate, obj]):
+                            continue
                         try:
                             proposed_ops.append(ChangeOp(op_type='add_edge', args={
                                 'source': subject,
@@ -246,7 +264,7 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                         'item_id': item_id,
                         'entity_ids': entity_ids
                     }
-                    edges_created = self._process_extracted_triples(context, item_id, triples)
+                    edges_created = self._process_extracted_relations(context, item_id, relations)
 
             # Build stored nodes list
             stored_nodes = []
@@ -265,21 +283,23 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                     'name': entity_name
                 })
 
-            # Build stored triples list
-            stored_triples = []
-            for triple in triples:
-                if len(triple) == 3:
-                    stored_triples.append({
-                        'subject': triple[0],
-                        'predicate': triple[1],
-                        'object': triple[2]
+            # Build stored relations list
+            stored_relations = []
+            for relation in relations:
+                if isinstance(relation, dict):
+                    stored_relations.append(relation)
+                elif isinstance(relation, (tuple, list)) and len(relation) == 3:
+                    stored_relations.append({
+                        'source_id': relation[0],
+                        'relation_type': relation[1],
+                        'target_id': relation[2]
                     })
 
             storage_metadata = {
                 'storage_strategy': getattr(config, 'storage_strategy', 'dual_node'),
                 'item_id': item_id,
                 'nodes_created': len(stored_nodes),
-                'relationships_created': edges_created,
+                'relations_created': edges_created,
                 'ontology_extraction_used': ontology_extraction is not None
             }
 
@@ -288,7 +308,7 @@ class StorageEngine(PipelineComponent[StorageConfig]):
 
             result_data: Dict[str, Any] = {
                 'stored_nodes': stored_nodes,
-                'stored_triples': stored_triples,
+                'stored_relations': stored_relations,
                 'storage_metadata': storage_metadata,
                 'item_id': item_id,
                 'entity_ids': entity_ids,

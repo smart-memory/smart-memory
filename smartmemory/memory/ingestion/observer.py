@@ -117,19 +117,17 @@ class IngestionObserver:
     def emit_ingestion_start(self, item_id: str, content_length: int, extractor: str, adapter: str):
         """Emit ingestion start event."""
         self.emit_event('ingestion_start', {
-            'item_id': item_id,
             'content_length': content_length,
             'extractor': extractor,
             'adapter': adapter
         })
 
-    def emit_extraction_results(self, item_id: str, entities_count: int, triples_count: int,
-                                extractor: str, duration_ms: float = None):
+    def emit_extraction_results(self, item_id: str, entities_count: int, relations_count: int, extractor: str, duration_ms: float = None):
         """Emit extraction results event."""
         data = {
             'item_id': item_id,
             'entities_count': entities_count,
-            'triples_count': triples_count,
+            'relations_count': relations_count,
             'extractor': extractor
         }
         if duration_ms is not None:
@@ -137,13 +135,13 @@ class IngestionObserver:
 
         self.emit_event('extraction_complete', data)
 
-    def emit_ingestion_complete(self, item_id: str, entities_extracted: int, triples_extracted: int,
+    def emit_ingestion_complete(self, item_id: str, entities_extracted: int, relations_extracted: int,
                                 total_duration_ms: float, extractor: str, adapter: str):
         """Emit comprehensive ingestion completion event."""
         self.emit_event('ingestion_complete', {
             'item_id': item_id,
             'entities_extracted': entities_extracted,
-            'triples_extracted': triples_extracted,
+            'relations_extracted': relations_extracted,
             'total_duration_ms': total_duration_ms,
             'extractor': extractor,
             'adapter': adapter,
@@ -192,14 +190,14 @@ class IngestionObserver:
         """Emit performance metrics for observability."""
         try:
             entities_count = len(context.get('entities', []))
-            triples_count = len(context.get('triples', []))
+            relations_count = len(context.get('relations', []))
 
             performance_data = {
                 'ingestion_duration_ms': total_duration_ms,
                 'entities_per_second': entities_count / (total_duration_ms / 1000) if total_duration_ms > 0 else 0,
-                'triples_per_second': triples_count / (total_duration_ms / 1000) if total_duration_ms > 0 else 0,
+                'relations_per_second': relations_count / (total_duration_ms / 1000) if total_duration_ms > 0 else 0,
                 'entities_processed': entities_count,
-                'triples_processed': triples_count,
+                'relations_processed': relations_count,
                 'timestamp': time.time()
             }
 
@@ -209,7 +207,7 @@ class IngestionObserver:
             summary_data = {
                 'ingestion_duration_ms': total_duration_ms,
                 'entities_processed': entities_count,
-                'triples_processed': triples_count,
+                'relations_processed': relations_count,
                 'timestamp': performance_data['timestamp']
             }
             self.emit_event('performance_summary', summary_data)

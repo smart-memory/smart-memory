@@ -250,7 +250,7 @@ class FalkorDBGraphService:
             # Convert result to dictionary format
             return {
                 "nodes": getattr(result, 'nodes_created', 0),
-                "relationships": getattr(result, 'relationships_created', 0),
+                "relations": getattr(result, 'relationships_created', 0),  # FalkorDB uses 'relationships_created'
                 "properties": getattr(result, 'properties_set', 0),
                 "result_set": result.result_set if hasattr(result, 'result_set') else []
             }

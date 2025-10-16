@@ -61,7 +61,7 @@ class RebelExtractor(ExtractorPlugin):
             user_id: Optional user ID for context
         
         Returns:
-            dict: Dictionary with 'entities' and 'triples' keys
+            dict: Dictionary with 'entities' and 'relations' keys
         """
         self._load_model()
         result = self.nlp(text, max_length=512, clean_up_tokenization_spaces=True)[0]['generated_text']
@@ -80,11 +80,4 @@ class RebelExtractor(ExtractorPlugin):
                 entities.add(obj)
                 relations.append((subj, rel, obj))
         
-        triples = []
-        for rel in relations:
-            if isinstance(rel, dict) and {'subject', 'predicate', 'object'} <= set(rel):
-                triples.append((rel['subject'], rel['predicate'], rel['object']))
-            elif isinstance(rel, (list, tuple)) and len(rel) == 3:
-                triples.append(tuple(rel))
-        
-        return {'entities': list(entities), 'relationships': triples}
+        return {'entities': list(entities), 'relations': relations}

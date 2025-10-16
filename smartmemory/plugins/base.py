@@ -193,7 +193,7 @@ class EnricherPlugin(PluginBase):
             node_ids: Optional dict of node IDs from extraction stage
         
         Returns:
-            dict: Enrichment results with keys like 'properties', 'relationships', 'tags'
+            dict: Enrichment results with keys like 'properties', 'relations', 'tags'
         """
         pass
 

@@ -11,7 +11,7 @@ def _make_payload_fn(plugin_name: str):
                 props = result.get('properties') or {}
                 if isinstance(props, dict):
                     props_count = len(props)
-                rels = result.get('relationships') or []
+                rels = result.get('relations') or []
                 if isinstance(rels, list):
                     rels_count = len(rels)
             return {
@@ -95,16 +95,16 @@ class Enrichment:
                         if 'properties' not in result or not isinstance(result.get('properties'), dict):
                             result['properties'] = {}
                         result['properties'].update(props)
-                # Merge 'relationships' as a concatenated list
-                if 'relationships' in enricher_result:
-                    rels = enricher_result.get('relationships') or []
+                # Merge 'relations' as a concatenated list
+                if 'relations' in enricher_result:
+                    rels = enricher_result.get('relations') or []
                     if rels:
-                        if 'relationships' not in result or not isinstance(result.get('relationships'), list):
-                            result['relationships'] = []
-                        result['relationships'].extend(rels)
+                        if 'relations' not in result or not isinstance(result.get('relations'), list):
+                            result['relations'] = []
+                        result['relations'].extend(rels)
                 # Merge any other top-level keys via last-wins (legacy compatibility)
                 for k, v in enricher_result.items():
-                    if k in ('properties', 'relationships'):
+                    if k in ('properties', 'relations'):
                         continue
                     result[k] = v
         return result

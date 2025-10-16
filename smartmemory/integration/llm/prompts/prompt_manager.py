@@ -201,9 +201,9 @@ class PromptManager:
         
         {text}
         
-        Return ONLY a JSON object with keys 'entities' and 'relationships'.
+        Return ONLY a JSON object with keys 'entities' and 'relations'.
         Do not include markdown fences or commentary.
-        If none found, return {{"entities": [], "relationships": []}}.
+        If none found, return {{"entities": [], "relations": []}}.
         """
 
         if schema:

@@ -17,7 +17,7 @@ GROUND_TRUTH_DATASET = [
             {'text': 'Albert Einstein', 'type': 'person', 'start': 0, 'end': 15},
             {'text': 'theory of relativity', 'type': 'concept', 'start': 30, 'end': 50}
         ],
-        'relationships': [
+        'relations': [
             {'source': 'Albert Einstein', 'target': 'theory of relativity', 'type': 'developed'}
         ]
     },
@@ -28,7 +28,7 @@ GROUND_TRUTH_DATASET = [
             {'text': 'Bill Gates', 'type': 'person', 'start': 25, 'end': 35},
             {'text': '1975', 'type': 'temporal', 'start': 39, 'end': 43}
         ],
-        'relationships': [
+        'relations': [
             {'source': 'Bill Gates', 'target': 'Microsoft', 'type': 'founded'}
         ]
     },
@@ -38,7 +38,7 @@ GROUND_TRUTH_DATASET = [
             {'text': 'Python', 'type': 'technology', 'start': 0, 'end': 6},
             {'text': 'Guido van Rossum', 'type': 'person', 'start': 44, 'end': 60}
         ],
-        'relationships': [
+        'relations': [
             {'source': 'Guido van Rossum', 'target': 'Python', 'type': 'created'}
         ]
     },
@@ -49,7 +49,7 @@ GROUND_TRUTH_DATASET = [
             {'text': 'Paris', 'type': 'location', 'start': 31, 'end': 36},
             {'text': 'France', 'type': 'location', 'start': 38, 'end': 44}
         ],
-        'relationships': [
+        'relations': [
             {'source': 'Eiffel Tower', 'target': 'Paris', 'type': 'located_in'}
         ]
     },
@@ -61,7 +61,7 @@ GROUND_TRUTH_DATASET = [
             {'text': 'Physics', 'type': 'field', 'start': 35, 'end': 42},
             {'text': '1903', 'type': 'temporal', 'start': 46, 'end': 50}
         ],
-        'relationships': [
+        'relations': [
             {'source': 'Marie Curie', 'target': 'Nobel Prize', 'type': 'won'}
         ]
     }
@@ -113,7 +113,7 @@ class TestGroundTruthAccuracy:
                 # Mock extractor to return ground truth (perfect accuracy)
                 mock_extractor.extract.return_value = {
                     'entities': case['entities'],
-                    'relationships': case['relationships']
+                    'relations': case['relations']
                 }
                 
                 result = mock_extractor.extract(case['text'])
@@ -149,19 +149,19 @@ class TestGroundTruthAccuracy:
             for case in GROUND_TRUTH_DATASET:
                 mock_extractor.extract.return_value = {
                     'entities': case['entities'],
-                    'relationships': case['relationships']
+                    'relations': case['relations']
                 }
                 
                 result = mock_extractor.extract(case['text'])
                 
                 # Count correct relationships
-                for rel in result['relationships']:
+                for rel in result['relations']:
                     total_relationships += 1
                     # Check if relationship exists in ground truth
                     if any(
                         gt_rel['source'] == rel['source'] and
                         gt_rel['target'] == rel['target']
-                        for gt_rel in case['relationships']
+                        for gt_rel in case['relations']
                     ):
                         correct_relationships += 1
             
@@ -182,7 +182,7 @@ class TestGroundTruthAccuracy:
             for case in GROUND_TRUTH_DATASET:
                 mock_extractor.extract.return_value = {
                     'entities': case['entities'],
-                    'relationships': case['relationships']
+                    'relations': case['relations']
                 }
                 
                 result = mock_extractor.extract(case['text'])
@@ -212,7 +212,7 @@ class TestGroundTruthAccuracy:
             test_case = GROUND_TRUTH_DATASET[0]
             mock_extractor.extract.return_value = {
                 'entities': test_case['entities'],
-                'relationships': test_case['relationships']
+                'relations': test_case['relations']
             }
             
             # Extract multiple times
@@ -221,7 +221,7 @@ class TestGroundTruthAccuracy:
             # All results should be identical
             for i in range(1, len(results)):
                 assert len(results[i]['entities']) == len(results[0]['entities'])
-                assert len(results[i]['relationships']) == len(results[0]['relationships'])
+                assert len(results[i]['relations']) == len(results[0]['relations'])
 
 
 class TestExtractionBenchmarks:
@@ -235,7 +235,7 @@ class TestExtractionBenchmarks:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             
             # Extract from all ground truth cases
@@ -258,7 +258,7 @@ class TestExtractionBenchmarks:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             
             latencies = []
@@ -290,7 +290,7 @@ class TestExtractionBenchmarks:
                 
                 mock_extractor.extract.return_value = {
                     'entities': [{'text': 'Test', 'type': 'concept', 'start': 0, 'end': 4}],
-                    'relationships': []
+                    'relations': []
                 }
                 
                 result = mock_extractor.extract(text)
@@ -309,13 +309,13 @@ class TestExtractionEdgeCases:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             
             result = mock_extractor.extract("")
             
             assert result['entities'] == []
-            assert result['relationships'] == []
+            assert result['relations'] == []
     
     def test_very_long_text(self):
         """Test extraction with very long text."""
@@ -323,7 +323,7 @@ class TestExtractionEdgeCases:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             
             # Very long text
@@ -340,7 +340,7 @@ class TestExtractionEdgeCases:
             mock_extractor = Mock()
             mock_extractor.extract.return_value = {
                 'entities': [],
-                'relationships': []
+                'relations': []
             }
             
             special_text = "Test @#$% text with 特殊字符 and émojis 🎉"
@@ -358,7 +358,7 @@ class TestExtractionEdgeCases:
                 'entities': [
                     {'text': 'Python', 'type': 'technology', 'start': 0, 'end': 6}
                 ],
-                'relationships': []
+                'relations': []
             }
             
             multilingual_text = "Python est un langage de programmation"

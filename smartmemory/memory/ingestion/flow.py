@@ -111,7 +111,7 @@ class MemoryIngestionFlow:
         # Override with individual configs if provided
         if input_adapter_config:
             bundle.input_adapter = input_adapter_config
-        elif adapter_name:
+        elif adapter_name and bundle.input_adapter:
             bundle.input_adapter.adapter_name = adapter_name
 
         if classification_config:
@@ -119,7 +119,7 @@ class MemoryIngestionFlow:
 
         if extraction_config:
             bundle.extraction = extraction_config
-        elif extractor_name:
+        elif extractor_name and bundle.extraction:
             bundle.extraction.extractor_name = extractor_name
 
         if storage_config:
@@ -130,7 +130,7 @@ class MemoryIngestionFlow:
 
         if enrichment_config:
             bundle.enrichment = enrichment_config
-        elif enricher_names:
+        elif enricher_names and bundle.enrichment:
             bundle.enrichment.enricher_names = enricher_names
 
         if grounding_config:
@@ -204,24 +204,22 @@ class MemoryIngestionFlow:
             extraction = self.extraction_pipeline.extract_semantics(item, actual_extractor, config_bundle.extraction)
             # Standardize on 'entities' for internal flow (Path A); accept 'nodes' for back-compat
             entities = extraction.get('entities') or extraction.get('nodes') or []
-            triples = extraction.get('triples', [])
             relations = extraction.get('relations', [])
 
             # Emit extraction results
             self.observer.emit_extraction_results(
                 item_id=item.item_id,
                 entities_count=len(entities),
-                triples_count=len(triples),
+                relations_count=len(relations),
                 extractor=extractor_name or 'default'
             )
 
             # Build ontology_extraction payload
             ontology_extraction = None
-            if entities or relations or triples:
+            if entities or relations:
                 ontology_extraction = {
                     'entities': entities,  # Use normalized entities (MemoryItems)
                     'relations': relations,
-                    'triples': triples,
                 }
 
         except Exception as e:
@@ -234,7 +232,7 @@ class MemoryIngestionFlow:
             raise
 
         context['entities'] = entities
-        context['triples'] = triples
+        context['relations'] = relations
         context['ontology_extraction'] = ontology_extraction
 
         # Stage 3: Item storage and entity creation
@@ -242,11 +240,11 @@ class MemoryIngestionFlow:
         entity_ids = self._process_add_result(add_result, entities, item)
         context['entity_ids'] = entity_ids
 
-        # Stage 4: Triple/relationship processing (delegated to storage pipeline)
-        if triples and len(triples) > 0:
+        # Stage 4: Relationship processing (delegated to storage pipeline)
+        if relations and len(relations) > 0:
             try:
-                self.storage_pipeline.process_extracted_triples(context, item.item_id, triples)
-                print(f"✅ Processed {len(triples)} relationships for item: {item.item_id}")
+                self.storage_pipeline.process_extracted_relations(context, item.item_id, relations)
+                print(f"✅ Processed {len(relations)} relationships for item: {item.item_id}")
             except Exception as e:
                 print(f"⚠️  Failed to process relationships: {e}")
                 raise
@@ -360,8 +358,8 @@ class MemoryIngestionFlow:
 
         self.observer.emit_ingestion_complete(
             item_id=context.get('item_id'),
-            entities_extracted=len(context.get('nodes', [])),
-            triples_extracted=len(context.get('triples', [])),
+            entities_extracted=len(context.get('entities', [])),
+            relations_extracted=len(context.get('relations', [])),
             total_duration_ms=total_duration_ms,
             extractor=context.get('extractor_name', extractor_name or 'default'),
             adapter=context.get('adapter_name', adapter_name or 'default')
