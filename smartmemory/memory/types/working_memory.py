@@ -106,8 +106,21 @@ class WorkingMemory(MemoryBase):
         content = "\n".join(str(item.content) for item in self.buffer)
         return MemoryItem(content=content, metadata={"summarized": True})
 
-    def clear_buffer(self):
-        """Clear the working memory buffer."""
+    def clear_buffer(self, archive_reason: str = "buffer_cleared"):
+        """Clear the working memory buffer by archiving items (soft delete)."""
+        from datetime import datetime, timezone
+        
+        # Archive each item instead of hard deleting
+        for item in self.buffer:
+            item.metadata['archived'] = True
+            item.metadata['archive_reason'] = archive_reason
+            item.metadata['archive_timestamp'] = datetime.now(timezone.utc).isoformat()
+            
+            # Update the item in storage if available
+            if hasattr(self, 'update') and callable(self.update):
+                self.update(item)
+        
+        # Clear the in-memory buffer
         self.buffer.clear()
 
     def detect_skill_patterns(self, min_count: int = 5) -> List[str]:
