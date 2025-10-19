@@ -40,6 +40,7 @@ except:
     __version_info__ = (0, 1, 6)
 
 # Version history:
+# 0.1.7 - Updated README, removed ChromaDB references, fixed PyPI deployment
 # 0.1.6 - Production PyPI deployment setup
 # 0.1.5 - Complete bi-temporal implementation: version tracking, temporal search, relationship queries, bi-temporal joins, performance optimizations
 # 0.1.4 - Bi-temporal queries: time-travel, audit trails, version history, rollback
