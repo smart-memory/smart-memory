@@ -1,9 +1,16 @@
 # SmartMemory - Multi-Layered AI Memory System
 
+[![PyPI version](https://badge.fury.io/py/smartmemory.svg)](https://pypi.org/project/smartmemory/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 SmartMemory is a comprehensive AI memory system that provides persistent, multi-layered memory storage and retrieval for AI applications. It combines graph databases, vector stores, and intelligent processing pipelines to create a unified memory architecture.
+
+## 🚀 Quick Install
+
+```bash
+pip install smartmemory
+```
 
 ## Architecture Overview
 
@@ -27,8 +34,7 @@ SmartMemory implements a multi-layered memory architecture with the following co
 
 ### Storage Backend
 
-- **FalkorDB**: Graph database for relationships and vector storage (default)
-- **ChromaDB**: Alternative vector database (optional, install with `[chromadb]`)
+- **FalkorDB**: Graph database for relationships and vector storage
 - **Redis**: Caching layer for performance optimization
 
 ### Processing Pipeline
@@ -47,7 +53,7 @@ The memory ingestion flow processes data through several stages:
 
 - **Multi-Type Memory System**: Working, Semantic, Episodic, and Procedural memory types
 - **Graph-Based Storage**: FalkorDB backend for complex relationship modeling
-- **Vector Similarity**: FalkorDB vector storage with optional ChromaDB support
+- **Vector Similarity**: FalkorDB vector storage for semantic search
 - **Extensible Pipeline**: Modular processing stages for ingestion and evolution
 - **Plugin Architecture**: 19 built-in plugins with external plugin support
 - **Plugin Security**: Sandboxing, permissions, and resource limits for safe plugin execution
@@ -55,9 +61,9 @@ The memory ingestion flow processes data through several stages:
 - **Caching Layer**: Redis-based performance optimization
 - **Configuration Management**: Flexible configuration with environment variable support
 
-## Quick Start
+## 📦 Installation
 
-### PyPI Installation (Recommended)
+### From PyPI (Recommended)
 
 ```bash
 # Core package
@@ -65,51 +71,44 @@ pip install smartmemory
 
 # With optional features
 pip install smartmemory[cli]           # CLI tools
-pip install smartmemory[gliner]        # GLiNER extractor
-pip install smartmemory[rebel]         # REBEL extractor
-pip install smartmemory[all]           # Everything
+pip install smartmemory[gliner]        # GLiNER entity extractor
+pip install smartmemory[rebel]         # REBEL relation extractor
+pip install smartmemory[wikipedia]     # Wikipedia enrichment
+pip install smartmemory[all]           # All optional features
 ```
 
-### Source Installation
+### From Source (Development)
 
 ```bash
-# Install from PyPI (recommended)
-pip install smartmemory
-
-# Install with CLI tools
-pip install smartmemory[cli]
-
-# Install with all optional features
-pip install smartmemory[all]
-
-# Or install from source
 git clone https://github.com/smart-memory/smart-memory.git
 cd smart-memory
-pip install -e .
+pip install -e ".[dev]"
 
 # Install spaCy model for entity extraction
 python -m spacy download en_core_web_sm
 ```
 
+### Docker Deployment
+
+See the [smart-memory-service](https://github.com/smart-memory/smart-memory-service) repository for production-ready Docker deployment with FastAPI, authentication, and multi-tenancy support.
+
+## 🎯 Quick Start
+
 ### Basic Usage
 
 ```python
-from smartmemory.smart_memory import SmartMemory
-from smartmemory.models.memory_item import MemoryItem
-from datetime import datetime
+from smartmemory import SmartMemory, MemoryItem
 
 # Initialize SmartMemory
 memory = SmartMemory()
 
-# Create a memory item
+# Add a memory
 item = MemoryItem(
     content="User prefers Python for data analysis tasks",
     memory_type="semantic",
     user_id="user123",
     metadata={'topic': 'preferences', 'domain': 'programming'}
 )
-
-# Add to memory
 memory.add(item)
 
 # Search memories
@@ -117,7 +116,6 @@ results = memory.search("Python programming", top_k=5)
 for result in results:
     print(f"Content: {result.content}")
     print(f"Type: {result.memory_type}")
-    print(f"Metadata: {result.metadata}")
 
 # Get memory summary
 summary = memory.summary()
@@ -430,7 +428,6 @@ SmartMemory requires the following key dependencies:
 - `redis`: Caching layer
 
 **Optional dependencies:**
-- `chromadb`: Alternative vector storage backend (install with `[chromadb]`)
 - `scikit-learn`: Machine learning utilities
 - `pydantic`: Data validation
 
@@ -468,27 +465,9 @@ Contributions are welcome! Please follow these guidelines:
 
 For major changes, please open an issue first to discuss the proposed changes.
 
-## License
+## 📄 License
 
-SmartMemory is dual-licensed to provide flexibility for both open-source and commercial use:
-[LICENSE](LICENSE)
-
-## Installation from PyPI
-
-SmartMemory is available on PyPI:
-
-```bash
-pip install smartmemory
-```
-
-For development:
-
-```bash
-git clone https://github.com/smart-memory/smart-memory.git
-cd smart-memory
-pip install -e ".[dev]"
-pytest
-```
+SmartMemory is dual-licensed to provide flexibility for both open-source and commercial use. See [LICENSE](LICENSE) for details.
 
 ## Security
 
@@ -501,12 +480,21 @@ SmartMemory takes plugin security seriously. All plugins run in a sandboxed envi
 
 External plugins use the `standard` security profile by default. See `docs/PLUGIN_SECURITY.md` for details.
 
-## Links
+## 🔗 Links
 
-- **PyPI**: https://pypi.org/project/smartmemory/
-- **Documentation**: https://docs.smartmemory.ai
-- **GitHub**: https://github.com/smart-memory/smart-memory
-- **Issues**: https://github.com/smart-memory/smart-memory/issues
-- **Security**: See `docs/PLUGIN_SECURITY.md`
+- **📦 PyPI Package**: https://pypi.org/project/smartmemory/
+- **📚 Documentation**: https://docs.smartmemory.ai
+- **🐙 GitHub Repository**: https://github.com/smart-memory/smart-memory
+- **🐛 Issue Tracker**: https://github.com/smart-memory/smart-memory/issues
+- **🔒 Security Policy**: See `docs/PLUGIN_SECURITY.md`
+- **🚀 Production Service**: https://github.com/smart-memory/smart-memory-service
 
-**Get started with SmartMemory by exploring the examples and documentation!**
+---
+
+**Get started with SmartMemory today!**
+
+```bash
+pip install smartmemory
+```
+
+Explore the [examples](examples/) directory for complete demonstrations and use cases.
