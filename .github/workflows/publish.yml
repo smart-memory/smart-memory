@@ -1,17 +1,25 @@
-name: Publish to Test PyPI
+name: Publish to PyPI
 
 on:
-  workflow_dispatch:  # Manual trigger only
-  push:
-    tags:
-      - 'v*-test'  # Trigger on test tags like v0.1.0-test
+  release:
+    types: [published]  # Trigger when a GitHub release is published
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      version:
+        description: 'Version to publish (must match pyproject.toml)'
+        required: true
+        type: string
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for trusted publishing
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -23,20 +31,91 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
+    - name: Verify version consistency
+      run: |
+        # Extract version from pyproject.toml
+        VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d'"' -f2)
+        echo "Package version: $VERSION"
+        
+        # If manual trigger, verify version matches
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$VERSION" != "${{ inputs.version }}" ]; then
+            echo "❌ Version mismatch: pyproject.toml has $VERSION but you specified ${{ inputs.version }}"
+            exit 1
+          fi
+        fi
+        
+        # Verify version in __init__.py matches
+        INIT_VERSION=$(grep -m 1 '__version__' smartmemory/__init__.py | cut -d'"' -f2)
+        if [ "$VERSION" != "$INIT_VERSION" ]; then
+          echo "❌ Version mismatch: pyproject.toml has $VERSION but __init__.py has $INIT_VERSION"
+          exit 1
+        fi
+        
+        echo "✅ Version consistency verified: $VERSION"
+    
+    - name: Clean previous builds
+      run: |
+        rm -rf dist/ build/ *.egg-info
+    
     - name: Build package
-      run: python -m build
+      run: |
+        python -m build
+        echo "📦 Package built successfully"
+        ls -lh dist/
     
     - name: Check package
-      run: twine check dist/*
+      run: |
+        twine check dist/*
+        echo "✅ Package validation passed"
     
-    - name: Publish to Test PyPI
+    - name: Verify package contents
+      run: |
+        # List contents of the wheel
+        python -m zipfile -l dist/*.whl | head -20
+        echo "..."
+        echo "✅ Package contents verified"
+    
+    - name: Publish to PyPI
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        twine upload --repository testpypi dist/* --verbose
+        echo "🚀 Publishing to PyPI..."
+        twine upload dist/* --verbose
+        echo "✅ Published to PyPI successfully!"
     
-    - name: Test installation from Test PyPI
+    - name: Wait for PyPI to update
       run: |
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ smartmemory
-        python -c "from smartmemory import SmartMemory; print('✅ Package installed successfully!')"
+        echo "⏳ Waiting 60 seconds for PyPI to update..."
+        sleep 60
+    
+    - name: Test installation from PyPI
+      run: |
+        # Create fresh virtual environment
+        python -m venv test-env
+        source test-env/bin/activate
+        
+        # Install from PyPI
+        pip install smartmemory --no-cache-dir
+        
+        # Test import
+        python -c "from smartmemory import SmartMemory; print('✅ Package installed successfully from PyPI!')"
+        python -c "from smartmemory import __version__; print(f'📦 Version: {__version__}')"
+        
+        deactivate
+    
+    - name: Create deployment summary
+      run: |
+        VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d'"' -f2)
+        echo "## 🎉 SmartMemory v$VERSION Published to PyPI" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Installation" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "pip install smartmemory==$VERSION" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Links" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [PyPI Package](https://pypi.org/project/smartmemory/$VERSION/)" >> $GITHUB_STEP_SUMMARY
+        echo "- 📚 [Documentation](https://docs.smartmemory.ai)" >> $GITHUB_STEP_SUMMARY
+        echo "- 🐙 [GitHub Repository](https://github.com/smart-memory/smart-memory)" >> $GITHUB_STEP_SUMMARY
