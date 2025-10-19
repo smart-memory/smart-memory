@@ -31,13 +31,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
-    - name: Verify version consistency
+    - name: Verify version
       run: |
-        # Extract version from pyproject.toml
+        # Extract version from pyproject.toml (single source of truth)
         VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d'"' -f2)
-        echo "Package version: $VERSION"
+        echo "📦 Package version: $VERSION"
         
-        # If manual trigger, verify version matches
+        # If manual trigger, verify version matches input
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           if [ "$VERSION" != "${{ inputs.version }}" ]; then
             echo "❌ Version mismatch: pyproject.toml has $VERSION but you specified ${{ inputs.version }}"
@@ -45,14 +45,7 @@ jobs:
           fi
         fi
         
-        # Verify version in __init__.py matches
-        INIT_VERSION=$(grep -m 1 '__version__' smartmemory/__init__.py | cut -d'"' -f2)
-        if [ "$VERSION" != "$INIT_VERSION" ]; then
-          echo "❌ Version mismatch: pyproject.toml has $VERSION but __init__.py has $INIT_VERSION"
-          exit 1
-        fi
-        
-        echo "✅ Version consistency verified: $VERSION"
+        echo "✅ Version verified: $VERSION"
     
     - name: Clean previous builds
       run: |
