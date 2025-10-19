@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartmemory"
-version = "0.1.8"
+version = "0.1.9"
 description = "Multi-layered AI memory system with graph databases, vector stores, and intelligent processing pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -49,7 +49,8 @@ dependencies = [
     "scikit-learn>=1.0.0",
     "pydantic>=2.0.0",
     "redis>=4.0.0",
-    "tomli>=2.0.0; python_version < '3.11'"
+    "tomli>=2.0.0; python_version < '3.11'",
+    "dspy>=3.0.0"
 ]
 
 [project.optional-dependencies]
