@@ -12,3 +12,4 @@ openai
 scikit-learn
 slack_sdk
 boto3
+dspy

@@ -2,7 +2,7 @@
 """Test Wikipedia grounding to debug what's happening."""
 
 import sys
-sys.path.insert(0, '/Users/ruze/reg/my/SmartMemory/smart-memory')
+sys.path.insert(0, '/')
 
 from smartmemory.plugins.enrichers import WikipediaEnricher
 from smartmemory.models.memory_item import MemoryItem
