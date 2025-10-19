@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartmemory"
-version = "0.1.7"
+version = "0.1.8"
 description = "Multi-layered AI memory system with graph databases, vector stores, and intelligent processing pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -53,11 +53,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Vector store backends
-chromadb = ["chromadb>=0.4.0"]
-
 # Optional dependencies for specific extractors
-gliner = ["gliner>=0.1.0"]
 rebel = ["transformers>=4.0.0"]
 relik = ["relik>=0.1.0"]
 
@@ -87,8 +83,6 @@ dev = [
 
 # All optional dependencies
 all = [
-    "chromadb>=0.4.0",
-    "gliner>=0.1.0",
     "transformers>=4.0.0",
     "relik>=0.1.0",
     "slack-sdk>=3.0.0",
@@ -97,14 +91,7 @@ all = [
     "smolagents>=0.1.0",
     "click>=8.0.0",
     "rich>=13.0.0",
-    "tabulate>=0.9.0",
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "build>=0.10.0",
-    "twine>=4.0.0"
+    "tabulate>=0.9.0"
 ]
 
 [project.urls]
