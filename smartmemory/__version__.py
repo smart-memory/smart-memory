@@ -40,6 +40,7 @@ except:
     __version_info__ = (0, 1, 6)
 
 # Version history:
+# 0.1.8 - README overhaul: fixed all code snippets to use public API, verified evolvers, added "In Progress" section, removed internal imports
 # 0.1.7 - Updated README, removed ChromaDB references, fixed PyPI deployment
 # 0.1.6 - Production PyPI deployment setup
 # 0.1.5 - Complete bi-temporal implementation: version tracking, temporal search, relationship queries, bi-temporal joins, performance optimizations

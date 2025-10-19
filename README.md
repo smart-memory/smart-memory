@@ -55,7 +55,7 @@ The memory ingestion flow processes data through several stages:
 - **Graph-Based Storage**: FalkorDB backend for complex relationship modeling
 - **Vector Similarity**: FalkorDB vector storage for semantic search
 - **Extensible Pipeline**: Modular processing stages for ingestion and evolution
-- **Plugin Architecture**: 19 built-in plugins with external plugin support
+- **Plugin Architecture**: 18 built-in plugins with external plugin support
 - **Plugin Security**: Sandboxing, permissions, and resource limits for safe plugin execution
 - **Multi-User Support**: User and group isolation for enterprise applications
 - **Caching Layer**: Redis-based performance optimization
@@ -71,8 +71,8 @@ pip install smartmemory
 
 # With optional features
 pip install smartmemory[cli]           # CLI tools
-pip install smartmemory[gliner]        # GLiNER entity extractor
 pip install smartmemory[rebel]         # REBEL relation extractor
+pip install smartmemory[relik]         # ReliK relation extractor
 pip install smartmemory[wikipedia]     # Wikipedia enrichment
 pip install smartmemory[all]           # All optional features
 ```
@@ -122,36 +122,49 @@ summary = memory.summary()
 print(f"Total memories: {summary}")
 ```
 
-### Using Specific Memory Types
+### Using Different Memory Types
 
 ```python
-from smartmemory.memory.types.working_memory import WorkingMemory
-from smartmemory.memory.types.semantic_memory import SemanticMemory
-from smartmemory.memory.types.zettel_memory import ZettelMemory
+from smartmemory import SmartMemory, MemoryItem
 
-# Working memory for short-term context
-working = WorkingMemory(capacity=10)
-working.add(MemoryItem(content="Current conversation context"))
+# Initialize SmartMemory
+memory = SmartMemory()
 
-# Semantic memory for facts and concepts
-semantic = SemanticMemory()
-semantic.add(MemoryItem(
+# Add working memory (short-term context)
+working_item = MemoryItem(
+    content="Current conversation context",
+    memory_type="working"
+)
+memory.add(working_item)
+
+# Add semantic memory (facts and concepts)
+semantic_item = MemoryItem(
     content="Python is a high-level programming language",
     memory_type="semantic"
-))
-
-# Zettelkasten for interconnected notes
-zettel = ZettelMemory()
-note = MemoryItem(
-    content="# Machine Learning\n\nML learns from data using algorithms.",
-    metadata={'title': 'ML Basics', 'tags': ['ai', 'ml'], 'concepts': ['Learning']},
-    item_id='ml_note'
 )
-zettel.add(note)
+memory.add(semantic_item)
 
-# Discover knowledge connections
-clusters = zettel.detect_knowledge_clusters()
-suggestions = zettel.suggest_related_notes('ml_note')
+# Add episodic memory (experiences)
+episodic_item = MemoryItem(
+    content="User completed Python tutorial on 2024-01-15",
+    memory_type="episodic"
+)
+memory.add(episodic_item)
+
+# Add procedural memory (skills and procedures)
+procedural_item = MemoryItem(
+    content="To sort a list in Python: use list.sort() or sorted(list)",
+    memory_type="procedural"
+)
+memory.add(procedural_item)
+
+# Add Zettelkasten note (interconnected knowledge)
+zettel_item = MemoryItem(
+    content="# Machine Learning\n\nML learns from data using algorithms.",
+    memory_type="zettel",
+    metadata={'title': 'ML Basics', 'tags': ['ai', 'ml']}
+)
+memory.add(zettel_item)
 ```
 
 ### CLI Usage (Optional)
@@ -215,49 +228,41 @@ The `examples/` directory contains several demonstration scripts:
 
 ## Configuration
 
-SmartMemory uses a configuration system that supports both file-based and environment variable configuration:
-
-```python
-from smartmemory.configuration.manager import ConfigManager
-
-# Load configuration
-config = ConfigManager(config_path="config.json")
-
-# Access configuration values
-graph_config = config.get("graph_db")
-vector_config = config.get("vector_store")
-```
+SmartMemory uses environment variables for configuration:
 
 ### Environment Variables
 
 Key environment variables:
-- `FALKORDB_HOST`: FalkorDB server host
-- `FALKORDB_PORT`: FalkorDB server port
-- `REDIS_HOST`: Redis server host
-- `REDIS_PORT`: Redis server port
+- `FALKORDB_HOST`: FalkorDB server host (default: localhost)
+- `FALKORDB_PORT`: FalkorDB server port (default: 6379)
+- `REDIS_HOST`: Redis server host (default: localhost)
+- `REDIS_PORT`: Redis server port (default: 6379)
 - `OPENAI_API_KEY`: OpenAI API key for embeddings
+
+```bash
+# Example .env file
+export FALKORDB_HOST=localhost
+export FALKORDB_PORT=6379
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+export OPENAI_API_KEY=your-api-key-here
+```
 
 ## Memory Evolution
 
-SmartMemory includes an evolution system that can transform memories based on configured rules:
+SmartMemory includes built-in evolvers that automatically transform memories:
 
-```python
-from smartmemory.evolution.flow import EvolutionFlow, EvolutionNode
+### Available Evolvers
 
-# Create evolution flow
-flow = EvolutionFlow()
+- **WorkingToEpisodicEvolver**: Converts working memory to episodic when buffer is full
+- **WorkingToProceduralEvolver**: Extracts repeated patterns as procedures
+- **EpisodicToSemanticEvolver**: Promotes stable facts to semantic memory
+- **EpisodicToZettelEvolver**: Converts episodic events to Zettelkasten notes
+- **EpisodicDecayEvolver**: Archives old episodic memories
+- **SemanticDecayEvolver**: Prunes low-relevance semantic facts
+- **ZettelPruneEvolver**: Merges duplicate or low-quality notes
 
-# Add evolution nodes
-node = EvolutionNode(
-    node_id="enrich_semantic",
-    evolver_path="smartmemory.plugins.evolvers.semantic_enricher",
-    params={"threshold": 0.8}
-)
-flow.add_node(node)
-
-# Execute evolution
-flow.execute(memory, context={})
-```
+Evolvers run automatically as part of the memory lifecycle. See the [examples](examples/) directory for evolution demonstrations.
 
 ## Plugin System
 
@@ -265,12 +270,12 @@ SmartMemory features a **unified, extensible plugin architecture** that allows y
 
 ### Built-in Plugins
 
-SmartMemory includes **19 built-in plugins** across 4 types:
+SmartMemory includes **18 built-in plugins** across 4 types:
 
-- **5 Extractors**: Extract entities and relationships
-  - `SpacyExtractor`, `LLMExtractor`, `GlinerExtractor`, `RebelExtractor`, `RelikExtractor`
+- **4 Extractors**: Extract entities and relationships
+  - `SpacyExtractor`, `LLMExtractor`, `RebelExtractor`, `RelikExtractor`
 - **6 Enrichers**: Add context and metadata to memories
-  - `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `WikipediaEnricher`, etc.
+  - `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `TopicEnricher`, `SkillsToolsEnricher`, `WikipediaEnricher`
 - **1 Grounder**: Connect to external knowledge
   - `WikipediaGrounder`
 - **7 Evolvers**: Transform memories based on rules
@@ -293,17 +298,18 @@ class MyCustomEnricher(EnricherPlugin):
             description="My custom enricher",
             plugin_type="enricher",
             dependencies=["some-lib>=1.0.0"],
-            
-            # Security settings
-            security_profile="standard",  # trusted, standard, restricted, or untrusted
-            requires_network=False,       # Set to True if plugin needs network access
-            requires_llm=False           # Set to True if plugin uses LLM APIs
+            security_profile="standard",
+            requires_network=False,
+            requires_llm=False
         )
     
     def enrich(self, item, node_ids=None):
         # Your enrichment logic
-        return {"custom_field": "value"}
+        item.metadata["custom_field"] = "value"
+        return item.metadata
 ```
+
+See the [examples](examples/) directory for complete plugin examples.
 
 ### Publishing Plugins
 
@@ -421,15 +427,18 @@ class MemoryItem:
 
 SmartMemory requires the following key dependencies:
 
-- `falkordb`: Graph database and vector storage backend (default)
+- `falkordb`: Graph database and vector storage backend
 - `spacy`: Natural language processing and entity extraction
 - `litellm`: LLM integration layer
-- `openai`: OpenAI API client
+- `openai`: OpenAI API client (for embeddings)
 - `redis`: Caching layer
-
-**Optional dependencies:**
 - `scikit-learn`: Machine learning utilities
 - `pydantic`: Data validation
+- `python-dateutil`: Date/time handling
+- `vaderSentiment`: Sentiment analysis
+- `jinja2`: Template rendering
+
+**Note:** SmartMemory uses FalkorDB for both graph and vector storage. While the codebase contains legacy ChromaDB integration code, FalkorDB is the primary and recommended backend.
 
 ### Optional Dependencies
 
@@ -437,9 +446,8 @@ Install additional features as needed:
 
 ```bash
 # Specific extractors
-pip install smartmemory[gliner]    # GLiNER entity extraction
 pip install smartmemory[rebel]     # REBEL relation extraction
-pip install smartmemory[relik]     # ReliK extraction
+pip install smartmemory[relik]     # ReliK relation extraction
 
 # Integrations
 pip install smartmemory[slack]     # Slack integration
@@ -498,3 +506,33 @@ pip install smartmemory
 ```
 
 Explore the [examples](examples/) directory for complete demonstrations and use cases.
+
+---
+
+## 🚧 In Progress
+
+The following features are currently under active development:
+
+### Ontology System
+- **Current**: Basic concept and relation extraction
+- **In Progress**: 
+  - Ontology governance and validation
+  - External ontology integration (DBpedia, Schema.org)
+  - Semantic clustering and concept hierarchies
+  - Ontology-driven query expansion
+- **Planned**: Full ontology management with Maya integration
+
+### Temporal Queries
+- **Current**: Basic bi-temporal support (valid_time, transaction_time)
+- **In Progress**:
+  - Time-travel queries
+  - Version history tracking
+  - Audit trail generation
+- **Planned**: Advanced temporal analytics
+
+### Multi-Tenancy (Service Layer)
+- **Current**: Single-user mode
+- **In Progress**: Full multi-tenancy support in smart-memory-service
+- **Planned**: Team collaboration features
+
+These features are functional but not yet production-ready. Check the [GitHub repository](https://github.com/smart-memory/smart-memory) for the latest updates.
