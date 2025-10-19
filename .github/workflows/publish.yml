@@ -72,7 +72,7 @@ jobs:
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_KEY }}
       run: |
         echo "🚀 Publishing to PyPI..."
         twine upload dist/* --verbose
