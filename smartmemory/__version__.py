@@ -5,8 +5,8 @@ This is the single source of truth for the version number.
 Update this file when releasing a new version.
 """
 
-__version__ = "0.1.5"
-__version_info__ = (0, 1, 5)
+__version__ = "0.1.6"
+__version_info__ = (0, 1, 6)
 
 # Version history:
 # 0.1.5 - Complete bi-temporal implementation: version tracking, temporal search, relationship queries, bi-temporal joins, performance optimizations
