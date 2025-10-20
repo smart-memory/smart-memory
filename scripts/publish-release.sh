@@ -76,26 +76,48 @@ echo ""
 echo "✅ Tag pushed successfully!"
 echo ""
 
+# Get repo URL for links
+REPO_URL=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+
 # Check if gh CLI is available
 if command -v gh &> /dev/null; then
     echo "📝 Creating GitHub release..."
     
-    # Create release with notes
-    gh release create "v$VERSION" \
+    # Try to create release
+    if gh release create "v$VERSION" \
         --title "v$VERSION" \
         --notes "$RELEASE_NOTES" \
-        --latest
-    
-    echo ""
-    echo "✅ GitHub release created!"
-    echo ""
-    echo "🔄 The PyPI publish workflow will start automatically."
-    echo "   Monitor progress: https://github.com/$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions"
+        --latest 2>/dev/null; then
+        
+        echo ""
+        echo "✅ GitHub release created!"
+        echo ""
+        echo "🔄 The PyPI publish workflow will start automatically."
+        echo "   Monitor progress: https://github.com/$REPO_URL/actions"
+    else
+        echo ""
+        echo "⚠️  Failed to create release via gh CLI."
+        echo "   This usually means the 'workflow' scope is missing."
+        echo ""
+        echo "📋 Option 1: Grant workflow scope"
+        echo "   gh auth refresh -h github.com -s workflow"
+        echo "   Then run this script again."
+        echo ""
+        echo "📋 Option 2: Create release manually"
+        echo "   1. Go to: https://github.com/$REPO_URL/releases/new"
+        echo "   2. Select tag: v$VERSION"
+        echo "   3. Set title: v$VERSION"
+        echo "   4. Add release notes"
+        echo "   5. Click 'Publish release'"
+        echo ""
+        echo "   This will trigger the PyPI publish workflow automatically."
+        exit 1
+    fi
 else
     echo "⚠️  GitHub CLI (gh) not found. Creating release manually..."
     echo ""
     echo "📋 Next steps:"
-    echo "   1. Go to: https://github.com/$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/releases/new"
+    echo "   1. Go to: https://github.com/$REPO_URL/releases/new"
     echo "   2. Select tag: v$VERSION"
     echo "   3. Set title: v$VERSION"
     echo "   4. Add release notes"
