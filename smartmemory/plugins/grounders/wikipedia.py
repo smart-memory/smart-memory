@@ -26,9 +26,11 @@ class WikipediaGrounder(GrounderPlugin):
             version="1.0.0",
             author="SmartMemory Team",
             description="Grounds entities to Wikipedia articles for provenance",
+            plugin_type="grounder",
             dependencies=["wikipedia>=1.4.0"],
             min_smartmemory_version="0.1.0",
-            tags=["grounding", "wikipedia", "provenance", "validation"]
+            tags=["grounding", "wikipedia", "provenance", "validation"],
+            requires_network=True
         )
 
     def ground(self, item, entities, graph) -> list:
