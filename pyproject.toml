@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartmemory"
-version = "0.1.11"
+version = "0.1.12"
 description = "Multi-layered AI memory system with graph databases, vector stores, and intelligent processing pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "AGPL-3.0"}
+license = "AGPL-3.0-or-later"
 authors = [
     {name = "SmartMemory Team"}
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
