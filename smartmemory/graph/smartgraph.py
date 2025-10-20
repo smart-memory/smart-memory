@@ -105,9 +105,10 @@ class SmartGraph:
                  properties: Dict[str, Any],
                  valid_time: Optional[Tuple] = None,
                  transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None):
+                 memory_type: Optional[str] = None,
+                 is_global: bool = False):
         """Add a node to the graph."""
-        return self.nodes.add_node(item_id, properties, valid_time, transaction_time, memory_type)
+        return self.nodes.add_node(item_id, properties, valid_time, transaction_time, memory_type, is_global)
 
     def add_dual_node(self, item_id: str, memory_properties: Dict[str, Any], memory_type: str, entity_nodes: List[Dict[str, Any]] = None, is_global: bool = False):
         """Add a dual-node structure through the backend."""
