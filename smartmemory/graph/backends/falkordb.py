@@ -98,13 +98,17 @@ class FalkorDBBackend(SmartGraphBackend):
         # Detect write mode marker (used by CRUD.update_memory_node for replace semantics)
         write_mode = props.pop('_write_mode', None)
 
-        # Add user_id/workspace_id for scoped nodes
+        # Add user_id/workspace_id/tenant_id for scoped nodes
         user_id = get_user_id()
         workspace_id = get_workspace_id()
+        # tenant_id should match workspace_id for tenant isolation
+        tenant_id = workspace_id  # In multi-tenant setup, workspace_id IS the tenant_id
         if not is_global and user_id:
             props["user_id"] = user_id
         if not is_global and workspace_id:
             props["workspace_id"] = workspace_id
+        if not is_global and tenant_id:
+            props["tenant_id"] = tenant_id
 
         # Store is_global in properties (will be used internally but not persisted)
         props["is_global"] = is_global
@@ -735,6 +739,11 @@ class FalkorDBBackend(SmartGraphBackend):
                 if not is_global and user_id:
                     entity_props["user_id"] = user_id
                 entity_props["is_global"] = is_global
+                # SECURITY: Add tenant metadata from memory properties for tenant isolation
+                if 'tenant_id' in memory_props:
+                    entity_props["tenant_id"] = memory_props['tenant_id']
+                if 'workspace_id' in memory_props:
+                    entity_props["workspace_id"] = memory_props['workspace_id']
 
                 # Build entity creation query
                 entity_set_clauses = []
@@ -805,9 +814,19 @@ class FalkorDBBackend(SmartGraphBackend):
                 # Preserve user scoping on entity nodes
                 if not is_global and user_id:
                     entity_params['ent_user_id'] = user_id
+                # SECURITY: Add tenant metadata from memory properties for tenant isolation
+                if 'tenant_id' in memory_props:
+                    entity_params['ent_tenant_id'] = memory_props['tenant_id']
+                if 'workspace_id' in memory_props:
+                    entity_params['ent_workspace_id'] = memory_props['workspace_id']
+                    
                 entity_set_parts = ['e.node_category = $ent_node_category']
                 if not is_global and user_id:
                     entity_set_parts.append('e.user_id = $ent_user_id')
+                if 'tenant_id' in memory_props:
+                    entity_set_parts.append('e.tenant_id = $ent_tenant_id')
+                if 'workspace_id' in memory_props:
+                    entity_set_parts.append('e.workspace_id = $ent_workspace_id')
 
                 for key, value in entity_properties.items():
                     if self._is_valid_property(key, value):

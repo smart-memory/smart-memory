@@ -89,7 +89,7 @@ class WikipediaGrounder(GrounderPlugin):
                             'node_category': 'grounding'
                         }
                         
-                        graph.add_node(item_id=wiki_id, properties=node_properties)
+                        graph.add_node(item_id=wiki_id, properties=node_properties, is_global=True)
                         logger.info(f"✅ Created Wikipedia node: {wiki_id}")
                     else:
                         logger.info(f"♻️  Reusing existing Wikipedia node: {wiki_id}")
