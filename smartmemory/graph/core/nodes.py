@@ -32,7 +32,8 @@ class SmartGraphNodes:
                  properties: Dict[str, Any],
                  valid_time: Optional[Tuple] = None,
                  transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None):
+                 memory_type: Optional[str] = None,
+                 is_global: bool = False):
         """Add a node to the graph."""
         if item_id is None:
             item_id = str(uuid.uuid4())
@@ -47,7 +48,7 @@ class SmartGraphNodes:
             # Validation failed but we're in warning mode, continue
             pass
 
-        result = self.backend.add_node(item_id, node_dict, valid_time, transaction_time, memory_type)
+        result = self.backend.add_node(item_id, node_dict, valid_time, transaction_time, memory_type, is_global)
 
         # Invalidate cache for this node
         if self.enable_caching:
