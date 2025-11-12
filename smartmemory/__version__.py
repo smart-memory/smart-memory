@@ -1,37 +1,29 @@
 """
 SmartMemory version information.
 
-Version is read dynamically from package metadata.
-Single source of truth: pyproject.toml
+Version is read dynamically from package metadata or VERSION file.
+Single source of truth: VERSION file
 """
 
-try:
-    # For installed package, read from metadata
-    from importlib.metadata import version
-    __version__ = version("smartmemory")
-except Exception:
-    # For development, read from pyproject.toml
+from pathlib import Path
+
+def _get_version() -> str:
+    """Get version from VERSION file or package metadata."""
     try:
-        import tomllib  # Python 3.11+
-    except ImportError:
+        # For installed package, read from metadata
+        from importlib.metadata import version
+        return version("smartmemory")
+    except Exception:
+        # For development, read from VERSION file
         try:
-            import tomli as tomllib  # Python 3.10
-        except ImportError:
-            # Fallback if no TOML parser available
-            __version__ = "0.1.6"
-            __version_info__ = (0, 1, 6)
-        else:
-            from pathlib import Path
-            pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
-            with open(pyproject_path, "rb") as f:
-                pyproject = tomllib.load(f)
-            __version__ = pyproject["project"]["version"]
-    else:
-        from pathlib import Path
-        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
-        with open(pyproject_path, "rb") as f:
-            pyproject = tomllib.load(f)
-        __version__ = pyproject["project"]["version"]
+            version_file = Path(__file__).parent.parent / "VERSION"
+            with open(version_file, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            # Fallback if VERSION file not found
+            return "unknown"
+
+__version__ = _get_version()
 
 # Parse version info
 try:
