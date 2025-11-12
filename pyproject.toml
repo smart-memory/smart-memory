@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartmemory"
-version = "0.1.15"
+dynamic = ["version"]
 description = "Multi-layered AI memory system with graph databases, vector stores, and intelligent processing pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -118,6 +118,9 @@ smartmemory = "smartmemory.cli:main"
 
 [tool.setuptools]
 packages = {find = {}}  # Auto-discover all packages
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
 
 [tool.setuptools.package-data]
 smartmemory = [
