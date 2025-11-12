@@ -153,5 +153,28 @@
       "js_alert_threshold": "${ANALYTICS_JS_THRESHOLD:-0.3}",
       "protected_attributes_default": "${ANALYTICS_PROTECTED_ATTRS:-gender,race,age_group,nationality,religion}"
     }
+  },
+  "ssg": {
+    "enabled": "${SSG_ENABLED:-true}",
+    "default_algorithm": "${SSG_DEFAULT_ALGORITHM:-query_traversal}",
+    "max_results": "${SSG_MAX_RESULTS:-15}",
+    "min_results_before_early_stop": "${SSG_MIN_BEFORE_EARLY_STOP:-8}",
+    "neighbor_candidates": {
+      "graph_neighbors": "${SSG_GRAPH_NEIGHBORS:-10}",
+      "vector_neighbors": "${SSG_VECTOR_NEIGHBORS:-10}",
+      "max_total": "${SSG_MAX_TOTAL_NEIGHBORS:-20}"
+    },
+    "caching": {
+      "similarity_cache_ttl": "${SSG_SIMILARITY_CACHE_TTL:-1800}",
+      "traversal_path_cache_ttl": "${SSG_TRAVERSAL_PATH_CACHE_TTL:-900}"
+    },
+    "algorithms": {
+      "query_traversal": {
+        "enabled": "${SSG_QUERY_TRAVERSAL_ENABLED:-true}"
+      },
+      "triangulation_fulldim": {
+        "enabled": "${SSG_TRIANGULATION_FULLDIM_ENABLED:-true}"
+      }
+    }
   }
 }
