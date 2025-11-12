@@ -173,4 +173,6 @@ test_data/
 .DS_Store
 .cascade/
 
+# Ignore markdown files except in docs/
 *.md
+!docs/public/*.md

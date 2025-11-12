@@ -137,8 +137,23 @@ class SmartMemory(MemoryBase):
                converter_name=None,
                extractor_name=None,
                sync: Optional[bool] = None,
-               conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None):
-        """Ingest item. If sync is True or mode is local, run full pipeline; otherwise persist and enqueue background processing."""
+               conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
+               user_id: Optional[str] = None):
+        """Ingest item. If sync is True or mode is local, run full pipeline; otherwise persist and enqueue background processing.
+        
+        Args:
+            item: Content to ingest
+            context: Additional context for processing
+            adapter_name: Specific adapter to use
+            converter_name: Specific converter to use
+            extractor_name: Specific extractor to use
+            sync: If True, run full pipeline synchronously; if False, enqueue for background processing
+            conversation_context: Conversation context for conversational memory
+            user_id: User ID for user isolation (sets item.user_id)
+            
+        Returns:
+            Union[Dict[str, Any], Any]: Pipeline result if sync=True, or {"item_id": str, "queued": bool} if sync=False
+        """
         # Determine effective mode
         if sync is None:
             try:
@@ -147,6 +162,13 @@ class SmartMemory(MemoryBase):
             except Exception:
                 mode = ''
             sync = (mode == 'local')
+        
+        # Normalize item and set user_id if provided
+        from smartmemory.models.memory_item import MemoryItem
+        if not isinstance(item, MemoryItem):
+            item = self._crud.normalize_item(item)
+        if user_id is not None:
+            item.user_id = user_id
 
         if sync:
             if self._ingestion_flow is None:
@@ -203,14 +225,33 @@ class SmartMemory(MemoryBase):
             extractor_name=None,
             enricher_names=None,
             conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
+            user_id: Optional[str] = None,
             **kwargs) -> str:
         """
         Primary entry point for adding items to SmartMemory.
         Runs the full canonical agentic memory ingestion flow with enrichment, linking, and semantic extraction.
         For basic storage without the full pipeline, use _add_basic() internally.
+        
+        Args:
+            item: Content to add (str, dict, or MemoryItem)
+            context: Additional context for processing
+            adapter_name: Specific adapter to use
+            converter_name: Specific converter to use
+            extractor_name: Specific extractor to use
+            enricher_names: Specific enrichers to use
+            conversation_context: Conversation context for conversational memory
+            user_id: User ID for user isolation (sets normalized_item.user_id)
+            **kwargs: Additional processing options
+            
+        Returns:
+            str: The item_id of the stored memory item
         """
         # Normalize item using CRUD component (eliminates mixed abstraction)
         normalized_item = self._crud.normalize_item(item)
+        
+        # Set user_id if provided (backward compatible)
+        if user_id is not None:
+            normalized_item.user_id = user_id
 
         # Annotate with conversation metadata if provided (non-invasive)
         try:
