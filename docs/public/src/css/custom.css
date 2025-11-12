@@ -1,0 +1,431 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #2e8555;
+  --ifm-color-primary-dark: #29784c;
+  --ifm-color-primary-darker: #277148;
+  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-light: #33925d;
+  --ifm-color-primary-lighter: #359962;
+  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Custom SmartMemory branding */
+.navbar__brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.hero__title {
+  background: linear-gradient(45deg, #2e8555, #25c2a0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Code block enhancements */
+.prism-code {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Mermaid diagram styling for better dark mode support */
+.mermaid {
+  background: var(--ifm-background-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+/* Light mode Mermaid styling */
+[data-theme='light'] .mermaid {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+/* Dark mode Mermaid styling */
+[data-theme='dark'] .mermaid {
+  background: #1e293b;
+  border-color: #374151;
+}
+
+/* Ensure Mermaid SVG elements have proper backgrounds */
+.mermaid svg {
+  background: transparent !important;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mermaid flowchart node styling */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse,
+.mermaid .node polygon {
+  fill: var(--ifm-color-emphasis-100) !important;
+  stroke: var(--ifm-color-primary) !important;
+  stroke-width: 2px !important;
+}
+
+/* Mermaid text styling - ensure white text in dark mode */
+.mermaid .nodeLabel,
+.mermaid .node text,
+.mermaid text {
+  fill: var(--ifm-font-color-base) !important;
+  font-family: var(--ifm-font-family-base) !important;
+  font-weight: 500 !important;
+}
+
+/* Dark mode specific text styling for better contrast */
+[data-theme='dark'] .mermaid .nodeLabel,
+[data-theme='dark'] .mermaid .node text,
+[data-theme='dark'] .mermaid text {
+  fill: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* Light mode specific text styling */
+[data-theme='light'] .mermaid .nodeLabel,
+[data-theme='light'] .mermaid .node text,
+[data-theme='light'] .mermaid text {
+  fill: #1f2937 !important;
+  font-weight: 500 !important;
+}
+
+/* Mermaid edge/arrow styling */
+.mermaid .edgePath path,
+.mermaid .arrowheadPath {
+  stroke: var(--ifm-color-emphasis-700) !important;
+  stroke-width: 2px !important;
+}
+
+/* Mermaid edge labels */
+.mermaid .edgeLabel {
+  background-color: var(--ifm-background-color) !important;
+  color: var(--ifm-font-color-base) !important;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+/* Responsive Mermaid diagrams */
+@media (max-width: 768px) {
+  .mermaid {
+    padding: 12px;
+    overflow-x: auto;
+  }
+}
+
+/* API reference tables */
+.api-table {
+  margin: 1rem 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.api-table th,
+.api-table td {
+  border: 1px solid var(--ifm-table-border-color);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.api-table th {
+  background-color: var(--ifm-table-head-background);
+  font-weight: 600;
+}
+
+/* Memory type badges */
+.memory-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin: 0.125rem;
+}
+
+.memory-type-semantic {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.memory-type-episodic {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.memory-type-procedural {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+}
+
+.memory-type-working {
+  background-color: #fff3e0;
+  color: #ef6c00;
+}
+
+/* Feature cards */
+.feature-card {
+  background: var(--ifm-card-background-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.feature-card h3 {
+  margin-top: 0;
+  color: var(--ifm-color-primary);
+}
+
+/* Architecture diagrams */
+.architecture-diagram {
+  text-align: center;
+  margin: 2rem 0;
+  padding: 1rem;
+  background: var(--ifm-background-surface-color);
+  border-radius: 8px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.architecture-diagram pre {
+  background: transparent;
+  border: none;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+/* Warning and info boxes */
+.admonition {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.admonition-warning {
+  background-color: #fff8e1;
+  border-left-color: #ff9800;
+  color: #e65100;
+}
+
+.admonition-info {
+  background-color: #e3f2fd;
+  border-left-color: #2196f3;
+  color: #0d47a1;
+}
+
+.admonition-tip {
+  background-color: #e8f5e8;
+  border-left-color: #4caf50;
+  color: #1b5e20;
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] .admonition-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #ffb74d;
+}
+
+[data-theme='dark'] .admonition-info {
+  background-color: rgba(33, 150, 243, 0.1);
+  color: #64b5f6;
+}
+
+[data-theme='dark'] .admonition-tip {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #81c784;
+}
+
+/* Code inline styling */
+code {
+  background-color: var(--ifm-code-background);
+  border-radius: 3px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.9em;
+}
+
+/* Navigation improvements */
+.table-of-contents {
+  border-left: 2px solid var(--ifm-color-primary-light);
+  padding-left: 1rem;
+}
+
+.table-of-contents__link--active {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+/* Footer customization */
+.footer {
+  background-color: var(--ifm-footer-background-color);
+  padding: 2rem 0;
+}
+
+.footer__title {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .feature-card {
+    margin: 0.5rem 0;
+    padding: 1rem;
+  }
+  
+  .architecture-diagram pre {
+    font-size: 0.7rem;
+    overflow-x: auto;
+  }
+}
+
+/* Search bar styling */
+.navbar__search-input {
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+/* Button improvements */
+.button {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Documentation-specific styles */
+.doc-content h1 {
+  border-bottom: 2px solid var(--ifm-color-primary-light);
+  padding-bottom: 0.5rem;
+}
+
+.doc-content h2 {
+  color: var(--ifm-color-primary-dark);
+  margin-top: 2rem;
+}
+
+/* API method signatures */
+.api-signature {
+  background: var(--ifm-code-background);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+  font-family: var(--ifm-font-family-monospace);
+  overflow-x: auto;
+}
+
+/* Parameter tables */
+.param-table {
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.param-table th {
+  background-color: var(--ifm-color-primary-lightest);
+  color: var(--ifm-color-primary-darkest);
+}
+
+/* Example code blocks */
+.example-block {
+  margin: 1.5rem 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.example-header {
+  background: var(--ifm-color-emphasis-100);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.example-content {
+  padding: 0;
+}
+
+/* Sidebar improvements */
+.menu__link {
+  border-radius: 4px;
+  margin: 0.125rem 0;
+}
+
+.menu__link--active {
+  background-color: var(--ifm-color-primary-lightest);
+  color: var(--ifm-color-primary-darkest);
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Accessibility improvements */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus indicators */
+a:focus,
+button:focus,
+input:focus {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .navbar,
+  .footer,
+  .table-of-contents,
+  .pagination-nav {
+    display: none !important;
+  }
+  
+  .main-wrapper {
+    margin: 0 !important;
+  }
+}
