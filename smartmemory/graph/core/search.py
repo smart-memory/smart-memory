@@ -12,12 +12,13 @@ logger = logging.getLogger(__name__)
 class SmartGraphSearch:
     """Handles all search-related operations for SmartGraph."""
 
-    def __init__(self, backend, nodes_module, enable_caching=True, cache_size=1000):
+    def __init__(self, backend, nodes_module, enable_caching=True, cache_size=1000, smart_memory=None):
         self.backend = backend
         self.nodes = nodes_module  # Reference to nodes module for conversion
         self.enable_caching = enable_caching
         self.cache_size = cache_size
         self._search_cache = {} if enable_caching else None
+        self.smart_memory = smart_memory  # Optional SmartMemory instance for SSG
 
     def search_nodes(self, query: Dict[str, Any]):
         """
@@ -35,19 +36,44 @@ class SmartGraphSearch:
         nodes = self.backend.search_nodes(query)
         return [self.nodes._from_node_dict(self.nodes.item_cls, n) for n in nodes]
 
-    def search(self, query_str: str, top_k: int = 5, **kwargs):
+    def search(self, query_str: str, top_k: int = 5, use_ssg: bool = None, **kwargs):
         """
         Enhanced search method using vector embeddings as primary method with text-based fallbacks.
         Provides semantic similarity search for better relevance.
+        
+        Args:
+            query_str: Search query string
+            top_k: Maximum number of results to return
+            use_ssg: Use Similarity Graph Traversal (SSG) for better multi-hop reasoning.
+                    If None, uses config default. If True, uses SSG. If False, uses basic vector search.
+            **kwargs: Additional arguments passed to search methods
         """
-        # Multi-level fallback strategy - vector search first, then text-based
-        fallback_attempts = [
-            self._search_with_vector_embeddings,  # Primary vector-based search
-            self._search_with_regex,
-            self._search_with_simple_contains,
-            self._search_with_keyword_matching,
-            self._get_all_nodes_fallback
-        ]
+        # Determine if SSG should be used
+        if use_ssg is None:
+            from smartmemory.utils import get_config
+            ssg_config = get_config('ssg') or {}
+            use_ssg = ssg_config.get('enabled', True)
+        
+        # Multi-level fallback strategy
+        if use_ssg:
+            # SSG-enhanced fallback chain
+            fallback_attempts = [
+                self._search_with_ssg_traversal,  # Primary: SSG traversal
+                self._search_with_vector_embeddings,  # Fallback: Basic vector search
+                self._search_with_regex,
+                self._search_with_simple_contains,
+                self._search_with_keyword_matching,
+                self._get_all_nodes_fallback
+            ]
+        else:
+            # Original fallback chain (backward compatible)
+            fallback_attempts = [
+                self._search_with_vector_embeddings,  # Primary vector-based search
+                self._search_with_regex,
+                self._search_with_simple_contains,
+                self._search_with_keyword_matching,
+                self._get_all_nodes_fallback
+            ]
 
         for i, fallback_method in enumerate(fallback_attempts):
             try:
@@ -67,6 +93,70 @@ class SmartGraphSearch:
         logger.error(f"All search fallbacks failed for query: {query_str}")
         return []
 
+    def _search_with_ssg_traversal(self, query_str: str, top_k: int = 5, **kwargs):
+        """
+        SSG-based search using graph traversal algorithms.
+        Superior to basic vector search for multi-hop reasoning and contextual retrieval.
+        """
+        try:
+            from smartmemory.retrieval.ssg_traversal import SimilarityGraphTraversal
+            from smartmemory.utils import get_config
+            
+            # Get SSG configuration
+            ssg_config = get_config('ssg') or {}
+            if not ssg_config.get('enabled', True):
+                logger.debug("SSG is disabled in config, skipping")
+                return None
+            
+            # Get algorithm from config or kwargs
+            algorithm = kwargs.get('ssg_algorithm') or ssg_config.get('default_algorithm', 'query_traversal')
+            
+            # Get workspace_id from kwargs if available
+            workspace_id = kwargs.get('workspace_id')
+            user_id = kwargs.get('user_id')
+            
+            # Need SmartMemory instance - get from parent if available
+            smart_memory = getattr(self, 'smart_memory', None)
+            if smart_memory is None:
+                # Try to construct from backend
+                logger.debug("No SmartMemory instance available, cannot use SSG")
+                return None
+            
+            # Create SSG instance
+            ssg = SimilarityGraphTraversal(smart_memory)
+            
+            # Execute selected algorithm
+            if algorithm == "query_traversal":
+                results = ssg.query_traversal(
+                    query_str, 
+                    max_results=top_k,
+                    user_id=user_id,
+                    workspace_id=workspace_id
+                )
+            elif algorithm == "triangulation_fulldim":
+                results = ssg.triangulation_fulldim(
+                    query_str,
+                    max_results=top_k,
+                    workspace_id=workspace_id
+                )
+            else:
+                logger.warning(f"Unknown SSG algorithm: {algorithm}, falling back to query_traversal")
+                results = ssg.query_traversal(
+                    query_str,
+                    max_results=top_k,
+                    user_id=user_id,
+                    workspace_id=workspace_id
+                )
+            
+            if results:
+                logger.info(f"SSG {algorithm} search found {len(results)} results for query: {query_str}")
+            
+            return results
+            
+        except Exception as e:
+            logger.warning(f"SSG traversal search failed: {e}", exc_info=True)
+            return None  # Fallback to next method
+    
     def _search_with_vector_embeddings(self, query_str: str, top_k: int = 5, **kwargs):
         """Primary search method using vector embeddings for semantic similarity."""
         try:
@@ -301,6 +391,14 @@ class SmartGraphSearch:
         if self.enable_caching:
             self._search_cache.clear()
 
+    def set_smart_memory(self, smart_memory):
+        """
+        Set SmartMemory instance for SSG traversal.
+        Called after SmartMemory initialization to avoid circular dependency.
+        """
+        self.smart_memory = smart_memory
+        logger.debug("SmartMemory instance set for SSG traversal")
+    
     def get_cache_stats(self):
         """Get search cache performance statistics."""
         if not self.enable_caching:

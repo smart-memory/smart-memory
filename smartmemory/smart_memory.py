@@ -57,6 +57,9 @@ class SmartMemory(MemoryBase):
 
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
+        
+        # Set self on graph search module for SSG traversal
+        self._graph.search.set_smart_memory(self)
 
     def clear(self):
         """Clear all memory from ALL storage backends comprehensively."""
