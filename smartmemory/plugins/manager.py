@@ -138,13 +138,15 @@ class PluginManager:
             from smartmemory.plugins.extractors.rebel import RebelExtractor
             from smartmemory.plugins.extractors.llm import LLMExtractor
             from smartmemory.plugins.extractors.relik import RelikExtractor
+            from smartmemory.plugins.extractors.conversation_aware_llm import ConversationAwareLLMExtractor
             
             # All extractors are now class-based - register them directly
             class_based_extractors = [
                 SpacyExtractor,
                 RebelExtractor,
                 LLMExtractor,
-                RelikExtractor
+                RelikExtractor,
+                ConversationAwareLLMExtractor
             ]
             
             for extractor_class in class_based_extractors:

@@ -26,7 +26,10 @@ class GlobalClustering:
 
     def run(self) -> Dict[str, Any]:
         """
-        Run global clustering.
+        Run clustering with automatic scope filtering via ScopeProvider.
+        
+        Filtering is determined by the ScopeProvider that was injected into SmartMemory
+        at initialization. This ensures consistent tenant/workspace/user isolation.
         
         Returns a dict with stats about merged entities:
         - merged_count: Number of entities merged
@@ -43,10 +46,25 @@ class GlobalClustering:
             backend = self.vector_store._backend
             label = backend.label
             
-            # Fetch all nodes with embeddings
-            # Note: Fetching all embeddings might be heavy. 
-            # In a production system, we might want to paginate or process in chunks.
-            query = f"MATCH (n:{label}) RETURN n.id as id, n.embedding as embedding"
+            # Get isolation filters from ScopeProvider (single source of truth)
+            filters = {}
+            if hasattr(self.smart_memory, 'scope_provider') and self.smart_memory.scope_provider:
+                filters = self.smart_memory.scope_provider.get_isolation_filters()
+            
+            # Build WHERE clause from ScopeProvider filters
+            where_clauses = []
+            for filter_key, filter_value in filters.items():
+                if filter_value:
+                    # Escape single quotes in values to prevent injection
+                    safe_value = str(filter_value).replace("'", "\\'")
+                    where_clauses.append(f"n.{filter_key} = '{safe_value}'")
+            
+            where_clause = ""
+            if where_clauses:
+                where_clause = " WHERE " + " AND ".join(where_clauses)
+            
+            query = f"MATCH (n:{label}){where_clause} RETURN n.id as id, n.embedding as embedding"
+            logger.info(f"Running clustering query: {query}")
             res = backend.graph.query(query)
             
             ids = []
@@ -59,7 +77,14 @@ class GlobalClustering:
                         embeddings.append(row[1])
             
             if not ids:
-                return {"merged_count": 0, "clusters_found": 0, "total_entities": 0}
+                scope_info = {}
+                if workspace_id:
+                    scope_info['workspace_id'] = workspace_id
+                if tenant_id:
+                    scope_info['tenant_id'] = tenant_id
+                if user_id:
+                    scope_info['user_id'] = user_id
+                return {"merged_count": 0, "clusters_found": 0, "total_entities": 0, **scope_info}
 
             # 2. Cluster embeddings
             # We use a simple greedy clustering approach leveraging the vector index

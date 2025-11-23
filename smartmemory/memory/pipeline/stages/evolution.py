@@ -32,10 +32,13 @@ class EvolutionOrchestrator:
         """
         Determine if working memory should be evolved to episodic memory.
         Simple heuristic: evolve every few items to populate episodic memory.
+        
+        Filtering is handled automatically by ScopeProvider in the search() method.
         """
         try:
-            # Get working memory items count using unified interface
+            # Get working memory items count - search() uses ScopeProvider for filtering
             working_items = self.smart_memory.search("*", memory_type="working", top_k=100)
+            
             # Evolve every 3-5 items to ensure episodic memory gets populated
             return len(working_items) >= 3
         except Exception as e:
@@ -46,10 +49,14 @@ class EvolutionOrchestrator:
         """
         Determine if working memory should be evolved to procedural memory.
         Simple heuristic: evolve when we have enough working memory items.
+        
+        Filtering is handled automatically by ScopeProvider in the search() method.
         """
         try:
+            # Get working memory items count - search() uses ScopeProvider for filtering
             working_items = self.smart_memory.search("*", memory_type="working", top_k=100)
-            # Evolve every 5-7 items to build procedural knowledge
+            
+            # Evolve when we have at least 5 working items
             return len(working_items) >= 5
         except Exception as e:
             logger.debug(f"Evolution check failed: {e}")
@@ -59,24 +66,26 @@ class EvolutionOrchestrator:
         """
         Run evolution cycle to populate episodic and procedural memory from working memory.
         This is the key to populating memory stores that depend on evolution.
+        
+        Filtering is handled automatically by ScopeProvider in all operations.
         """
-        # If a dynamic workflow is installed, delegate to it
-        if getattr(self, "_workflow", None):
-            try:
-                self.run_workflow()
-                return
-            except Exception as e:
-                logger.error(f"Dynamic workflow execution failed, falling back: {e}")
-
-        # Check if we should evolve working memory to episodic
+        # Check if workflow is set (Studio mode)
+        if self._workflow:
+            logger.info("Using dynamic evolution workflow from Studio")
+            return self._workflow.run(self.smart_memory)
+        
+        # Default evolution logic
+        logger.info("Running default evolution cycle")
+        
+        # Check if we should evolve working to episodic
         if self.should_evolve_working_to_episodic():
+            logger.info("Evolving working memory to episodic")
             self.commit_working_to_episodic()
-            logger.info("Evolved working memory to episodic memory")
-
-        # Check if we should evolve working memory to procedural
+        
+        # Check if we should evolve working to procedural
         if self.should_evolve_working_to_procedural():
+            logger.info("Evolving working memory to procedural")
             self.commit_working_to_procedural()
-            logger.info("Evolved working memory to procedural memory")
 
     # ------------------------------
     # Dynamic DAG workflow support

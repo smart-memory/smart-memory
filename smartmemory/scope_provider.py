@@ -4,27 +4,34 @@ from smartmemory.interfaces import ScopeProvider
 class DefaultScopeProvider(ScopeProvider):
     """
     Default implementation that uses explicitly provided scope identifiers.
-    defaults to None (global/unscoped) if not provided.
+    Defaults to None (global/unscoped) if not provided.
+    
+    **OSS Usage**: When no parameters are provided (default), this allows unrestricted
+    access to all data - perfect for single-user or development environments.
+    
+    Example OSS usage:
+        # No scope provider = unrestricted access
+        memory = SmartMemory()
     """
     
     def __init__(
         self,
         user_id: Optional[str] = None,
         workspace_id: Optional[str] = None,
-        org_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
         team_id: Optional[str] = None
     ):
         self.user_id = user_id
         self.workspace_id = workspace_id
-        self.org_id = org_id
+        self.tenant_id = tenant_id
         self.team_id = team_id
     
     def get_isolation_filters(self) -> Dict[str, Any]:
         filters = {}
         
         # Org/Tenant (Hard Isolation)
-        if self.org_id:
-            filters["tenant_id"] = self.org_id
+        if self.tenant_id:
+            filters["tenant_id"] = self.tenant_id
             
         # Workspace (Container Isolation)
         if self.workspace_id:

@@ -114,7 +114,7 @@ class VectorStore:
         # Expose collection for compatibility with _vec_data method
         self.collection = self._backend
 
-    def add(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False, workspace_id=None):
+    def add(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False):
         """
         Add an embedding to the vector store. Supports cross-referencing multiple node_ids and chunk_ids.
         - item_id: unique vector entry ID (string)
@@ -123,6 +123,8 @@ class VectorStore:
         - node_ids: single string or list of graph node IDs
         - chunk_ids: single string or list of chunk IDs
         - is_global: if True, forcibly remove user_id from metadata (though provider might override)
+        
+        Filtering is handled automatically by ScopeProvider.
         All IDs are stored in metadata as lists for robust cross-referencing.
         """
         meta = metadata.copy() if metadata else {}
@@ -167,10 +169,12 @@ class VectorStore:
         # Best-effort emit with automatic context
         VectorStore.VEC_EMIT(None, "add", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
 
-    def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False, workspace_id=None):
+    def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False):
         """
         Upsert an embedding to the vector store. Overwrites if the id exists, inserts if not.
         - is_global: if True, forcibly remove user_id from metadata
+        
+        Filtering is handled automatically by ScopeProvider.
         """
         meta = metadata.copy() if metadata else {}
         
@@ -236,20 +240,22 @@ class VectorStore:
                 return False
         return False
 
-    def search(self, query_embedding, top_k=5, is_global=False, workspace_id=None):
+    def search(self, query_embedding, top_k=5, is_global=False):
         """
-        Search the vector store. If is_global is True, return all results. If not, filter to user_id.
+        Search the vector store with automatic scope filtering.
+        
+        If is_global is True, return all results. Otherwise, filter by ScopeProvider.
+        Filtering is handled automatically by ScopeProvider.
         """
         t0 = perf_counter()
         backend_results = self._backend.search(query_embedding=query_embedding, top_k=top_k * 2)
         hits = []
         count = 0
         
-        # Get context from provider
+        # Get context from provider (single source of truth)
         filters = self.scope_provider.get_isolation_filters()
         effective_user_id = filters.get("user_id")
-        # Allow argument override for workspace_id
-        effective_workspace_id = workspace_id if workspace_id is not None else filters.get("workspace_id")
+        effective_workspace_id = filters.get("workspace_id")
         
         for i, res in enumerate(backend_results):
             id_ = res.get("id")

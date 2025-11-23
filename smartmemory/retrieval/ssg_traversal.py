@@ -106,8 +106,7 @@ class SimilarityGraphTraversal:
         # 2. Find anchor chunk (most similar to query)
         anchor_results = self.vector_store.search(
             query_embedding=query_embedding,
-            top_k=1,
-            workspace_id=workspace_id
+            top_k=1
         )
         
         if not anchor_results:
@@ -199,14 +198,14 @@ class SimilarityGraphTraversal:
         if query_embedding is None:
             return []
         
+        # 2. Find anchor chunk
         anchor_results = self.vector_store.search(
             query_embedding=query_embedding,
-            top_k=1,
-            workspace_id=workspace_id
+            top_k=1
         )
         
         if not anchor_results:
-            logger.warning(f"No anchor found for query: {query}")
+            logger.warning(f"No anchor found for triangulation query: {query}")
             return []
         
         anchor_id = anchor_results[0]['id']
@@ -340,8 +339,7 @@ class SimilarityGraphTraversal:
                 
                 similar_chunks = self.vector_store.search(
                     query_embedding=chunk_embedding,
-                    top_k=self.max_vector_neighbors,
-                    workspace_id=workspace_id
+                    top_k=self.max_vector_neighbors
                 )
                 
                 for result in similar_chunks:
