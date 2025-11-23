@@ -1,14 +1,12 @@
 name: Publish to PyPI
 
 on:
-  release:
-    types: [published]  # Trigger when a GitHub release is published
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
   workflow_dispatch:  # Allow manual trigger
-    inputs:
-      version:
-        description: 'Version to publish (must match pyproject.toml)'
-        required: true
-        type: string
 
 jobs:
   build-and-publish:
@@ -31,38 +29,42 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
-    - name: Verify version
+    - name: Check if version exists on PyPI
+      id: check_version
       run: |
-        # Extract version from pyproject.toml (single source of truth)
-        VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d'"' -f2)
-        echo "📦 Package version: $VERSION"
+        VERSION=$(cat VERSION | tr -d '\n')
+        echo "📦 Local version: $VERSION"
         
-        # If manual trigger, verify version matches input
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          if [ "$VERSION" != "${{ inputs.version }}" ]; then
-            echo "❌ Version mismatch: pyproject.toml has $VERSION but you specified ${{ inputs.version }}"
-            exit 1
-          fi
+        # Check if version exists on PyPI
+        if pip index versions smartmemory 2>/dev/null | grep -q "($VERSION)"; then
+          echo "⏭️  Version $VERSION already exists on PyPI, skipping..."
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "✅ Version $VERSION not found on PyPI, proceeding with publish..."
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         fi
-        
-        echo "✅ Version verified: $VERSION"
     
     - name: Clean previous builds
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         rm -rf dist/ build/ *.egg-info
     
     - name: Build package
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         python -m build
         echo "📦 Package built successfully"
         ls -lh dist/
     
     - name: Check package
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         twine check dist/*
         echo "✅ Package validation passed"
     
     - name: Verify package contents
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         # List contents of the wheel
         python -m zipfile -l dist/*.whl | head -20
@@ -70,6 +72,7 @@ jobs:
         echo "✅ Package contents verified"
     
     - name: Publish to PyPI
+      if: steps.check_version.outputs.skip != 'true'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_KEY }}
@@ -79,11 +82,13 @@ jobs:
         echo "✅ Published to PyPI successfully!"
     
     - name: Wait for PyPI to update
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         echo "⏳ Waiting 60 seconds for PyPI to update..."
         sleep 60
     
     - name: Test installation from PyPI
+      if: steps.check_version.outputs.skip != 'true'
       run: |
         # Create fresh virtual environment
         python -m venv test-env
@@ -99,8 +104,9 @@ jobs:
         deactivate
     
     - name: Create deployment summary
+      if: steps.check_version.outputs.skip != 'true'
       run: |
-        VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d'"' -f2)
+        VERSION=$(cat VERSION | tr -d '\n')
         echo "## 🎉 SmartMemory v$VERSION Published to PyPI" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Installation" >> $GITHUB_STEP_SUMMARY
