@@ -38,6 +38,15 @@ class SmartMemory(MemoryBase):
 
     def __init__(self, scope_provider: Optional[ScopeProvider] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Use DefaultScopeProvider if none provided (for OSS usage)
+        # Service layer should always provide a secure ScopeProvider
+        if scope_provider is None:
+            # Lazy import to avoid circular dependency
+            from smartmemory.scope_provider import DefaultScopeProvider
+            scope_provider = DefaultScopeProvider()
+        
+        self.scope_provider = scope_provider  # Store for use in filtering methods
         self._graph = SmartGraph(scope_provider=scope_provider)  # Direct SmartGraph backend is the canonical store
 
         # Initialize stages with proper delegation
@@ -487,7 +496,11 @@ class SmartMemory(MemoryBase):
         return self._crud.update(item)
 
     def run_evolution_cycle(self):
-        """Public wrapper to run a single evolution cycle."""
+        """
+        Public wrapper to run a single evolution cycle with automatic scope filtering.
+        
+        Filtering is determined by the ScopeProvider that was injected at initialization.
+        """
         return self._evolution.run_evolution_cycle()
 
     def ground_context(self, context: dict):
@@ -511,8 +524,13 @@ class SmartMemory(MemoryBase):
         """Delegate resolve_external to ExternalResolver submodule."""
         return self._external_resolver.resolve_external(node)
 
-    def search(self, query: str, top_k: int = 5, memory_type: str = None, user_id: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None):
-        """Search using canonical search component."""
+    def search(self, query: str, top_k: int = 5, memory_type: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None):
+        """
+        Search using canonical search component with automatic scope filtering.
+        
+        Filtering by tenant/workspace/user is handled automatically by ScopeProvider.
+        This ensures consistent isolation across all search operations.
+        """
         if memory_type == 'working':
             # Check if persistence is enabled; if so, use canonical search on persisted working items
             persist_enabled = False
@@ -525,7 +543,9 @@ class SmartMemory(MemoryBase):
 
             if persist_enabled:
                 # Use canonical search for working memory stored in graph
-                results = self._search.search(query, top_k=top_k * 2, memory_type='working')
+                # ScopeProvider handles tenant/user filtering automatically
+                results = self._search.search(query, top_k=top_k, memory_type='working')
+                
                 # Optional: filter by conversation_id when provided
                 conv_id = None
                 try:
@@ -538,16 +558,7 @@ class SmartMemory(MemoryBase):
                     conv_id = None
                 if conv_id and results:
                     results = [r for r in results if getattr(r, 'metadata', {}).get('conversation_id') == conv_id]
-                # Apply user_id filtering consistent with non-working path
-                if user_id and results:
-                    filtered_results = []
-                    for item in results:
-                        item_metadata = getattr(item, 'metadata', {})
-                        if item_metadata.get('user_id') == user_id:
-                            filtered_results.append(item)
-                    results = filtered_results[:top_k] if filtered_results else []
-                elif user_id:
-                    results = []
+                
                 return results[:top_k]
             else:
                 # Fallback to in-memory buffer behavior
@@ -593,28 +604,9 @@ class SmartMemory(MemoryBase):
                 return []
 
         # Use canonical search component directly
-        results = self._search.search(query, top_k=top_k * 2, memory_type=memory_type)  # Overfetch for filtering
-
-        # Apply user_id filtering if provided
-        if user_id and results:
-            filtered_results = []
-            for item in results:
-                item_metadata = getattr(item, 'metadata', {})
-                item_user_id = getattr(item, 'user_id', None)
-                # Check both user_id attribute and metadata for user_id
-                # Also restore user_id attribute if it's missing but exists in metadata
-                if not item_user_id and item_metadata.get('user_id'):
-                    item.user_id = item_metadata.get('user_id')
-                    item_user_id = item.user_id
-
-                if item_user_id == user_id or item_metadata.get('user_id') == user_id:
-                    filtered_results.append(item)
-                # Skip memories with different user_ids or no user_id (legacy items)
-            results = filtered_results[:top_k] if filtered_results else []
-        elif user_id:
-            # If user_id is provided but no results match, return empty instead of all results
-            results = []
-
+        # ScopeProvider handles all tenant/workspace/user filtering automatically
+        results = self._search.search(query, top_k=top_k, memory_type=memory_type)
+        
         return results[:top_k]
 
     # Linking
@@ -675,8 +667,13 @@ class SmartMemory(MemoryBase):
         return self._grounding.ground(context)
 
     # Personalization & Feedback
-    def personalize(self, user_id: str, traits: dict = None, preferences: dict = None) -> None:
-        return self._personalization.personalize(user_id, traits, preferences)
+    def personalize(self, traits: dict = None, preferences: dict = None) -> None:
+        """
+        Personalize the memory system for the current user.
+        
+        The current user is determined by ScopeProvider automatically.
+        """
+        return self._personalization.personalize(traits, preferences)
 
     def update_from_feedback(self, feedback: dict, memory_type: str = "semantic") -> None:
         return self._personalization.update_from_feedback(feedback, memory_type)
@@ -732,8 +729,13 @@ class SmartMemory(MemoryBase):
 
     def run_clustering(self) -> dict:
         """
-        Run global clustering to deduplicate entities.
-        Returns stats about merged entities.
+        Run clustering to deduplicate entities with automatic scope filtering.
+        
+        Filtering is determined by the ScopeProvider that was injected at initialization.
+        This ensures consistent tenant/workspace/user isolation.
+        
+        Returns:
+            Dict with stats about merged entities
         """
         return self._clustering.run()
 
@@ -773,18 +775,22 @@ class SmartMemory(MemoryBase):
         debug_info['results'] = search_results
         return debug_info
 
-    def get_all_items_debug(self, tenant_id: str = None, user_id: str = None) -> Dict[str, Any]:
-        """Get all items for debugging, optionally filtered by tenant/user.
+    def get_all_items_debug(self) -> Dict[str, Any]:
+        """Get all items for debugging, automatically filtered by ScopeProvider.
         
-        Args:
-            tenant_id: Filter by tenant/workspace ID
-            user_id: Filter by user ID
+        Uses ScopeProvider.get_isolation_filters() to determine which items to return.
+        This ensures consistent filtering across all operations.
         """
         debug_info = {
             'total_items': 0,
             'items_by_type': {},
             'sample_items': []
         }
+        
+        # Get isolation filters from ScopeProvider (single source of truth)
+        filters = {}
+        if self.scope_provider:
+            filters = self.scope_provider.get_isolation_filters()
         
         # Get all node IDs - self._graph.nodes is SmartGraphNodes object with nodes() method
         if hasattr(self._graph, 'nodes'):
@@ -803,16 +809,21 @@ class SmartMemory(MemoryBase):
                 if item_id in seen_ids:
                     continue
                 
-                # Filter by tenant/user if specified
-                if tenant_id or user_id:
+                # Apply filters from ScopeProvider (generic filtering)
+                if filters:
                     item_metadata = getattr(item, 'metadata', {})
-                    item_workspace = getattr(item, 'workspace_id', None) or item_metadata.get('workspace_id')
-                    item_user = getattr(item, 'user_id', None) or item_metadata.get('user_id')
+                    skip_item = False
                     
-                    # Skip if doesn't match filter
-                    if tenant_id and item_workspace != tenant_id:
-                        continue
-                    if user_id and item_user != user_id:
+                    for filter_key, filter_value in filters.items():
+                        # Check both direct property and metadata
+                        item_value = getattr(item, filter_key, None) or item_metadata.get(filter_key)
+                        
+                        # Skip if filter is set and doesn't match
+                        if filter_value and item_value != filter_value:
+                            skip_item = True
+                            break
+                    
+                    if skip_item:
                         continue
                 
                 seen_ids.add(item_id)
