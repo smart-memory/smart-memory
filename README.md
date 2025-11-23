@@ -57,7 +57,9 @@ The memory ingestion flow processes data through several stages:
 - **Extensible Pipeline**: Modular processing stages for ingestion and evolution
 - **Plugin Architecture**: 18 built-in plugins with external plugin support
 - **Plugin Security**: Sandboxing, permissions, and resource limits for safe plugin execution
-- **Multi-User Support**: User and group isolation for enterprise applications
+- **Flexible Scoping**: Optional `ScopeProvider` for multi-tenancy or unrestricted OSS usage
+- **Zero Configuration**: Works out-of-the-box for single-user applications
+- **Production Ready**: Service layer with JWT auth, tenant isolation, and team management
 - **Caching Layer**: Redis-based performance optimization
 - **Configuration Management**: Flexible configuration with environment variable support
 
@@ -94,32 +96,51 @@ See the [smart-memory-service](https://github.com/smart-memory/smart-memory-serv
 
 ## 🎯 Quick Start
 
-### Basic Usage
+### Basic Usage (OSS - Single User)
 
 ```python
 from smartmemory import SmartMemory, MemoryItem
 
-# Initialize SmartMemory
+# Initialize SmartMemory (no configuration needed for OSS usage)
 memory = SmartMemory()
 
 # Add a memory
 item = MemoryItem(
     content="User prefers Python for data analysis tasks",
     memory_type="semantic",
-    user_id="user123",
     metadata={'topic': 'preferences', 'domain': 'programming'}
 )
 memory.add(item)
 
-# Search memories
+# Search memories (automatically scoped)
 results = memory.search("Python programming", top_k=5)
 for result in results:
     print(f"Content: {result.content}")
     print(f"Type: {result.memory_type}")
 
 # Get memory summary
-summary = memory.summary()
-print(f"Total memories: {summary}")
+summary = memory.get_all_items_debug()
+print(f"Total memories: {summary['total_items']}")
+```
+
+### Multi-Tenant Usage (Service Layer)
+
+For production multi-tenant applications, use the [smart-memory-service](https://github.com/smart-memory/smart-memory-service) which provides:
+- Automatic tenant isolation via `ScopeProvider`
+- JWT authentication
+- Team and workspace management
+- RESTful API with FastAPI
+
+```python
+# Service layer automatically handles scoping
+from service_common.security import create_secure_smart_memory
+
+# Scope provider is injected automatically based on authenticated user
+memory = create_secure_smart_memory(user, request_scope=scope)
+
+# All operations automatically tenant-scoped
+memory.add(item)  # Stamped with tenant_id
+memory.search("query")  # Filtered by tenant
 ```
 
 ### Using Different Memory Types
@@ -391,14 +412,20 @@ Main interface for memory operations:
 
 ```python
 class SmartMemory:
-    def add(self, item: MemoryItem) -> Optional[MemoryItem]
+    def __init__(self, scope_provider: Optional[ScopeProvider] = None)
+    def add(self, item: MemoryItem) -> str
     def get(self, item_id: str) -> Optional[MemoryItem]
-    def search(self, query: str, top_k: int = 10) -> List[MemoryItem]
+    def search(self, query: str, top_k: int = 10, memory_type: str = None) -> List[MemoryItem]
     def delete(self, item_id: str) -> bool
     def clear(self) -> None
-    def summary(self) -> Dict[str, Any]
+    def get_all_items_debug(self) -> Dict[str, Any]
     def ingest(self, content: str, **kwargs) -> MemoryItem
+    def run_clustering(self) -> dict
+    def run_evolution_cycle(self) -> None
+    def personalize(self, traits: dict = None, preferences: dict = None) -> None
 ```
+
+**Note**: All methods automatically use `ScopeProvider` for filtering. No `user_id`, `tenant_id`, or `workspace_id` parameters needed - scoping is handled transparently.
 
 ### MemoryItem Class
 
@@ -410,8 +437,6 @@ class MemoryItem:
     content: str
     memory_type: str = 'semantic'
     item_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: Optional[str] = None
-    group_id: Optional[str] = None
     valid_start_time: Optional[datetime] = None
     valid_end_time: Optional[datetime] = None
     transaction_time: datetime = field(default_factory=datetime.now)
@@ -420,6 +445,8 @@ class MemoryItem:
     relations: Optional[list] = None
     metadata: dict = field(default_factory=dict)
 ```
+
+**Note**: `user_id`, `workspace_id`, `tenant_id`, and `team_id` are automatically injected by `ScopeProvider` when using the service layer. For OSS usage, these fields are optional.
 
 ## Dependencies
 
@@ -530,9 +557,13 @@ The following features are currently under active development:
   - Audit trail generation
 - **Planned**: Advanced temporal analytics
 
-### Multi-Tenancy (Service Layer)
-- **Current**: Single-user mode
-- **In Progress**: Full multi-tenancy support in smart-memory-service
-- **Planned**: Team collaboration features
+## ✅ Recently Completed
 
-These features are functional but not yet production-ready. Check the [GitHub repository](https://github.com/smart-memory/smart-memory) for the latest updates.
+### Multi-Tenancy & Scoping (v0.1.17)
+- ✅ **Complete ScopeProvider architecture**: All filtering through single source of truth
+- ✅ **Optional scoping**: OSS works without configuration, service layer enforces isolation
+- ✅ **Zero hardcoded parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods
+- ✅ **Tenant isolation**: Full multi-tenancy support in smart-memory-service
+- ✅ **Team collaboration**: Team and workspace management
+
+Check the [GitHub repository](https://github.com/smart-memory/smart-memory) for the latest updates.
