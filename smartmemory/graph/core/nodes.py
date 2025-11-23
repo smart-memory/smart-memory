@@ -174,7 +174,18 @@ class SmartGraphNodes:
     def get_neighbors(self, item_id: str, edge_type: Optional[str] = None, as_of_time: Optional[str] = None):
         """Get neighbors of a node."""
         neighbors = self.backend.get_neighbors(item_id, edge_type, as_of_time)
-        return [self._from_node_dict(self.item_cls, n) for n in neighbors]
+        # Backend returns [(neighbor_dict, link_type), ...] tuples
+        result = []
+        for item in neighbors:
+            if isinstance(item, tuple) and len(item) == 2:
+                neighbor_dict, link_type = item
+                neighbor_obj = self._from_node_dict(self.item_cls, neighbor_dict)
+                result.append((neighbor_obj, link_type))
+            else:
+                # Fallback for backends that don't return tuples
+                neighbor_obj = self._from_node_dict(self.item_cls, item)
+                result.append((neighbor_obj, None))
+        return result
 
     def remove_node(self, item_id: str):
         """Remove a node from the graph."""
@@ -202,6 +213,15 @@ class SmartGraphNodes:
             pass
         return result
 
+    def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
+        """Execute a raw query against the backend."""
+        if hasattr(self.backend, 'execute_cypher'):
+            return self.backend.execute_cypher(query, params)
+        elif hasattr(self.backend, 'execute_query'):
+            return self.backend.execute_query(query, params)
+        else:
+            raise NotImplementedError("Backend does not support raw queries")
+
     def nodes(self):
         """Return all node IDs for compatibility with memory store iteration."""
         try:
@@ -219,67 +239,38 @@ class SmartGraphNodes:
 
     @staticmethod
     def _to_node_dict(obj):
-        """Convert object to node dictionary."""
-        # Supports dataclasses/mixins, Pydantic models, and dicts
-        if hasattr(obj, "to_dict"):
-            node = obj.to_dict()
-            if hasattr(obj, "metadata") and isinstance(obj.metadata, dict):
-                node.update(obj.metadata)
-            node = flatten_dict(node)
-            return node
-        if hasattr(obj, "dict"):
-            node = obj.to_dict(exclude_unset=True)
-            if hasattr(obj, "metadata") and isinstance(obj.metadata, dict):
-                node.update(obj.metadata)
-            node = flatten_dict(node)
-            return node
+        """
+        Convert object to node dictionary using MemoryItemSerializer.
+        
+        This is the central serialization path for graph storage.
+        """
+        from smartmemory.utils.serialization import MemoryItemSerializer
+        
+        # Supports MemoryItem/Serializable objects
+        if hasattr(obj, "to_dict") or hasattr(obj, "to_storage"):
+            return MemoryItemSerializer.to_storage(obj)
         elif isinstance(obj, dict):
-            return flatten_dict(obj)
+            return flatten_dict(obj, sep='__')
         else:
-            raise TypeError("Unsupported type for _to_node_dict")
+            raise TypeError(f"Unsupported type for _to_node_dict: {type(obj)}")
 
     @staticmethod
     def _from_node_dict(item_cls, node):
-        """Convert node dictionary to object."""
+        """
+        Convert node dictionary to object using MemoryItemSerializer.
+        
+        Uses the centralized hydration logic to ensure consistency.
+        """
+        from smartmemory.utils.serialization import MemoryItemSerializer
+        
         # Handles both flat and nested dicts (Neo4j sometimes nests under 'properties')
         props = node.get("properties") or {} if "properties" in node else node
-
-        # Determine known field names across dataclasses and Pydantic
-        known_fields = get_field_names(item_cls)
-
-        # Separate known fields from metadata
-        known = {}
-        metadata = {}
-
-        for k, v in props.items():
-            if k in known_fields and k != 'metadata':  # Don't include metadata in known fields
-                known[k] = v
-            else:
-                metadata[k] = v
-
-        # Ensure required fields have defaults
-        if 'content' not in known:
-            known['content'] = props.get('name', props.get('description', ''))
-
-        # Handle transaction_time - ensure it's never None
-        if 'transaction_time' not in known or known.get('transaction_time') is None:
-            # Use current time if not provided or None
-            from datetime import datetime
-            known['transaction_time'] = datetime.now()
-
-        # Handle other datetime fields that might be None
-        datetime_fields = ['valid_start_time', 'valid_end_time']
-        for field in datetime_fields:
-            if field in known and known[field] is None:
-                # Remove None datetime fields rather than setting defaults
-                del known[field]
-
-        # Unflatten metadata if needed
-        metadata = unflatten_dict(metadata)
-
-        # Construct the item with known fields and metadata
-        known['metadata'] = metadata
-        return item_cls(**known)
+        
+        # Use the serializer to rehydrate
+        # The serializer expects a flat dict (which backends should now return)
+        # If properties are already partially unflattened (unlikely with new backend logic but possible in transition),
+        # the serializer should still handle public fields correctly.
+        return MemoryItemSerializer.from_storage(item_cls, props)
 
     def _emit_graph_stats(self, operation: str, details: Dict[str, Any], delta_nodes: Optional[int] = None, delta_edges: Optional[int] = None) -> None:
         """Best-effort emission of graph stats update events."""

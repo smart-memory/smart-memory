@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import math
 
 from falkordb import FalkorDB
 
@@ -116,11 +117,16 @@ class FalkorVectorBackend(VectorBackend):
 
     def _upsert_impl(self, *, item_id: str, embedding: List[float], metadata: Dict) -> None:
         scalars = self._to_scalar_props(metadata)
+        # Remove 'item_id' from scalars since it's already in the MERGE clause
+        scalars.pop('item_id', None)
+        scalars.pop('id', None)  # Also remove 'id' to avoid conflicts
+        
         params: Dict = {"item_id": item_id, "embedding": embedding}
         # Ensure vector literal creation via vecf32($embedding)
         set_parts = ["n.embedding = vecf32($embedding)"]
         for k, v in scalars.items():
-            set_parts.append(f"n.{k} = $prop_{k}")
+            # Escape property names with backticks to avoid reserved word conflicts
+            set_parts.append(f"n.`{k}` = $prop_{k}")
             params[f"prop_{k}"] = v
         set_clause = ", ".join(set_parts)
         query = f"MERGE (n:{self.label} {{id: $item_id}}) SET {set_clause}"

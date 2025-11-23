@@ -48,7 +48,7 @@ def integration_config():
         "graph_db": {
             "backend_class": "FalkorDBBackend",
             "host": "localhost",
-            "port": 6379,
+            "port": 9010,
             "database": "integration_test_smartmemory"
         },
         "vector_store": {
@@ -59,7 +59,7 @@ def integration_config():
         "cache": {
             "redis": {
                 "host": "localhost",
-                "port": 6379,
+                "port": 9012,
                 "db": 14  # Separate integration test database
             }
         },
@@ -82,6 +82,11 @@ def real_smartmemory_for_integration(integration_config):
     # Import here to avoid circular imports
     from smartmemory.smart_memory import SmartMemory
 
+    # Set environment variables to match integration config/docker services
+    os.environ["FALKORDB_PORT"] = str(integration_config["graph_db"]["port"])
+    os.environ["REDIS_PORT"] = str(integration_config["cache"]["redis"]["port"])
+    os.environ["VECTOR_BACKEND"] = "falkordb" # Use FalkorDB as default if Chroma is missing
+    
     # Try to create real SmartMemory instance; skip gracefully if backends are unavailable
     try:
         memory = SmartMemory()
@@ -100,6 +105,11 @@ def real_smartmemory_for_integration(integration_config):
     # Reset environment
     if 'SMARTMEMORY_ENV' in os.environ:
         del os.environ['SMARTMEMORY_ENV']
+    
+    # Cleanup env vars
+    os.environ.pop("FALKORDB_PORT", None)
+    os.environ.pop("REDIS_PORT", None)
+    os.environ.pop("VECTOR_BACKEND", None)
 
 
 @pytest.fixture

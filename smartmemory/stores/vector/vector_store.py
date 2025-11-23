@@ -1,11 +1,13 @@
 import json
 from datetime import datetime
 from time import perf_counter
+from typing import Optional
 
 from smartmemory.observability.instrumentation import make_emitter
 from smartmemory.stores.vector.backends.base import create_backend
 from smartmemory.utils import get_config
-from smartmemory.utils.context import get_user_id, get_workspace_id
+from smartmemory.interfaces import ScopeProvider
+from smartmemory.scope_provider import DefaultScopeProvider
 
 
 class VectorStore:
@@ -77,15 +79,22 @@ class VectorStore:
         # Omit None entries
         return {k: v for k, v in data.items() if v is not None}
 
-    def __init__(self, collection_name=None, persist_directory=None):
+    def __init__(self, collection_name=None, persist_directory=None, scope_provider: Optional[ScopeProvider] = None):
         """Construct a VectorStore that delegates to a configured backend."""
+        self.scope_provider = scope_provider or DefaultScopeProvider()
+        
         vector_cfg = get_config('vector') or {}
         full_cfg = get_config()
 
         # Resolve effective collection name with namespace support
         ns = full_cfg.get('active_namespace') if isinstance(full_cfg, dict) else None
         use_ws_ns = bool(vector_cfg.get("use_workspace_namespace", False))
-        ws = get_workspace_id() if use_ws_ns else None
+        
+        # Use scope provider to get workspace context if needed for namespacing
+        ws = None
+        if use_ws_ns:
+            ctx = self.scope_provider.get_isolation_filters()
+            ws = ctx.get("workspace_id")
 
         base_collection = collection_name or vector_cfg.get("collection_name") or "semantic_memory"
         # Chroma collections cannot contain ':'; use '_' as delimiter
@@ -113,12 +122,17 @@ class VectorStore:
         - metadata: dict of additional metadata
         - node_ids: single string or list of graph node IDs
         - chunk_ids: single string or list of chunk IDs
-        - user_id: user context for multi-tenancy (None for global)
-        - is_global: if True, forcibly remove user_id from metadata
+        - is_global: if True, forcibly remove user_id from metadata (though provider might override)
         All IDs are stored in metadata as lists for robust cross-referencing.
         """
         meta = metadata.copy() if metadata else {}
         meta["item_id"] = str(item_id)
+        
+        # Inject write context from provider
+        if not is_global:
+            write_ctx = self.scope_provider.get_write_context()
+            meta.update(write_ctx)
+        
         # Flatten 'properties' dict if present
         node = meta.pop("_node", None)
         if node:
@@ -147,24 +161,7 @@ class VectorStore:
 
         meta = {k: chroma_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
-        # Multi-tenancy logic
-        effective_user_id = get_user_id()
-        effective_workspace_id = workspace_id if workspace_id is not None else get_workspace_id()
-        if "user_id" in meta:
-            # If user_id is specified in metadata, always use it (metadata wins)
-            pass
-        elif effective_user_id is None:
-            # No user context, always treat as global
-            meta.pop("user_id", None)
-        elif is_global:
-            meta.pop("user_id", None)
-        else:
-            meta["user_id"] = effective_user_id
-        # workspace scope: best-effort tagging; allow explicit override in metadata
-        if "workspace_id" in meta:
-            pass
-        elif effective_workspace_id:
-            meta["workspace_id"] = effective_workspace_id
+        
         t0 = perf_counter()
         self._backend.add(item_id=str(item_id), embedding=embedding, metadata=meta)
         # Best-effort emit with automatic context
@@ -173,10 +170,15 @@ class VectorStore:
     def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False, workspace_id=None):
         """
         Upsert an embedding to the vector store. Overwrites if the id exists, inserts if not.
-        - user_id: user context for multi-tenancy (None for global)
         - is_global: if True, forcibly remove user_id from metadata
         """
         meta = metadata.copy() if metadata else {}
+        
+        # Inject write context from provider
+        if not is_global:
+            write_ctx = self.scope_provider.get_write_context()
+            meta.update(write_ctx)
+            
         if node_ids is not None:
             meta["node_ids"] = node_ids if isinstance(node_ids, list) else [node_ids]
         if chunk_ids is not None:
@@ -192,24 +194,7 @@ class VectorStore:
 
         meta = {k: chroma_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
-        from smartmemory.utils.context import get_user_id, get_workspace_id
-        effective_user_id = get_user_id()
-        effective_workspace_id = workspace_id if workspace_id is not None else get_workspace_id()
-        if "user_id" in meta:
-            # If user_id is specified in metadata, always use it (metadata wins)
-            pass
-        elif effective_user_id is None:
-            # No user context, always treat as global
-            meta.pop("user_id", None)
-        elif is_global:
-            meta.pop("user_id", None)
-        else:
-            meta["user_id"] = effective_user_id
-        # workspace scope tagging
-        if "workspace_id" in meta:
-            pass
-        elif effective_workspace_id:
-            meta["workspace_id"] = effective_workspace_id
+        
         t0 = perf_counter()
         self._backend.upsert(item_id=str(item_id), embedding=embedding, metadata=meta)
         VectorStore.VEC_EMIT(None, "upsert", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
@@ -259,12 +244,17 @@ class VectorStore:
         backend_results = self._backend.search(query_embedding=query_embedding, top_k=top_k * 2)
         hits = []
         count = 0
-        from smartmemory.utils.context import get_user_id, get_workspace_id
-        effective_user_id = get_user_id()
-        effective_workspace_id = workspace_id if workspace_id is not None else get_workspace_id()
+        
+        # Get context from provider
+        filters = self.scope_provider.get_isolation_filters()
+        effective_user_id = filters.get("user_id")
+        # Allow argument override for workspace_id
+        effective_workspace_id = workspace_id if workspace_id is not None else filters.get("workspace_id")
+        
         for i, res in enumerate(backend_results):
             id_ = res.get("id")
             meta = res.get("metadata", {})
+            
             # Global searches return everything regardless of scope
             if effective_user_id is None or is_global:
                 if "user_id" in meta:
@@ -272,9 +262,11 @@ class VectorStore:
             else:
                 if meta.get("user_id") != effective_user_id:
                     continue
+                    
             # If a workspace_id is set, enforce match
             if effective_workspace_id is not None and meta.get("workspace_id") != effective_workspace_id:
                 continue
+                
             hit = {"id": id_}
             hit["metadata"] = self.deserialize_metadata(meta)
             if "score" in res:
