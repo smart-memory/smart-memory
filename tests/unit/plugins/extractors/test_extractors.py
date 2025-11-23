@@ -225,6 +225,20 @@ class TestRelikExtractor:
     """Test RelikExtractor plugin."""
     
     @pytest.fixture
+    def mock_relik_module(self):
+        """Mock relik module to prevent import errors."""
+        import sys
+        from unittest.mock import MagicMock
+        
+        # Create mock module
+        mock_relik = MagicMock()
+        mock_relik.Relik = MagicMock()
+        
+        # Patch sys.modules
+        with patch.dict(sys.modules, {'relik': mock_relik}):
+            yield mock_relik
+    
+    @pytest.fixture
     def mock_relik_model(self):
         """Create mock Relik model."""
         mock_model = Mock()
@@ -232,8 +246,9 @@ class TestRelikExtractor:
         return mock_model
     
     @pytest.fixture
-    def extractor(self, mock_relik_model):
+    def extractor(self, mock_relik_module, mock_relik_model):
         """Create RelikExtractor with mocked model."""
+        # patch inside the context where relik module exists
         with patch('relik.Relik.from_pretrained', return_value=mock_relik_model):
             extractor = RelikExtractor()
             # Ensure the mock is used and prevent loading

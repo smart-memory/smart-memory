@@ -139,6 +139,10 @@ class StoragePipeline:
         """
         Ensure an entity node exists in the graph, creating it if necessary.
         Returns the node ID.
+        
+        Note: Internal entities from extraction are typically created via the atomic 
+        add_dual_node path. This method serves as a fallback and for ensuring 
+        existence of external entities referenced in relationships.
         """
         # Normalize entity name for disambiguation
         normalized_name = str(entity_name).strip().lower()

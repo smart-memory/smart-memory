@@ -21,7 +21,7 @@ class CommonsenseGroundingConfig(BaseModel):
 
 
 class CausalGroundingConfig(BaseModel):
-    model_name: str = "gpt-4o"
+    model_name: str = "gpt-5.1"
     inference_method: Literal["pattern", "bayesian", "do_calculus", "llm"] = "llm"
     confidence_threshold: confloat(ge=0, le=1) = 0.7
     max_paths: conint(ge=1, le=50) = 10

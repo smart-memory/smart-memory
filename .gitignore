@@ -176,3 +176,4 @@ test_data/
 # Ignore markdown files except in docs/
 *.md
 !docs/public/*.md
+!DESIGN_STANDARDS.md

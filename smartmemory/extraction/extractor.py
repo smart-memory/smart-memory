@@ -34,7 +34,7 @@ class OntologyExtractor:
     def __init__(self):
         self.config = get_config('extractor')
         self.llm_config = self.config.get('llm') or {}
-        self.model_name = self.llm_config.get('model_name', 'gpt-5-mini')
+        self.model_name = self.llm_config.get('model_name', 'gpt-5.1-mini')
 
     def _build_ontology_prompt(self, template: Optional[str] = None) -> str:
         """Build a comprehensive prompt that includes the ontology schema.

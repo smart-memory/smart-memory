@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import json
+import logging
 from typing import Union, Any, Dict, List
 
 from smartmemory.graph.models.node_types import NodeTypeProcessor, MemoryNodeType, EntityNodeType
@@ -8,6 +9,7 @@ from smartmemory.models.memory_item import MemoryItem
 from smartmemory.stores.base import BaseHandler
 from smartmemory.utils import get_config
 
+logger = logging.getLogger(__name__)
 
 class CRUD(BaseHandler):
     """
@@ -58,11 +60,13 @@ class CRUD(BaseHandler):
         return item
 
     def add(self, item: Union[MemoryItem, dict, Any], **kwargs) -> str:
-        """Add item using dual-node architecture.
+        """Add item using dual-node architecture with selective embedding generation.
         
         Behavior:
         - Always create via dual-node path. If no ontology_extraction is provided,
           we still create a memory node (entities=[]).
+        - Generate embeddings for memory nodes (semantic, episodic, procedural)
+        - Skip embeddings for entity/relation nodes (not searchable content)
         - When crud.return_full_result is true, returns a dict containing
           memory_node_id and entity_node_ids; otherwise returns memory_node_id.
         """
@@ -84,10 +88,68 @@ class CRUD(BaseHandler):
             ontology_extraction
         )
         result = self.node_processor.create_dual_node_structure(dual_spec)
+        
+        # Generate embedding for memory nodes (makes them searchable)
+        memory_node_id = result['memory_node_id']
+        if self._should_generate_embedding(normalized_item):
+            try:
+                self._generate_and_store_embedding(normalized_item, memory_node_id)
+            except Exception as e:
+                logger.warning(f"Failed to generate embedding for {memory_node_id}: {e}")
+                # Non-fatal: item is still in graph, searchable via text fallback
+        
         # Optionally return the full creation result (including entity_node_ids)
         if return_full and isinstance(result, dict):
             return result  # type: ignore[return-value]
         return result['memory_node_id']
+    
+    def _should_generate_embedding(self, item: MemoryItem) -> bool:
+        """Determine if item needs embedding based on node type and memory type."""
+        # Check node category (memory vs entity vs relation)
+        node_category = item.metadata.get('node_category') if item.metadata else None
+        
+        # Only generate for memory nodes
+        if node_category and node_category != 'memory':
+            return False
+        
+        # Check memory type
+        memory_type = getattr(item, 'memory_type', 'semantic')
+        
+        # Always generate for searchable memory types
+        if memory_type in ['semantic', 'episodic', 'procedural']:
+            return True
+        
+        # Never generate for temporary/metadata types
+        if memory_type in ['working', 'metadata', 'relation']:
+            return False
+        
+        # Check configuration for other types
+        try:
+            embedding_cfg = get_config('embeddings') or {}
+            return embedding_cfg.get(f'enable_{memory_type}', True)
+        except Exception:
+            return True  # Default to generating embeddings
+    
+    def _generate_and_store_embedding(self, item: MemoryItem, item_id: str):
+        """Generate embedding and store in vector store."""
+        from smartmemory.plugins.embedding import create_embeddings
+        from smartmemory.stores.vector.vector_store import VectorStore
+        
+        # Generate embedding if not already present
+        if not hasattr(item, 'embedding') or item.embedding is None:
+            item.embedding = create_embeddings(str(item.content))
+        
+        # Store in vector store if embedding was generated
+        if item.embedding is not None:
+            vector_store = VectorStore()
+            vector_store.upsert(
+                item_id=str(item_id),
+                embedding=item.embedding,
+                metadata=item.metadata or {},
+                node_ids=[str(item_id)],
+                is_global=False  # Respect workspace scoping
+            )
+            logger.debug(f"Generated and stored embedding for {item_id}")
 
     # Legacy single-node path removed
 

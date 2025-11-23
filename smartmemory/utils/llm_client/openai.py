@@ -27,7 +27,7 @@ def call_openai_responses(
     """Invoke the OpenAI Responses API and return output text.
 
     Arguments
-    - model: OpenAI model name (e.g., gpt-5-mini).
+    - model: OpenAI model name (e.g., gpt-5.1-mini).
     - messages: list of dicts with keys {role, content}.
     - max_output_tokens: output token budget for Responses API.
     - api_key: OpenAI API key.

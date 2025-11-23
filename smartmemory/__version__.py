@@ -32,6 +32,13 @@ except:
     __version_info__ = (0, 1, 6)
 
 # Version history:
+# 0.1.16 - SSG integration, user signature support, documentation updates, DRY version management (VERSION file as single source of truth)
+# 0.1.14 - Tenant isolation bug fix
+# 0.1.13 - Tenant isolation bug fix
+# 0.1.12 - Tenant isolation improvements
+# 0.1.11 - Version bump and maintenance
+# 0.1.10 - Minor fix to grounder plugin, publish script improvements
+# 0.1.9 - Add dspy to requirements
 # 0.1.8 - README overhaul: fixed all code snippets to use public API, verified evolvers, added "In Progress" section, removed internal imports
 # 0.1.7 - Updated README, removed ChromaDB references, fixed PyPI deployment
 # 0.1.6 - Production PyPI deployment setup

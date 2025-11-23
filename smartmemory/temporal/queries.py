@@ -144,18 +144,25 @@ class TemporalQueries:
             # This requires querying the graph for all items
             try:
                 query = """
-                MATCH (m:Memory)
-                RETURN m.item_id as item_id
+                MATCH (m)
+                WHERE m.item_id IS NOT NULL
+                RETURN DISTINCT m.item_id as item_id
                 """
                 result = self.memory.graph.execute_query(query, {})
                 
                 memories_at_time = []
                 for row in result:
-                    item_id = row['item_id']
+                    # FalkorDB returns results as a list, not dict
+                    item_id = row[0]  # RETURN m.item_id as item_id
+                    logger.debug(f"Checking item_id: {item_id} at time {dt.isoformat()}")
                     version = self.version_tracker.get_version_at_time(item_id, dt)
                     if version:
+                        logger.debug(f"Found version {version.version_number} for {item_id}")
                         memories_at_time.append(version)
+                    else:
+                        logger.debug(f"No version found for {item_id} at {dt.isoformat()}")
                 
+                logger.info(f"at_time query returned {len(memories_at_time)} memories")
                 return memories_at_time
                 
             except Exception as e:
@@ -518,24 +525,41 @@ class TemporalQueries:
         end: Optional[str]
     ) -> List[TemporalVersion]:
         """Query all versions from backend."""
-        # For now, we only have access to current version via as_of_time
-        # A full implementation would query the graph database for all versions
+        if not self.version_tracker:
+            logger.warning("Version tracker not available")
+            return []
         
         try:
-            current = self.memory.graph.get_node(item_id)
-            if current:
-                version = TemporalVersion(
-                    item_id=item_id,
-                    content=getattr(current, 'content', ''),
-                    metadata=getattr(current, 'metadata', {}),
-                    transaction_time_start=datetime.now(),
-                    version=1
-                )
-                return [version]
+            # Parse time strings to datetime
+            start_dt = self._parse_time(start) if start else None
+            end_dt = self._parse_time(end) if end else None
+            
+            # Get versions from version tracker
+            versions = self.version_tracker.get_versions(
+                item_id,
+                start_time=start_dt,
+                end_time=end_dt
+            )
+            
+            # Convert Version objects to TemporalVersion objects
+            temporal_versions = []
+            for v in versions:
+                temporal_versions.append(TemporalVersion(
+                    item_id=v.item_id,
+                    content=v.content,
+                    metadata=v.metadata,
+                    valid_time_start=v.valid_time_start,
+                    valid_time_end=v.valid_time_end,
+                    transaction_time_start=v.transaction_time_start,
+                    transaction_time_end=v.transaction_time_end,
+                    version=v.version_number
+                ))
+            
+            return temporal_versions
+            
         except Exception as e:
             logger.error(f"Error querying versions: {e}")
-        
-        return []
+            return []
     
     def _parse_time(self, time_str: str) -> datetime:
         """Parse time string to datetime."""

@@ -181,8 +181,8 @@ class SmartGraphSearch:
             vector_results = vector_store.search(query_embedding, top_k=top_k * 2)  # Get more for filtering
 
             if not vector_results:
-                logger.debug(f"No vector results found for query: {query_str}")
-                return []
+                logger.debug(f"No vector results found for query: {query_str}, triggering fallback")
+                return None  # Return None to trigger fallback chain
 
             # Convert vector results to MemoryItems by retrieving from graph
             memory_items = []
@@ -198,6 +198,11 @@ class SmartGraphSearch:
                     except Exception as e:
                         logger.warning(f"Failed to retrieve node {node_id}: {e}")
                         continue
+
+            # If we got vector results but couldn't retrieve any items, trigger fallback
+            if not memory_items:
+                logger.debug(f"Vector results found but items not retrievable, triggering fallback")
+                return None
 
             logger.info(f"Vector search found {len(memory_items)} results for query: {query_str}")
             return memory_items

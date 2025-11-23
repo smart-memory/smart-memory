@@ -7,9 +7,11 @@ Enables full history tracking, version comparison, and temporal queries.
 
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 import logging
 import json
+
+from smartmemory.utils import unflatten_dict
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,26 @@ class Version:
         for key in ['valid_time_start', 'valid_time_end', 'transaction_time_start', 'transaction_time_end']:
             if data.get(key) and isinstance(data[key], str):
                 data[key] = datetime.fromisoformat(data[key])
-        return cls(**data)
+        
+        # Separate known fields from metadata (handling flattened storage)
+        known_fields = {f.name for f in fields(cls)}
+        init_args = {}
+        metadata = data.get('metadata', {}).copy()
+        
+        # Handle reference item ID (stored as ref_item_id to avoid conflict with node ID)
+        if 'ref_item_id' in data:
+            data['item_id'] = data['ref_item_id']
+        
+        for k, v in data.items():
+            if k in known_fields:
+                init_args[k] = v
+            elif k != 'metadata':
+                # Flattened metadata field -> add to metadata dict
+                metadata[k] = v
+        
+        init_args['metadata'] = metadata
+        
+        return cls(**init_args)
     
     def is_current(self) -> bool:
         """Check if this is the current version."""
@@ -281,17 +302,49 @@ class VersionTracker:
         try:
             # Store as a Version node in the graph
             properties = version.to_dict()
-            properties['label'] = 'Version'
+            
+            # Rename item_id to ref_item_id to avoid conflict with node ID (version_...)
+            if 'item_id' in properties:
+                properties['ref_item_id'] = properties.pop('item_id')
+            
+            # Flatten metadata into properties to ensure compatibility with MemoryItemSerializer
+            # This prevents double-nesting (metadata__key -> metadata: {key}) during retrieval
+            metadata = properties.pop('metadata', {})
+            if isinstance(metadata, dict):
+                for k, v in metadata.items():
+                    # Don't overwrite system fields
+                    if k not in properties:
+                        properties[k] = v
+            
+            # VersionTracker uses 'Version' as the type/label
             
             # Use graph backend to store
+            # Note: self.graph is expected to be SmartGraphNodes or compatible interface
+            # add_node(item_id, properties, memory_type=...)
             self.graph.add_node(
                 item_id=f"version_{version.item_id}_{version.version_number}",
-                label='Version',
-                properties=properties
+                properties=properties,
+                memory_type='Version' 
             )
             
-            # Link to the main memory item
-            self.graph.add_edge(
+            # Ensure main node exists before creating edge
+            # Check if it exists first
+            check_query = "MATCH (m {item_id: $id}) RETURN COUNT(m) as count"
+            result = list(self.graph.execute_query(check_query, {'id': version.item_id}))
+            node_exists = result[0][0] > 0 if result else False
+            
+            if not node_exists:
+                # Create minimal main node directly via backend to avoid version tracking loops
+                # Use a simple MERGE query to create if not exists
+                create_query = """
+                MERGE (m {item_id: $id})
+                ON CREATE SET m:Memory, m:semantic, m.item_id = $id
+                """
+                self.graph.execute_query(create_query, {'id': version.item_id})
+                logger.debug(f"Created placeholder main node for {version.item_id}")
+            
+            # Now create the edge
+            self.graph.backend.add_edge(
                 source_id=version.item_id,
                 target_id=f"version_{version.item_id}_{version.version_number}",
                 edge_type='HAS_VERSION',
@@ -308,8 +361,24 @@ class VersionTracker:
             version_id = f"version_{version.item_id}_{version.version_number}"
             properties = version.to_dict()
             
+            # Rename item_id to ref_item_id
+            if 'item_id' in properties:
+                properties['ref_item_id'] = properties.pop('item_id')
+            
+            # Flatten metadata into properties
+            metadata = properties.pop('metadata', {})
+            if isinstance(metadata, dict):
+                for k, v in metadata.items():
+                    if k not in properties:
+                        properties[k] = v
+            
             # Update node properties
-            self.graph.update_node(version_id, properties)
+            # Use add_node for upsert
+            self.graph.add_node(
+                item_id=version_id,
+                properties=properties,
+                memory_type='Version'
+            )
             
         except Exception as e:
             logger.error(f"Error updating version: {e}")
@@ -323,7 +392,7 @@ class VersionTracker:
     ) -> List[Version]:
         """Query versions from graph database."""
         try:
-            # Query all version nodes for this item
+            # First try to query via HAS_VERSION relationship
             query = f"""
             MATCH (m {{item_id: $item_id}})-[:HAS_VERSION]->(v:Version)
             RETURN v
@@ -331,10 +400,37 @@ class VersionTracker:
             """
             
             result = self.graph.execute_query(query, {'item_id': item_id})
+            result_list = list(result)
+            
+            # If no results via relationship, try querying version nodes directly by item_id property
+            if not result_list:
+                query = f"""
+                MATCH (v:Version)
+                WHERE v.item_id = $item_id
+                RETURN v
+                ORDER BY v.version_number DESC
+                """
+                result = self.graph.execute_query(query, {'item_id': item_id})
+                result_list = list(result)
             
             versions = []
-            for row in result:
-                version_data = row['v']
+            for row in result_list:
+                # FalkorDB returns results as a list, not dict
+                # Each row is a list with values corresponding to RETURN clause
+                node = row[0]  # RETURN v
+                
+                # Convert node object to dict
+                if hasattr(node, 'properties'):
+                    version_data = dict(node.properties)
+                else:
+                    version_data = {k: v for k, v in vars(node).items() if not k.startswith('_')}
+                
+                # Remove internal properties that shouldn't be exposed
+                version_data.pop('is_global', None)
+                
+                # Unflatten the dict to restore nested structure (e.g., metadata__version -> metadata: {version: ...})
+                version_data = unflatten_dict(version_data)
+                
                 version = Version.from_dict(version_data)
                 
                 # Apply filters

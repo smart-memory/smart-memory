@@ -10,7 +10,6 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from smartmemory.configuration import MemoryConfig
-from smartmemory.utils.context import get_workspace_id
 
 try:
     import redis
@@ -64,11 +63,9 @@ class RedisOntologyCache:
             self.client = None
 
     def _key(self, prefix: str, *args) -> str:
-        """Generate cache key, optionally namespaced by workspace_id if present in context."""
-        ws = get_workspace_id()
+        """Generate cache key."""
         parts = ["ontology", prefix]
-        if ws:
-            parts.append(str(ws))
+        # Workspace scoping should be handled by registry_id in args if needed
         parts.extend(str(arg) for arg in args)
         return ":".join(parts)
 
