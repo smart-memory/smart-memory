@@ -15,8 +15,10 @@ from smartmemory.memory.pipeline.stages.linking import Linking
 from smartmemory.memory.pipeline.stages.monitoring import Monitoring
 from smartmemory.memory.pipeline.stages.personalization import Personalization
 from smartmemory.memory.pipeline.stages.search import Search
+from smartmemory.memory.pipeline.stages.clustering import GlobalClustering
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.plugins.resolvers.external_resolver import ExternalResolver
+from smartmemory.interfaces import ScopeProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +36,9 @@ class SmartMemory(MemoryBase):
     Do not use Linking directly; it is an internal implementation detail.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, scope_provider: Optional[ScopeProvider] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._graph = SmartGraph()  # Direct SmartGraph backend is the canonical store
+        self._graph = SmartGraph(scope_provider=scope_provider)  # Direct SmartGraph backend is the canonical store
 
         # Initialize stages with proper delegation
         self._graph_ops = GraphOperations(self._graph)
@@ -48,10 +50,13 @@ class SmartMemory(MemoryBase):
         self._search = Search(self._graph)
         self._monitoring = Monitoring(self._graph)
         self._evolution = EvolutionOrchestrator(self)
+        self._clustering = GlobalClustering(self)
         self._external_resolver = ExternalResolver()
 
         # Initialize temporal queries
         from smartmemory.temporal.queries import TemporalQueries
+        from smartmemory.temporal.version_tracker import VersionTracker
+        self.version_tracker = VersionTracker(self._graph)
         self.temporal = TemporalQueries(self)
         self._temporal_context = None  # For time-travel context manager
 
@@ -60,6 +65,11 @@ class SmartMemory(MemoryBase):
         
         # Set self on graph search module for SSG traversal
         self._graph.search.set_smart_memory(self)
+
+    @property
+    def graph(self):
+        """Access to underlying graph storage."""
+        return self._graph
 
     def clear(self):
         """Clear all memory from ALL storage backends comprehensively."""
@@ -285,6 +295,25 @@ class SmartMemory(MemoryBase):
         if memory_type == 'working':
             return self._add_basic(normalized_item, **kwargs)
 
+        # Check for explicit versioning via original_id
+        # This supports the temporal test patterns where add() is used to create new versions
+        if normalized_item.metadata and 'original_id' in normalized_item.metadata:
+            original_id = normalized_item.metadata['original_id']
+            try:
+                version = self.version_tracker.create_version(
+                    item_id=original_id,
+                    content=normalized_item.content,
+                    metadata=normalized_item.metadata,
+                    changed_by=user_id,
+                    change_reason="updated via add()"
+                )
+                # Return a unique ID for the version node, consistent with the expectation that
+                # add() returns a unique ID for the new "item" (version)
+                return f"version_{original_id}_{version.version_number}"
+            except Exception as e:
+                logger.warning(f"Failed to create version for {original_id}: {e}")
+                # Fallback to normal add if versioning fails (e.g. original not found)
+
         # If this is called from internal code that needs basic storage, check for bypass flag
         if kwargs.pop('_bypass_ingestion', False):
             return self._add_basic(normalized_item, **kwargs)
@@ -321,16 +350,36 @@ class SmartMemory(MemoryBase):
         # Delegate evolution to EvolutionOrchestrator (fail fast)
         self._evolution.run_evolution_cycle()
 
-        # Return the item_id from the result
+        # Extract item_id from result
+        item_id = None
         if isinstance(result, dict) and 'item' in result:
             item = result['item']
-            return item.item_id if hasattr(item, 'item_id') else str(item)
+            item_id = item.item_id if hasattr(item, 'item_id') else str(item)
         elif isinstance(result, dict) and 'item_id' in result:
-            return result['item_id']
+            item_id = result['item_id']
         elif hasattr(result, 'item_id'):
-            return result.item_id
+            item_id = result.item_id
         else:
-            return str(result) if result else None
+            item_id = str(result) if result else None
+            
+        # Auto-version initial creation
+        if item_id and self.version_tracker:
+            try:
+                # Only create if no versions exist (avoid double creation if logic changes)
+                # We check cache first to avoid DB hit if possible, but get_versions does that
+                versions = self.version_tracker.get_versions(item_id)
+                if not versions:
+                    self.version_tracker.create_version(
+                        item_id=item_id,
+                        content=normalized_item.content,
+                        metadata=normalized_item.metadata,
+                        changed_by=user_id,
+                        change_reason="initial creation"
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to create initial version for {item_id}: {e}")
+                
+        return item_id
 
     def _add_basic(self, item, **kwargs) -> str:
         """
@@ -588,16 +637,16 @@ class SmartMemory(MemoryBase):
 
     def get_neighbors(self, item_id: str):
         """
-        Return neighboring MemoryItems for a node.
+        Return neighboring MemoryItems for a node with link types.
         Delegates to GraphOperations component for proper abstraction.
+        
+        Returns:
+            List of tuples: [(MemoryItem, link_type), ...]
         """
         neighbors = self._graph_ops.get_neighbors(item_id)
-        neighbor_items = []
-        for neighbor_id in neighbors:
-            neighbor_item = self.get(neighbor_id)
-            if neighbor_item:
-                neighbor_items.append(neighbor_item)
-        return neighbor_items
+        # neighbors is now [(MemoryItem, link_type), ...] from graph_ops
+        # Just return them directly since they're already MemoryItem objects
+        return neighbors
 
     # Enrichment & Transformation
     def enrich(self, item_id: str, routines: Optional[List[str]] = None) -> None:
@@ -680,6 +729,13 @@ class SmartMemory(MemoryBase):
     def commit_working_to_procedural(self, remove_from_source: bool = True) -> List[str]:
         """Delegate evolution to EvolutionOrchestrator component."""
         return self._evolution.commit_working_to_procedural(remove_from_source)
+
+    def run_clustering(self) -> dict:
+        """
+        Run global clustering to deduplicate entities.
+        Returns stats about merged entities.
+        """
+        return self._clustering.run()
 
     # Debug and troubleshooting methods
     def debug_search(self, query: str, top_k: int = 5) -> dict:

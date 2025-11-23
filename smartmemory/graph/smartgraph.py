@@ -6,6 +6,7 @@ from smartmemory.graph.core.nodes import SmartGraphNodes
 from smartmemory.graph.core.search import SmartGraphSearch
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.utils import get_config
+from smartmemory.interfaces import ScopeProvider
 
 
 class SmartGraph:
@@ -14,12 +15,13 @@ class SmartGraph:
     Backend is selected based on the 'backend_class' key in config.json['graph_db'] (default: FalkorDBBackend).
     """
 
-    def __init__(self, item_cls=None, enable_caching=True, cache_size=1000):
+    def __init__(self, item_cls=None, enable_caching=True, cache_size=1000, scope_provider: Optional[ScopeProvider] = None):
         if item_cls is None:
             item_cls = MemoryItem
         self.item_cls = item_cls
         backend_cls = self._get_backend_class()
-        self.backend = backend_cls()
+        # Inject scope provider into backend
+        self.backend = backend_cls(scope_provider=scope_provider)
 
         # Initialize submodules
         self.nodes = SmartGraphNodes(self.backend, item_cls, enable_caching, cache_size)
@@ -274,3 +276,7 @@ class SmartGraph:
             "search": search_stats,
             "max_cache_size": self.cache_size
         }
+
+    def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
+        """Execute a raw query against the backend."""
+        return self.nodes.execute_query(query, params)

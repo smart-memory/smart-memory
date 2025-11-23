@@ -125,7 +125,7 @@ SmartMemory supports multiple extractors for entity and relationship extraction,
 "extractor": {
   "default": "llm",
   "llm": {
-    "model_name": "gpt-4.1-mini",
+    "model_name": "gpt-5.1-mini",
     "openai_api_key": "your-api-key"
   }
 }

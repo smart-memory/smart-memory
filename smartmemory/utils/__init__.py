@@ -5,10 +5,20 @@ from smartmemory.configuration import MemoryConfig
 from smartmemory.configuration.models import ConfigDict
 
 
-def flatten_dict(d, parent_key='', sep='_'):
+def flatten_dict(d, parent_key='', sep='__'):
     """
-    Recursively flattens a nested dict using sep as the separator.
-    Example: {'foo': {'bar': 1}} -> {'foo_bar': 1}
+    Recursively flattens a nested dict using double underscore as separator.
+    
+    This ensures single underscores in field names are preserved.
+    Example: {'metadata': {'user_name': 'John'}} -> {'metadata__user_name': 'John'}
+    
+    Args:
+        d: Dictionary to flatten
+        parent_key: Internal use for recursion
+        sep: Separator (default '__' to avoid conflicts with field names)
+    
+    Returns:
+        Flattened dictionary with nested keys joined by separator
     """
     items = []
     for k, v in d.items():
@@ -20,20 +30,34 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 
-def unflatten_dict(d, sep='_'):
+def unflatten_dict(d, sep='__'):
     """
-    Reconstructs a nested dict from a flat dict with sep-separated keys.
-    Example: {'foo_bar': 1} -> {'foo': {'bar': 1}}
+    Reconstructs a nested dict from a flat dict with double underscore separator.
+    
+    Only splits on the separator (default '__'), preserving single underscores in keys.
+    Example: {'metadata__user_name': 'John'} -> {'metadata': {'user_name': 'John'}}
+    
+    Args:
+        d: Flattened dictionary
+        sep: Separator to split on (default '__')
+    
+    Returns:
+        Nested dictionary structure
     """
     result = {}
     for k, v in d.items():
-        parts = k.split(sep)
-        cur = result
-        for part in parts[:-1]:
-            if part not in cur or not isinstance(cur[part], dict):
-                cur[part] = {}
-            cur = cur[part]
-        cur[parts[-1]] = v
+        # Only split if separator is present
+        if sep in k:
+            parts = k.split(sep)
+            cur = result
+            for part in parts[:-1]:
+                if part not in cur or not isinstance(cur[part], dict):
+                    cur[part] = {}
+                cur = cur[part]
+            cur[parts[-1]] = v
+        else:
+            # No separator - keep key as-is (preserves single underscores)
+            result[k] = v
     return result
 
 

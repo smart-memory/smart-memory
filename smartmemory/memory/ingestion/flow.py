@@ -243,8 +243,34 @@ class MemoryIngestionFlow:
         # Stage 4: Relationship processing (delegated to storage pipeline)
         if relations and len(relations) > 0:
             try:
-                self.storage_pipeline.process_extracted_relations(context, item.item_id, relations)
-                print(f"✅ Processed {len(relations)} relationships for item: {item.item_id}")
+                # Filter out internal relations already handled by add_dual_node
+                # Internal relations are those where both source and target are in the extracted entities list
+                internal_entity_ids = set()
+                for e in entities:
+                    if isinstance(e, MemoryItem):
+                        if e.item_id: internal_entity_ids.add(e.item_id)
+                    elif isinstance(e, dict):
+                        eid = e.get('item_id') or e.get('id')
+                        if eid: internal_entity_ids.add(eid)
+
+                external_relations = []
+                for r in relations:
+                    # Handle various relation formats
+                    src = r.get('source_id') or r.get('subject') or r.get('source')
+                    tgt = r.get('target_id') or r.get('object') or r.get('target')
+                    
+                    # If both src and tgt are in internal_entity_ids, it's internal and already created
+                    if src and tgt and src in internal_entity_ids and tgt in internal_entity_ids:
+                        continue
+                    external_relations.append(r)
+
+                if external_relations:
+                    self.storage_pipeline.process_extracted_relations(context, item.item_id, external_relations)
+                    print(f"✅ Processed {len(external_relations)} external relationships for item: {item.item_id}")
+                
+                if len(relations) > len(external_relations):
+                    print(f"ℹ️  Skipped {len(relations) - len(external_relations)} internal relationships (handled by dual-node creation)")
+                    
             except Exception as e:
                 print(f"⚠️  Failed to process relationships: {e}")
                 raise
