@@ -54,9 +54,9 @@ graph TD
 
 ```python
 # Examples of semantic memory
-memory.add("Python is a programming language")
-memory.add("The capital of France is Paris")
-memory.add("Machine learning is a subset of AI")
+memory.ingest("Python is a programming language")
+memory.ingest("The capital of France is Paris")
+memory.ingest("Machine learning is a subset of AI")
 ```
 
 **Characteristics**:
@@ -70,9 +70,9 @@ memory.add("Machine learning is a subset of AI")
 
 ```python
 # Examples of episodic memory
-memory.add("I attended the AI conference in San Francisco last week")
-memory.add("Had lunch with Sarah at the Italian restaurant yesterday")
-memory.add("Completed my first Python project in 2020")
+memory.ingest("I attended the AI conference in San Francisco last week")
+memory.ingest("Had lunch with Sarah at the Italian restaurant yesterday")
+memory.ingest("Completed my first Python project in 2020")
 ```
 
 **Characteristics**:
@@ -86,9 +86,9 @@ memory.add("Completed my first Python project in 2020")
 
 ```python
 # Examples of procedural memory
-memory.add("To deploy to AWS: 1) Build image 2) Push to ECR 3) Update ECS")
-memory.add("Git workflow: branch → commit → push → PR → merge")
-memory.add("Morning routine: exercise → shower → coffee → emails")
+memory.ingest("To deploy to AWS: 1) Build image 2) Push to ECR 3) Update ECS")
+memory.ingest("Git workflow: branch → commit → push → PR → merge")
+memory.ingest("Morning routine: exercise → shower → coffee → emails")
 ```
 
 **Characteristics**:
@@ -102,9 +102,9 @@ memory.add("Morning routine: exercise → shower → coffee → emails")
 
 ```python
 # Examples of working memory
-memory.add("Currently debugging the authentication issue")
-memory.add("Meeting with team at 3 PM today")
-memory.add("Need to review PR #123 before EOD")
+memory.ingest("Currently debugging the authentication issue")
+memory.ingest("Meeting with team at 3 PM today")
+memory.ingest("Need to review PR #123 before EOD")
 ```
 
 **Characteristics**:
@@ -351,9 +351,11 @@ SmartMemory provides multiple search strategies:
 results = memory.search(
     query="machine learning",
     memory_type="semantic",
-    user_id="user123",
-    time_range=("2023-01-01", "2023-12-31")
+    top_k=10
 )
+
+# Note: User/tenant filtering is handled automatically by ScopeProvider
+# in multi-tenant deployments. Time-range filtering can be done post-search.
 ```
 
 ## Component Architecture

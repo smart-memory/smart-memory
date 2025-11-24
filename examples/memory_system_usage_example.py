@@ -21,15 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 def run_memory_operations(memory: SmartMemory):
-    """Demonstrates adding, searching, and removing memories."""
-    logger.info("\n--- Adding Example ---")
+    """Demonstrates ingesting, searching, and removing memories."""
+    logger.info("\n--- Ingesting Example ---")
     memory_item_1 = MemoryItem(
         content="The user attended the AI conference on Tuesday.",
         valid_start_time=datetime.now(),
         metadata={'source': 'user_input', 'importance': 0.8}
     )
-    memory.add(memory_item_1)
-    logger.info(f"Added item to memory graph: {memory_item_1.item_id}")
+    # Use ingest() for full pipeline (extract → store → link → enrich → evolve)
+    item_id = memory.ingest(memory_item_1)
+    memory_item_1.item_id = item_id  # Store the returned ID
+    logger.info(f"Ingested item to memory graph: {item_id}")
 
     logger.info("\n--- Search Example ---")
     query = "AI conference"

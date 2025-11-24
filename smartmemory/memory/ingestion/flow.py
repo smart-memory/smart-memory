@@ -98,7 +98,9 @@ class MemoryIngestionFlow:
         item.metadata.setdefault('created_at', now)
         item.metadata['updated_at'] = now
         item.metadata.setdefault('status', 'created')
-        item.memory_type = 'semantic'
+        # Only set default memory_type if not already specified
+        if not item.memory_type:
+            item.memory_type = 'semantic'
         return item
 
     def _resolve_configurations(self, pipeline_config, classification_config, linking_config,

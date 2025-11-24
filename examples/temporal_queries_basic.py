@@ -29,6 +29,7 @@ def main():
         content="Python is a programming language",
         metadata={"category": "programming", "version": 1, "author": "system"}
     )
+    # Use add() for simple storage (temporal demo doesn't need full pipeline)
     item_id = memory.add(item)
     item.item_id = item_id  # Set the ID on the item
     print(f"✓ Created memory: {item_id}")
@@ -37,7 +38,7 @@ def main():
     # Wait a moment to ensure different timestamps
     time.sleep(0.1)
     
-    # Add updated version (simulating an update)
+    # Add updated version (simulating an update) - use add() for version records
     item2 = MemoryItem(
         content="Python is a powerful programming language",
         metadata={"category": "programming", "version": 2, "updated_by": "user_alice", "original_id": item_id}

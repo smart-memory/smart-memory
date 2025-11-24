@@ -45,10 +45,10 @@ def main():
     }
     context.turn_history.append(turn1)
     
-    # Add to memory with conversation context
+    # Ingest to memory with conversation context (full pipeline)
     # This will use the configured extractor (can be conversation_aware_llm)
-    memory.add(
-        MemoryItem(content=turn1_content, memory_type="episodic"),
+    memory.ingest(
+        turn1_content,
         conversation_context=context
     )
     
@@ -79,8 +79,8 @@ def main():
     context.turn_history.append(turn3)
     
     # With conversation-aware extraction, "it" will be resolved to "machine learning"
-    memory.add(
-        MemoryItem(content=turn3_content, memory_type="episodic"),
+    memory.ingest(
+        turn3_content,
         conversation_context=context
     )
     
@@ -99,8 +99,8 @@ def main():
     }
     context.turn_history.append(turn4)
     
-    memory.add(
-        MemoryItem(content=turn4_content, memory_type="episodic"),
+    memory.ingest(
+        turn4_content,
         conversation_context=context
     )
     

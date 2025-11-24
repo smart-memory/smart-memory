@@ -45,22 +45,15 @@ framework = EnhancedSimilarityFramework(config)
 Search across different types of content and metadata:
 
 ```python
-# Complex search with multiple filters
+# Search with memory type filter
 results = memory.search(
     query="machine learning projects",
-    filters={
-        "memory_type": ["semantic", "episodic"],
-        "user_id": "user123",
-        "date_range": {
-            "start": "2024-01-01",
-            "end": "2024-12-31"
-        },
-        "tags": ["ml", "ai"],
-        "confidence_threshold": 0.7
-    },
-    top_k=10,
-    include_metadata=True
+    memory_type="semantic",
+    top_k=10
 )
+
+# Note: User/tenant filtering is handled automatically by ScopeProvider
+# in multi-tenant deployments. No manual user_id parameter needed.
 ```
 
 #### Graph Neighborhood
@@ -305,34 +298,35 @@ memory = SmartMemory(evolution_config=evolution_config)
 Implement secure multi-tenant memory systems:
 
 ```python
-class MultiUserMemoryManager:
-    def __init__(self):
-        # Single SmartMemory instance; enforce isolation via user_id filters
-        self.memory = SmartMemory()
+from smartmemory.interfaces import ScopeProvider
+
+class TenantScopeProvider(ScopeProvider):
+    """Custom scope provider for multi-tenant isolation."""
     
-    def get_user_memory(self):
-        return self.memory
+    def __init__(self, tenant_id: str, user_id: str):
+        self.tenant_id = tenant_id
+        self.user_id = user_id
     
-    def cross_user_search(self, query, requesting_user_id, permissions):
-        results = []
-        
-        # Search user's own memory (filter by user_id)
-        user_results = self.memory.search(query, user_id=requesting_user_id)
-        results.extend(user_results)
-        
-        # Search shared memory if permitted
-        if permissions.get("access_shared", False):
-            shared_results = self.memory.search(query)  # Define your own shared tagging/filters
-            results.extend(shared_results)
-        
-        # Search other users' memory if permitted
-        for user_id, permission in permissions.get("access_users", {}).items():
-            if permission:
-                other_results = self.memory.search(query, user_id=user_id)
-                results.extend(other_results)
-        
-        return self.rank_and_deduplicate(results)
+    def get_isolation_filters(self):
+        return {
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id
+        }
+
+class MultiTenantMemoryManager:
+    def create_scoped_memory(self, tenant_id: str, user_id: str):
+        """Create a SmartMemory instance scoped to a specific tenant/user."""
+        scope_provider = TenantScopeProvider(tenant_id, user_id)
+        return SmartMemory(scope_provider=scope_provider)
+    
+    def search_for_user(self, tenant_id: str, user_id: str, query: str):
+        """Search is automatically filtered by ScopeProvider."""
+        memory = self.create_scoped_memory(tenant_id, user_id)
+        # No user_id parameter needed - ScopeProvider handles filtering
+        return memory.search(query)
 ```
+
+**Note:** User/tenant isolation is handled automatically by `ScopeProvider`. The core library methods no longer accept `user_id` parameters directly.
 
 ### Federated Memory Networks
 

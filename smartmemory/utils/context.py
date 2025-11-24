@@ -6,7 +6,8 @@ used to automatically scope all graph/memory operations for multi-tenancy.
 
 Preferred usage is via the `scope` context manager to ensure cleanup:
     with smartmemory.utils.context.scope(tenant_id="org_123"):
-        smart_memory.add(...)
+        smart_memory.ingest(...)  # Full pipeline
+        smart_memory.add(...)     # Simple storage
 """
 from contextvars import ContextVar, Token
 import contextlib

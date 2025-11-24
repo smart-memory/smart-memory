@@ -23,68 +23,77 @@ memory = SmartMemory()
 # Or with custom configuration
 # memory = SmartMemory(config_path="config.json")
 ```
-### 2. Add Memories
+### 2. Ingest Memories
 
-SmartMemory automatically processes and enriches memories:
-
-```python
-# Add memories for different users (user isolation via user_id parameter)
-memory.add("I learned Python programming in 2020", user_id="alice")
-memory.add("Paris is the capital of France", user_id="bob")
-memory.add("To make coffee: heat water, add grounds, brew for 4 minutes", user_id="alice")
-memory.add("Yesterday I had lunch with Sarah at the Italian restaurant", user_id="charlie")
-```
-### 3. Search Memories with User Filtering
-
-Search for relevant memories for specific users:
-```python
-# Search for relevant memories for specific users
-alice_results = memory.search("programming", user_id="alice")
-bob_results = memory.search("France", user_id="bob")
-
-# Each user only sees their own memories
-for result in alice_results:
-    print(f"Alice's memory: {result.content}")
-
-for result in bob_results:
-    print(f"Bob's memory: {result.content}")
-```
-
-## Multi-User Features
-
-### User Isolation
-
-SmartMemory provides **enterprise-grade user isolation**:
+SmartMemory automatically processes and enriches memories through the full pipeline:
 
 ```python
-# Users only access their own memories
-user_a_memories = memory.search("coffee", user_id="user_a")  # Only user_a's coffee memories
-user_b_memories = memory.search("coffee", user_id="user_b")  # Only user_b's coffee memories
+# Ingest memories (full pipeline: extract → store → link → enrich → evolve)
+memory.ingest("I learned Python programming in 2020")
+memory.ingest("Paris is the capital of France")
+memory.ingest("To make coffee: heat water, add grounds, brew for 4 minutes")
+memory.ingest("Yesterday I had lunch with Sarah at the Italian restaurant")
 
-# No cross-user contamination
-assert len(user_a_memories) != len(user_b_memories)  # Different results for different users
+# Or use add() for simple storage without pipeline
+from smartmemory import MemoryItem
+item = MemoryItem(content="Quick note", memory_type="semantic")
+memory.add(item)
+```
+### 3. Search Memories
+
+Search for relevant memories:
+```python
+# Search for relevant memories
+results = memory.search("programming")
+for result in results:
+    print(f"Found: {result.content}")
+
+# Filter by memory type
+semantic_results = memory.search("France", memory_type="semantic")
+episodic_results = memory.search("lunch", memory_type="episodic")
 ```
 
-## Complete Example: Personal Assistant with Multi-User Support
+**Note:** In multi-tenant deployments (smart-memory-service), user/tenant filtering is handled automatically by `ScopeProvider`.
+
+## Multi-Tenant Features
+
+### Automatic User Isolation
+
+SmartMemory provides **enterprise-grade tenant isolation** via `ScopeProvider`:
+
+```python
+# OSS usage (single user, no isolation needed)
+memory = SmartMemory()
+memory.ingest("My data")  # No scoping
+
+# Service layer (automatic tenant isolation)
+# In smart-memory-service, ScopeProvider is injected automatically
+from service_common.security import create_secure_smart_memory
+memory = create_secure_smart_memory(user, request_scope=scope)
+memory.ingest("User data")  # Automatically scoped to tenant
+memory.search("query")      # Automatically filtered by tenant
+```
+
+## Complete Example: Personal Assistant
 
 ```python
 from smartmemory import SmartMemory
 import datetime
+
 class PersonalAssistant:
     def __init__(self):
         self.memory = SmartMemory()
         
-    def learn(self, information, user_id):
-        """Add new information to memory"""
-        # Add timestamp for episodic memories
+    def learn(self, information):
+        """Ingest new information to memory (full pipeline)"""
         timestamped_info = f"[{datetime.datetime.now()}] {information}"
-        result = self.memory.add(timestamped_info, user_id=user_id)
+        item_id = self.memory.ingest(timestamped_info)
         print(f"Learned: {information}")
-        return result
+        return item_id
         
-    def recall(self, query, user_id):
+    def recall(self, query):
         """Search for relevant memories"""
-        results = self.memory.search(query, user_id=user_id, top_k=3)
+        results = self.memory.search(query, top_k=3)
         if results:
             print(f"I remember {len(results)} things about '{query}':")
             for i, result in enumerate(results, 1):
@@ -93,32 +102,30 @@ class PersonalAssistant:
             print(f"I don't remember anything about '{query}'")
         return results
         
-    def get_context(self, topic, user_id):
+    def get_context(self, topic):
         """Get comprehensive context about a topic"""
-        # Search across all memory types
         all_results = []
         for memory_type in ["semantic", "episodic", "procedural"]:
-            results = self.memory.search(topic, user_id=user_id, memory_type=memory_type, top_k=2)
+            results = self.memory.search(topic, memory_type=memory_type, top_k=2)
             all_results.extend(results)
-        
         return all_results
 
 # Usage example
 assistant = PersonalAssistant()
 
-# Learn various things for different users
-assistant.learn("My favorite coffee shop is Blue Bottle", user_id="alice")
-assistant.learn("I have a meeting with John tomorrow at 2 PM", user_id="bob")
-assistant.learn("To reset WiFi router: unplug for 30 seconds, then plug back in", user_id="alice")
-assistant.learn("Python is a programming language I use for data analysis", user_id="charlie")
+# Learn various things
+assistant.learn("My favorite coffee shop is Blue Bottle")
+assistant.learn("I have a meeting with John tomorrow at 2 PM")
+assistant.learn("To reset WiFi router: unplug for 30 seconds, then plug back in")
+assistant.learn("Python is a programming language I use for data analysis")
 
-# Recall information for specific users
-assistant.recall("coffee", user_id="alice")
-assistant.recall("meeting", user_id="bob")
-assistant.recall("Python", user_id="charlie")
+# Recall information
+assistant.recall("coffee")
+assistant.recall("meeting")
+assistant.recall("Python")
 
-# Get comprehensive context for a topic
-context = assistant.get_context("programming", user_id="alice")
+# Get comprehensive context
+context = assistant.get_context("programming")
 print(f"Programming context: {len(context)} memories")
 ```
 
@@ -127,37 +134,37 @@ print(f"Programming context: {len(context)} memories")
 ### Semantic Memory (Facts & Knowledge)
 
 ```python
-# Add factual information with user isolation
-memory.add("The speed of light is 299,792,458 meters per second", user_id="alice")
-memory.add("Machine learning is a subset of artificial intelligence", user_id="bob")
-memory.add("Tokyo is the capital of Japan", user_id="alice")
+# Ingest factual information
+memory.ingest("The speed of light is 299,792,458 meters per second")
+memory.ingest("Machine learning is a subset of artificial intelligence")
+memory.ingest("Tokyo is the capital of Japan")
 
-# Search semantic knowledge (user_id parameter filters results)
-facts = memory.search("artificial intelligence", user_id="bob", memory_type="semantic")
+# Search semantic knowledge
+facts = memory.search("artificial intelligence", memory_type="semantic")
 ```
 
 ### Episodic Memory (Personal Experiences)
 
 ```python
-# Add personal experiences with context
-memory.add("I attended the AI conference in San Francisco last week", user_id="alice")
-memory.add("Had dinner at the new sushi place downtown yesterday", user_id="bob")
-memory.add("Completed the machine learning course on Coursera in March", user_id="alice")
+# Ingest personal experiences
+memory.ingest("I attended the AI conference in San Francisco last week")
+memory.ingest("Had dinner at the new sushi place downtown yesterday")
+memory.ingest("Completed the machine learning course on Coursera in March")
 
 # Search personal experiences
-experiences = memory.search("conference", user_id="alice", memory_type="episodic")
+experiences = memory.search("conference", memory_type="episodic")
 ```
 
 ### Procedural Memory (How-to Knowledge)
 
 ```python
-# Add step-by-step procedures
-memory.add("To deploy to AWS: 1) Build Docker image 2) Push to ECR 3) Update ECS service", user_id="alice")
-memory.add("Git workflow: 1) Create branch 2) Make changes 3) Commit 4) Push 5) Create PR", user_id="bob")
-memory.add("Morning routine: 1) Exercise 2) Shower 3) Coffee 4) Check emails", user_id="alice")
+# Ingest step-by-step procedures
+memory.ingest("To deploy to AWS: 1) Build Docker image 2) Push to ECR 3) Update ECS service")
+memory.ingest("Git workflow: 1) Create branch 2) Make changes 3) Commit 4) Push 5) Create PR")
+memory.ingest("Morning routine: 1) Exercise 2) Shower 3) Coffee 4) Check emails")
 
 # Search procedures
-procedures = memory.search("deploy", user_id="alice", memory_type="procedural")
+procedures = memory.search("deploy", memory_type="procedural")
 ```
 
 ## Background Processing
@@ -166,10 +173,10 @@ Enable background processing for better performance:
 
 ```python
 # Synchronous (process now via full pipeline)
-memory.ingest("Process immediately", user_id="alice", sync=True)
+memory.ingest("Process immediately", sync=True)
 
 # Asynchronous (quick persist + enqueue for background workers)
-result = memory.ingest("Process in background", user_id="alice", sync=False)
+result = memory.ingest("Process in background", sync=False)
 print(result)  # {"item_id": "...", "queued": True}
 
 # Note: a separate worker service must consume the background queue.
@@ -181,8 +188,8 @@ print(result)  # {"item_id": "...", "queued": True}
 
 ```python
 # Create explicit relationships between memories
-python_id = memory.add("Python programming language", user_id="alice")
-ds_id = memory.add("Data science projects", user_id="alice")
+python_id = memory.ingest("Python programming language")
+ds_id = memory.ingest("Data science projects")
 
 # Link related concepts
 memory.link(
@@ -208,8 +215,8 @@ from smartmemory.ontology import OntologyManager
 ontology_manager = OntologyManager()
 ontology = ontology_manager.get_active_ontology()
 
-# Add structured knowledge
-memory.add({
+# Ingest structured knowledge with pre-extracted entities
+memory.ingest({
     "content": "John Smith works at Google",
     "entities": [
         {"name": "John Smith", "type": "Person"},
@@ -218,7 +225,7 @@ memory.add({
     "relations": [
         {"source": "John Smith", "target": "Google", "type": "WORKS_AT"}
     ]
-}, user_id="alice")
+})
 ```
 
 ## Integration Examples
@@ -234,7 +241,7 @@ class SmartMemoryLangChain:
         self.smart_memory = SmartMemory()
         self.conversation_memory = ConversationBufferMemory()
     
-    def add_conversation(self, human_input, ai_response, user_id):
+    def add_conversation(self, human_input, ai_response):
         # Store in both systems
         self.conversation_memory.save_context(
             {"input": human_input},
@@ -242,8 +249,8 @@ class SmartMemoryLangChain:
         )
         
         # Add to SmartMemory for long-term retention
-        self.smart_memory.add(f"User asked: {human_input}", user_id=user_id)
-        self.smart_memory.add(f"I responded: {ai_response}", user_id=user_id)
+        self.smart_memory.ingest(f"User asked: {human_input}")
+        self.smart_memory.ingest(f"I responded: {ai_response}")
 ```
 
 ### With OpenAI API
@@ -256,9 +263,9 @@ class MemoryEnhancedChatbot:
     def __init__(self):
         self.memory = SmartMemory()
         
-    def chat(self, user_message, user_id):
+    def chat(self, user_message):
         # Search for relevant context
-        context = self.memory.search(user_message, user_id=user_id, top_k=3)
+        context = self.memory.search(user_message, top_k=3)
         context_text = "\n".join([c.content for c in context])
         
         # Create prompt with memory context
@@ -277,9 +284,9 @@ class MemoryEnhancedChatbot:
         
         ai_response = response.choices[0].message.content
         
-        # Store conversation in memory
-        self.memory.add(f"User said: {user_message}", user_id=user_id)
-        self.memory.add(f"I responded: {ai_response}", user_id=user_id)
+        # Store conversation in memory (full pipeline)
+        self.memory.ingest(f"User said: {user_message}")
+        self.memory.ingest(f"I responded: {ai_response}")
         
         return ai_response
 ```
