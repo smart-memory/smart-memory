@@ -557,6 +557,53 @@ The following features are currently under active development:
   - Audit trail generation
 - **Planned**: Advanced temporal analytics
 
+
+flowchart TB
+    %% Top-level interaction
+    U[User / Agent Request] --> K[ArifOS Kernel<br/>(ΔΩΨ + APEX PRIME)]
+
+    %% Kernel pipeline
+    K --> TAC[TAC / TEARFRAME<br/>(000 → 888 Forge)]
+    TAC --> L0
+    TAC --> Q[Optional Content Query]
+
+    %% L0–L3 Memory Stack
+    subgraph STACK[ArifOS Memory Stack (L0–L3)]
+        direction TB
+
+        subgraph L0[ L0 – Vault-999<br/>Constitutional Memory ]
+            V999[Immutable Laws, Floors,<br/>Case Law, ΔΩΨ Axioms]
+        end
+
+        subgraph L1[ L1 – Cooling Ledger<br/>Interaction / Audit Memory ]
+            CL[Append-only Ledger<br/>ΔS, Peace², κᵣ, Verdicts,<br/>zkPC Receipts]
+        end
+
+        subgraph L2[ L2 – Phoenix-72<br/>Metabolic Memory ]
+            P72[Recidivism Scan → Error Clusters →<br/>New Laws Proposed & Ratified]
+        end
+
+        subgraph L3[ L3 – Retrieval Layer<br/>(Content Memory / RAG) ]
+            SM[SmartMemory Stack<br/>(working/semantic/episodic/Zettelkasten)<br/>+ Vector DB / Graph DB]
+        end
+    end
+
+    %% How queries flow
+    Q --> SM
+    SM --> RAGCTX[(Retrieved Context / Candidate Facts)]
+
+    %% Gating: L0–L2 veto & metabolism
+    RAGCTX --> L0
+    L0 -->|Constitution Check| APEX[APEX PRIME<br/>(Floors: Truth, Peace², Amanah, Tri-Witness)]
+
+    APEX -->|If OK (Ψ ≥ 1.0)| OUT[SEAL: Final Answer to User]
+    APEX -->|If Breach| VOID[VOID / SABAR<br/>Cooling, Refusal, or Reframe]
+
+    %% Logging & metabolism
+    APEX --> L1
+    L1 --> L2
+    L2 -->|New Law Sealed| L0
+
 ## ✅ Recently Completed
 
 ### Multi-Tenancy & Scoping (v0.1.17)
