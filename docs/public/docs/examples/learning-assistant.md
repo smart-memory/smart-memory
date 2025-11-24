@@ -41,11 +41,11 @@ class LearningAssistant:
         }
         
         # Store session start in episodic memory
-        self.memory.add(
-            content=f"Started learning session on {topic}",
-            memory_type="episodic",
-            metadata=session_data
-        )
+        self.memory.ingest({
+            "content": f"Started learning session on {topic}",
+            "memory_type": "episodic",
+            "metadata": session_data
+        })
         
         self.current_session = session_data
         return session_data["session_id"]
@@ -68,13 +68,13 @@ def learn_concept(self, concept, definition, examples=None):
     }
 
     # Store in semantic memory
-    semantic_memory = self.memory.add(
-        content=f"{concept}: {definition}",
-        memory_type="semantic",
-        metadata=concept_data
-    )
+    memory_id = self.memory.ingest({
+        "content": f"{concept}: {definition}",
+        "memory_type": "semantic",
+        "metadata": concept_data
+    })
 
-    return semantic_memory
+    return memory_id
 ```
 
 ### Usage Example

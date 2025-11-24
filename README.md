@@ -104,11 +104,14 @@ from smartmemory import SmartMemory, MemoryItem
 # Initialize SmartMemory (no configuration needed for OSS usage)
 memory = SmartMemory()
 
-# Add a memory
+# Ingest a memory (full pipeline: extract → store → link → enrich → evolve)
+item_id = memory.ingest("User prefers Python for data analysis tasks")
+
+# Or use add() for simple storage without pipeline
 item = MemoryItem(
-    content="User prefers Python for data analysis tasks",
+    content="Quick note about Python",
     memory_type="semantic",
-    metadata={'topic': 'preferences', 'domain': 'programming'}
+    metadata={'topic': 'preferences'}
 )
 memory.add(item)
 
@@ -139,7 +142,8 @@ from service_common.security import create_secure_smart_memory
 memory = create_secure_smart_memory(user, request_scope=scope)
 
 # All operations automatically tenant-scoped
-memory.add(item)  # Stamped with tenant_id
+memory.ingest(content)  # Full pipeline, stamped with tenant_id
+memory.add(item)        # Simple storage, stamped with tenant_id
 memory.search("query")  # Filtered by tenant
 ```
 
@@ -413,17 +417,24 @@ Main interface for memory operations:
 ```python
 class SmartMemory:
     def __init__(self, scope_provider: Optional[ScopeProvider] = None)
-    def add(self, item: MemoryItem) -> str
+    
+    # Primary API
+    def ingest(self, item, sync=True, **kwargs) -> str  # Full pipeline
+    def add(self, item, **kwargs) -> str                # Simple storage
     def get(self, item_id: str) -> Optional[MemoryItem]
-    def search(self, query: str, top_k: int = 10, memory_type: str = None) -> List[MemoryItem]
+    def search(self, query: str, top_k: int = 5, memory_type: str = None) -> List[MemoryItem]
     def delete(self, item_id: str) -> bool
-    def clear(self) -> None
-    def get_all_items_debug(self) -> Dict[str, Any]
-    def ingest(self, content: str, **kwargs) -> MemoryItem
+    
+    # Advanced
     def run_clustering(self) -> dict
     def run_evolution_cycle(self) -> None
     def personalize(self, traits: dict = None, preferences: dict = None) -> None
+    def get_all_items_debug(self) -> Dict[str, Any]
 ```
+
+**API Design:**
+- `ingest()` - Full agentic pipeline: extract → store → link → enrich → evolve. Use for user-facing ingestion.
+- `add()` - Simple storage: normalize → store → embed. Use for internal operations or when pipeline is not needed.
 
 **Note**: All methods automatically use `ScopeProvider` for filtering. No `user_id`, `tenant_id`, or `workspace_id` parameters needed - scoping is handled transparently.
 
@@ -559,7 +570,7 @@ The following features are currently under active development:
 
 ## ✅ Recently Completed
 
-### Multi-Tenancy & Scoping (v0.1.17)
+### Multi-Tenancy & Scoping (v0.1.18)
 - ✅ **Complete ScopeProvider architecture**: All filtering through single source of truth
 - ✅ **Optional scoping**: OSS works without configuration, service layer enforces isolation
 - ✅ **Zero hardcoded parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods

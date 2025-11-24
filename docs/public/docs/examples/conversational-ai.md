@@ -45,11 +45,10 @@ class MemoryEnhancedChatbot:
     
     def _store_user_message(self, message: str):
         """Store user message in memory"""
-        self.memory.add({
+        self.memory.ingest({
             "content": f"User said: {message}",
             "memory_type": "episodic",
             "metadata": {
-                "user_id": self.user_id,
                 "timestamp": datetime.now().isoformat(),
                 "speaker": "user",
                 "message_type": "input"
@@ -58,11 +57,10 @@ class MemoryEnhancedChatbot:
     
     def _store_ai_response(self, response: str, sources: List[str] = None):
         """Store AI response in memory with optional source grounding"""
-        memory_item_id = self.memory.add({
+        memory_item_id = self.memory.ingest({
             "content": f"I responded: {response}",
             "memory_type": "episodic", 
             "metadata": {
-                "user_id": self.user_id,
                 "timestamp": datetime.now().isoformat(),
                 "speaker": "assistant",
                 "message_type": "response"
@@ -88,7 +86,6 @@ class MemoryEnhancedChatbot:
         relevant_memories = self.memory.search(
             query=message,
             memory_type="episodic",
-            user_id=self.user_id,
             top_k=max_context
         )
         
@@ -193,10 +190,10 @@ class AdvancedConversationalAI:
         """Get or create user personality profile"""
         if user_id not in self.user_profiles:
             # Search for existing profile in memory
+            # Note: User filtering is handled by ScopeProvider in multi-tenant deployments
             profile_memories = self.memory.search(
                 f"user_profile_{user_id}",
-                memory_type="semantic",
-                user_id=user_id
+                memory_type="semantic"
             )
             
             if profile_memories:
@@ -219,11 +216,10 @@ class AdvancedConversationalAI:
     
     def _store_message(self, user_id: str, message: str, speaker: str, session_id: Optional[str]):
         """Store message with rich metadata"""
-        self.memory.add({
+        self.memory.ingest({
             "content": f"{speaker}: {message}",
             "memory_type": "episodic",
             "metadata": {
-                "user_id": user_id,
                 "session_id": session_id or "default",
                 "speaker": speaker,
                 "timestamp": datetime.now().isoformat(),
@@ -240,8 +236,7 @@ class AdvancedConversationalAI:
         if session_id:
             recent_session = self.memory.search(
                 query=message,
-                memory_type="episodic", 
-                user_id=user_id,
+                memory_type="episodic",
                 top_k=3
             )
             context.extend([{
@@ -254,7 +249,6 @@ class AdvancedConversationalAI:
         historical = self.memory.search(
             query=message,
             memory_type="episodic",
-            user_id=user_id,
             top_k=5
         )
         context.extend([{
@@ -340,11 +334,10 @@ class AdvancedConversationalAI:
         self._detect_communication_style(user_message, profile)
         
         # Store updated profile
-        self.memory.add({
+        self.memory.ingest({
             "content": json.dumps(profile),
             "memory_type": "semantic",
             "metadata": {
-                "user_id": user_id,
                 "content_type": "user_profile",
                 "updated_at": datetime.now().isoformat()
             }
@@ -388,10 +381,10 @@ class AdvancedConversationalAI:
     def get_conversation_summary(self, user_id: str, days: int = 7) -> Dict:
         """Get conversation summary for a user"""
         # Get recent conversations
+        # Note: User filtering handled by ScopeProvider in multi-tenant deployments
         recent_memories = self.memory.search(
-            query="",  # Empty query to get all
+            query="*",  # Wildcard to get all
             memory_type="episodic",
-            user_id=user_id,
             top_k=50
         )
         
@@ -484,9 +477,9 @@ class SmartMemoryLangChain:
     
     def chat(self, message: str) -> str:
         # Get relevant long-term context
+        # Note: User filtering handled by ScopeProvider in multi-tenant deployments
         context = self.smart_memory.search(
             query=message,
-            user_id=self.user_id,
             top_k=3
         )
         
@@ -501,17 +494,8 @@ class SmartMemoryLangChain:
         response = self.chain.predict(input=enhanced_message)
         
         # Store in SmartMemory for long-term retention
-        self.smart_memory.add({
-            "content": f"User: {message}",
-            "memory_type": "episodic",
-            "metadata": {"user_id": self.user_id}
-        })
-        
-        self.smart_memory.add({
-            "content": f"Assistant: {response}",
-            "memory_type": "episodic", 
-            "metadata": {"user_id": self.user_id}
-        })
+        self.smart_memory.ingest(f"User: {message}")
+        self.smart_memory.ingest(f"Assistant: {response}")
         
         return response
 ```

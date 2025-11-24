@@ -75,10 +75,10 @@ def example_smartmemory_with_huggingface():
     # Initialize SmartMemory (will automatically use HuggingFace embeddings)
     memory = SmartMemory()
 
-    # Add some memories
-    memory.add("Python is a high-level programming language.", memory_type="semantic")
-    memory.add("I learned about neural networks today.", memory_type="episodic")
-    memory.add("To train a model: load data, define model, train, evaluate.", memory_type="procedural")
+    # Ingest some memories (full pipeline)
+    memory.ingest("Python is a high-level programming language.")
+    memory.ingest("I learned about neural networks today.")
+    memory.ingest("To train a model: load data, define model, train, evaluate.")
 
     # Search using semantic similarity (powered by HuggingFace embeddings)
     results = memory.search("programming languages", top_k=2)

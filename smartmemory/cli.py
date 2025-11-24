@@ -137,14 +137,14 @@ def main():
                 user_id=user_id
             )
             
-            result = memory.add(item)
+            item_id = memory.ingest(item)
             
-            if result:
-                console.print(f"[green]✅ Memory added successfully![/green]")
-                console.print(f"ID: {result.item_id}")
-                console.print(f"Type: {result.memory_type}")
+            if item_id:
+                console.print(f"[green]✅ Memory ingested successfully![/green]")
+                console.print(f"ID: {item_id}")
+                console.print(f"Type: {memory_type}")
             else:
-                console.print("[red]❌ Failed to add memory[/red]")
+                console.print("[red]❌ Failed to ingest memory[/red]")
                 return 1
                 
         except Exception as e:

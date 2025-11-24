@@ -6,7 +6,7 @@ and merging duplicates in the graph.
 """
 
 import logging
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 
 from smartmemory.stores.vector.vector_store import VectorStore
 from smartmemory.models.memory_item import MemoryItem
@@ -37,54 +37,31 @@ class GlobalClustering:
         - total_entities: Total number of entities processed
         """
         try:
-            # 1. Fetch all embeddings
-            # Access FalkorDB backend directly
-            if not hasattr(self.vector_store, '_backend') or not hasattr(self.vector_store._backend, 'label'):
-                logger.warning("Vector store backend is not FalkorDB or incompatible. Skipping clustering.")
-                return {"skipped": True, "reason": "backend_incompatible"}
-            
-            backend = self.vector_store._backend
-            label = backend.label
-            
             # Get isolation filters from ScopeProvider (single source of truth)
             filters = {}
-            if hasattr(self.smart_memory, 'scope_provider') and self.smart_memory.scope_provider:
-                filters = self.smart_memory.scope_provider.get_isolation_filters()
+            if hasattr(self.memory, 'scope_provider') and self.memory.scope_provider:
+                filters = self.memory.scope_provider.get_isolation_filters()
             
-            # Build WHERE clause from ScopeProvider filters
-            where_clauses = []
-            for filter_key, filter_value in filters.items():
-                if filter_value:
-                    # Escape single quotes in values to prevent injection
-                    safe_value = str(filter_value).replace("'", "\\'")
-                    where_clauses.append(f"n.{filter_key} = '{safe_value}'")
-            
-            where_clause = ""
-            if where_clauses:
-                where_clause = " WHERE " + " AND ".join(where_clauses)
-            
-            query = f"MATCH (n:{label}){where_clause} RETURN n.id as id, n.embedding as embedding"
-            logger.info(f"Running clustering query: {query}")
-            res = backend.graph.query(query)
-            
+            # 1. Fetch all items with embeddings using backend-agnostic approach
             ids = []
             embeddings = []
             
-            if hasattr(res, 'result_set'):
-                for row in res.result_set:
-                    if len(row) >= 2:
-                        ids.append(row[0])
-                        embeddings.append(row[1])
+            # Use SmartMemory's graph abstraction instead of direct backend access
+            all_items = self.memory.get_all_items_debug()
+            
+            for item_id in self._get_all_item_ids():
+                item = self.memory.get(item_id)
+                if not item:
+                    continue
+                    
+                # Get embedding from item or vector store
+                embedding = self._get_embedding(item_id, item)
+                if embedding:
+                    ids.append(item_id)
+                    embeddings.append(embedding)
             
             if not ids:
-                scope_info = {}
-                if workspace_id:
-                    scope_info['workspace_id'] = workspace_id
-                if tenant_id:
-                    scope_info['tenant_id'] = tenant_id
-                if user_id:
-                    scope_info['user_id'] = user_id
-                return {"merged_count": 0, "clusters_found": 0, "total_entities": 0, **scope_info}
+                return {"merged_count": 0, "clusters_found": 0, "total_entities": 0, **filters}
 
             # 2. Cluster embeddings
             # We use a simple greedy clustering approach leveraging the vector index
@@ -121,6 +98,36 @@ class GlobalClustering:
             logger.error(f"Global clustering failed: {e}")
             return {"error": str(e)}
 
+    def _get_all_item_ids(self) -> List[str]:
+        """Get all item IDs using backend-agnostic approach."""
+        try:
+            # Use graph's nodes interface
+            if hasattr(self.memory._graph, 'nodes') and hasattr(self.memory._graph.nodes, 'nodes'):
+                return list(self.memory._graph.nodes.nodes())
+            # Fallback to get_all_items_debug
+            debug_info = self.memory.get_all_items_debug()
+            return [s.get('item_id') for s in debug_info.get('sample_items', [])]
+        except Exception as e:
+            logger.warning(f"Failed to get item IDs: {e}")
+            return []
+
+    def _get_embedding(self, item_id: str, item: Any) -> List[float]:
+        """Get embedding for an item from item or vector store."""
+        # Try item's embedding attribute first
+        if hasattr(item, 'embedding') and item.embedding is not None:
+            emb = item.embedding
+            return emb.tolist() if hasattr(emb, 'tolist') else list(emb)
+        
+        # Try vector store lookup
+        try:
+            result = self.vector_store.get(item_id)
+            if result and 'embedding' in result:
+                return result['embedding']
+        except Exception:
+            pass
+        
+        return None
+
     def _find_clusters(self, ids: List[str], embeddings: List[List[float]]) -> List[List[str]]:
         """
         Find clusters of similar entities.
@@ -129,14 +136,8 @@ class GlobalClustering:
         clusters = []
         processed_indices: Set[int] = set()
         
-        # Threshold for similarity. 
-        # FalkorDB vector search returns 'score'. 
-        # If using Euclidean distance, lower is better.
-        # If using Cosine Similarity, higher is better (usually).
-        # FalkorDB documentation says: "The score is the distance between the query vector and the node vector."
-        # So lower is better.
-        # For cosine distance, range is [0, 2]. 0 is identical.
-        # Let's assume a strict threshold.
+        # Distance threshold for clustering (lower = more similar)
+        # Most vector stores return distance scores where 0 = identical
         distance_threshold = 0.1 
 
         for i, embedding in enumerate(embeddings):
