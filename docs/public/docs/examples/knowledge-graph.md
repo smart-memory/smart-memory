@@ -34,38 +34,46 @@ class KnowledgeGraph:
     def add_knowledge(self, concept, description, related_concepts=None):
         """Add a concept to the knowledge graph"""
         # Store in semantic memory
-        memory = self.memory.add(
-            content=f"{concept}: {description}",
-            memory_type="semantic",
-            metadata={
+        memory_id = self.memory.ingest({
+            "content": f"{concept}: {description}",
+            "memory_type": "semantic",
+            "metadata": {
                 "concept": concept,
                 "description": description,
                 "related_concepts": related_concepts or []
             }
-        )
+        })
         
         # Add to NetworkX graph
-        self.graph.add_node(concept, description=description, memory_id=memory.id)
+        self.graph.add_node(concept, description=description, memory_id=memory_id)
         
         # Add explicit relationships
         if related_concepts:
             for related in related_concepts:
                 self.graph.add_edge(concept, related, relationship="related")
         
-        return memory
+        return memory_id
     
     def discover_relationships(self, similarity_threshold=0.7):
         """Discover implicit relationships between concepts"""
+        from smartmemory.similarity.framework import EnhancedSimilarityFramework
+        similarity_framework = EnhancedSimilarityFramework()
+        
         concepts = list(self.graph.nodes())
         
         for i, concept1 in enumerate(concepts):
             for concept2 in concepts[i+1:]:
                 # Get memories for both concepts
-                memory1 = self.memory.search(concept1, memory_type="semantic", max_results=1)[0]
-                memory2 = self.memory.search(concept2, memory_type="semantic", max_results=1)[0]
+                results1 = self.memory.search(concept1, memory_type="semantic", top_k=1)
+                results2 = self.memory.search(concept2, memory_type="semantic", top_k=1)
                 
-                # Calculate similarity
-                similarity = self.memory.calculate_similarity(memory1, memory2)
+                if not results1 or not results2:
+                    continue
+                    
+                memory1, memory2 = results1[0], results2[0]
+                
+                # Calculate similarity using the framework
+                similarity = similarity_framework.calculate_similarity(memory1, memory2)
                 
                 if similarity > similarity_threshold:
                     self.graph.add_edge(

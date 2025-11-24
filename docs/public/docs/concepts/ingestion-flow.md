@@ -20,13 +20,15 @@ The ingestion flow consists of several stages that process memories from initial
 
 ```python
 # Raw input can be various formats
-memory.add("I learned Python programming in 2020")
+memory.ingest("I learned Python programming in 2020")
 memory.ingest({
     "content": "Meeting notes from today",
     "metadata": {"participants": ["Alice", "Bob"]},
     "memory_type": "episodic"
 })
 ```
+
+**Note:** Use `ingest()` for full pipeline processing. Use `add()` for simple storage without extraction/linking/evolution.
 
 **Processing:**
 - Content validation and sanitization

@@ -37,12 +37,12 @@ memory = SmartMemory(config={
 
 ## Core Methods
 
-### add()
+### ingest()
 
-Add a new memory item with full intelligent processing.
+Ingest content with full intelligent processing pipeline (extract → store → link → enrich → evolve).
 
 ```python
-def add(
+def ingest(
     self,
     item: Union[str, Dict, MemoryItem],
     context: Optional[Dict] = None,
@@ -52,6 +52,66 @@ def add(
     enricher_names: Optional[List[str]] = None,
     conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
     user_id: Optional[str] = None,
+    sync: Optional[bool] = None,
+    **kwargs
+) -> Union[str, Dict[str, Any]]
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `item` | `Union[str, Dict, MemoryItem]` | Content to ingest |
+| `context` | `Optional[Dict]` | Additional context for processing |
+| `adapter_name` | `Optional[str]` | Specific adapter to use |
+| `converter_name` | `Optional[str]` | Specific converter to use |
+| `extractor_name` | `Optional[str]` | Specific extractor to use |
+| `enricher_names` | `Optional[List[str]]` | Specific enrichers to use |
+| `conversation_context` | `Optional[Union[ConversationContext, Dict]]` | Conversation context |
+| `user_id` | `Optional[str]` | User ID for user isolation |
+| `sync` | `Optional[bool]` | If True (default), run synchronously. If False, queue for background processing |
+| `**kwargs` | `Any` | Additional processing options |
+
+#### Returns
+
+- `str` - The item_id (when sync=True)
+- `Dict[str, Any]` - `{"item_id": str, "queued": bool}` (when sync=False)
+
+#### Examples
+
+```python
+# Simple ingestion (full pipeline)
+item_id = memory.ingest("I learned Python programming in 2020")
+
+# With user isolation
+item_id = memory.ingest(
+    "Meeting with John about project timeline",
+    user_id="alice"
+)
+
+# Async ingestion (queue for background)
+result = memory.ingest("Large document...", sync=False)
+print(f"Queued: {result['item_id']}, queued: {result['queued']}")
+
+# With conversation context
+from smartmemory.conversation.context import ConversationContext
+conv_ctx = ConversationContext(conversation_id="conv_123")
+item_id = memory.ingest(
+    "User prefers Python for data science",
+    conversation_context=conv_ctx
+)
+```
+
+---
+
+### add()
+
+Simple storage without the full ingestion pipeline. Use for internal operations, derived items, or when pipeline is not needed.
+
+```python
+def add(
+    self,
+    item: Union[str, Dict, MemoryItem],
     **kwargs
 ) -> str  # item_id
 ```
@@ -60,15 +120,8 @@ def add(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `item` | `Union[str, Dict, MemoryItem]` | Content to add to memory |
-| `context` | `Optional[Dict]` | Additional context for processing |
-| `adapter_name` | `Optional[str]` | Specific adapter to use |
-| `converter_name` | `Optional[str]` | Specific converter to use |
-| `extractor_name` | `Optional[str]` | Specific extractor to use |
-| `enricher_names` | `Optional[List[str]]` | Specific enrichers to use |
-| `conversation_context` | `Optional[Union[ConversationContext, Dict]]` | Conversation context for conversational memory |
-| `user_id` | `Optional[str]` | User ID for user isolation (sets item.user_id) |
-| `**kwargs` | `Any` | Additional processing options |
+| `item` | `Union[str, Dict, MemoryItem]` | Content to store |
+| `**kwargs` | `Any` | Additional storage options |
 
 #### Returns
 
@@ -77,41 +130,24 @@ def add(
 #### Examples
 
 ```python
-# Simple text addition
-result = memory.add("I learned Python programming in 2020")
+from smartmemory import MemoryItem
 
-# With user isolation (recommended)
-result = memory.add(
-    "Meeting with John about project timeline",
-    user_id="alice"
+# Simple storage (no extraction/linking/evolution)
+item = MemoryItem(content="Quick note", memory_type="semantic")
+item_id = memory.add(item)
+
+# With metadata
+item = MemoryItem(
+    content="Derived fact",
+    memory_type="semantic",
+    metadata={"source": "enrichment"}
 )
-
-# Structured data with user isolation
-result = memory.add({
-    "content": "Meeting notes",
-    "memory_type": "episodic",
-    "metadata": {
-        "participants": ["John"],
-        "topic": "timeline"
-    }
-}, user_id="alice")
-
-# With custom context
-result = memory.add(
-    "Deploy application to production",
-    context={"urgency": "high", "project": "web-app"},
-    user_id="alice"
-)
-
-# With conversation context
-from smartmemory.conversation.context import ConversationContext
-conv_ctx = ConversationContext(conversation_id="conv_123")
-result = memory.add(
-    "User prefers Python for data science",
-    conversation_context=conv_ctx,
-    user_id="alice"
-)
+item_id = memory.add(item)
 ```
+
+**When to use which:**
+- `ingest()` - User input, external data, anything needing full processing
+- `add()` - Internal operations, derived items, evolution/enrichment output
 
 ### search()
 
@@ -122,8 +158,7 @@ def search(
     self,
     query: str,
     top_k: int = 5,
-    memory_type: Optional[str] = None,
-    user_id: Optional[str] = None
+    memory_type: Optional[str] = None
 ) -> List[MemoryItem]
 ```
 
@@ -134,7 +169,8 @@ def search(
 | `query` | `str` | - | Search query string |
 | `top_k` | `int` | `5` | Maximum number of results |
 | `memory_type` | `Optional[str]` | `None` | Filter by memory type |
-| `user_id` | `Optional[str]` | `None` | Filter by user ID |
+
+**Note:** User/tenant filtering is handled automatically by `ScopeProvider`. No manual `user_id` parameter needed.
 
 #### Returns
 
@@ -149,9 +185,6 @@ results = memory.search("Python programming")
 # Type-specific search
 semantic_results = memory.search("France", memory_type="semantic")
 episodic_results = memory.search("meeting", memory_type="episodic")
-
-# User-specific search
-user_results = memory.search("project", user_id="user123")
 
 # Limited results
 top_results = memory.search("AI", top_k=3)

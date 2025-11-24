@@ -48,11 +48,11 @@ class MCPHandler:
 
     def add(self, item: 'MemoryItem', **kwargs) -> str:
         """
-        Add a MemoryItem to SmartMemory.
+        Add a MemoryItem to SmartMemory with full ingestion pipeline.
         Args:
-            item: MemoryItem to add
+            item: MemoryItem to ingest
         Returns:
-            item_id of added item
+            item_id of ingested item
         """
         if MemoryItem is None:
             raise ImportError("MemoryItem not available")
@@ -61,7 +61,7 @@ class MCPHandler:
             raise TypeError('MCPHandler.add only accepts MemoryItem objects')
 
         try:
-            return self.memory.add(item, **kwargs)
+            return self.memory.ingest(item, **kwargs)
         except Exception as e:
             raise RuntimeError(f"MCPHandler.add failed: {e}")
 

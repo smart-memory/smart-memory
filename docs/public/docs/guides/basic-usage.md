@@ -22,40 +22,49 @@ memory = SmartMemory(config={
 })
 ```
 
-## Adding Memories
+## Ingesting Memories
 
-### Simple Text Addition
+### Simple Text Ingestion
 
-The most basic way to add information to SmartMemory:
+The most basic way to add information to SmartMemory using the full pipeline:
 
 ```python
-# Add simple facts
-memory.add("Python is a programming language")
-memory.add("The capital of France is Paris")
-memory.add("Machine learning is a subset of AI")
+# Ingest simple facts (full pipeline: extract → store → link → enrich → evolve)
+memory.ingest("Python is a programming language")
+memory.ingest("The capital of France is Paris")
+memory.ingest("Machine learning is a subset of AI")
 
-# Add personal experiences
-memory.add("I learned Python programming in 2020")
-memory.add("Had lunch with Sarah at the Italian restaurant yesterday")
+# Ingest personal experiences
+memory.ingest("I learned Python programming in 2020")
+memory.ingest("Had lunch with Sarah at the Italian restaurant yesterday")
 
-# Add procedures
-memory.add("To make coffee: heat water, add grounds, brew for 4 minutes")
+# Ingest procedures
+memory.ingest("To make coffee: heat water, add grounds, brew for 4 minutes")
+```
 
-# Add Zettelkasten notes (atomic knowledge)
-memory.add(
-    "Attention mechanisms allow models to focus on relevant input parts",
+### Simple Storage (No Pipeline)
+
+For internal operations or when pipeline is not needed, use `add()`:
+
+```python
+from smartmemory import MemoryItem
+
+# Simple storage without extraction/linking/evolution
+item = MemoryItem(
+    content="Attention mechanisms allow models to focus on relevant input parts",
     memory_type="zettel",
     metadata={"tags": ["#ml", "#attention", "#transformer"]}
 )
+memory.add(item)
 ```
 
-### Structured Data Addition
+### Structured Data Ingestion
 
 For more control over how memories are processed:
 
 ```python
-# Add with explicit memory type
-memory.add({
+# Ingest with explicit memory type
+memory.ingest({
     "content": "Meeting with John about project timeline",
     "memory_type": "episodic",
     "metadata": {
@@ -65,8 +74,8 @@ memory.add({
     }
 })
 
-# Add with entities and relations
-memory.add({
+# Ingest with pre-extracted entities and relations
+memory.ingest({
     "content": "John Smith works at Google",
     "entities": [
         {"name": "John Smith", "type": "PERSON"},
@@ -78,9 +87,9 @@ memory.add({
 })
 ```
 
-### Batch Addition
+### Batch Ingestion
 
-For adding multiple memories efficiently:
+For ingesting multiple memories efficiently:
 
 ```python
 memories = [
@@ -90,22 +99,22 @@ memories = [
     "FastAPI is a modern Python web framework"
 ]
 
-# Add all memories
-for memory_text in memories:
-    memory.add(memory_text)
-
-# Or use fast ingestion for background processing
+# Ingest all memories (full pipeline)
 for memory_text in memories:
     memory.ingest(memory_text)
+
+# Or use async for background processing
+for memory_text in memories:
+    memory.ingest(memory_text, sync=False)
 ```
 
-### Adding Memories with Source Attribution (Grounding)
+### Ingesting with Source Attribution (Grounding)
 
 Grounding allows you to link memories to their sources for transparency and verification:
 
 ```python
-# Add memory with source information
-memory_id = memory.add("The Earth's circumference is approximately 40,075 km")
+# Ingest memory with source information
+memory_id = memory.ingest("The Earth's circumference is approximately 40,075 km")
 
 # Ground the memory to its source
 memory.ground(
@@ -114,9 +123,9 @@ memory.ground(
     validation={"confidence": 0.95, "verified": True}
 )
 
-# Or add with source information directly
-memory.add(
-    content="Python was created by Guido van Rossum",
+# Or ingest with source information directly
+memory.ingest(
+    "Python was created by Guido van Rossum",
     context={
         "source_url": "https://python.org/about",
         "source_type": "official",
@@ -166,16 +175,15 @@ procedures = memory.search("deploy", memory_type="procedural")
 # Limit number of results
 top_results = memory.search("machine learning", top_k=3)
 
-# User-specific search
-user_memories = memory.search("project", user_id="user123")
-
-# Search with context
+# Search with memory type filter
 results = memory.search(
     query="programming",
     memory_type="semantic",
     top_k=5
 )
 ```
+
+**Note:** User/tenant filtering is handled automatically by `ScopeProvider` in multi-tenant deployments.
 
 ## Retrieving Specific Memories
 

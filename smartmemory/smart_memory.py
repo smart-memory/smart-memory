@@ -16,6 +16,8 @@ from smartmemory.memory.pipeline.stages.monitoring import Monitoring
 from smartmemory.memory.pipeline.stages.personalization import Personalization
 from smartmemory.memory.pipeline.stages.search import Search
 from smartmemory.memory.pipeline.stages.clustering import GlobalClustering
+from smartmemory.temporal.queries import TemporalQueries
+from smartmemory.temporal.version_tracker import VersionTracker
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.plugins.resolvers.external_resolver import ExternalResolver
 from smartmemory.interfaces import ScopeProvider
@@ -28,9 +30,11 @@ class SmartMemory(MemoryBase):
     Unified agentic memory store combining semantic, episodic, procedural, and working memory.
     Delegates responsibilities to submodules for store management, linking, enrichment, grounding, and personalization.
 
-    The canonical agentic ingestion flow is exposed via the ingest() method, which runs the full flowchart pipeline:
-    adapt → classify → route → create → extract semantics → link → activate → enrich/feedback.
-    This is the recommended entry point for all agentic workflows. Use add() only for direct low-level node insertion.
+    API:
+        ingest(item) - Full agentic pipeline: extract → store → link → enrich → ground → evolve.
+                       Use for user-facing ingestion with all processing stages.
+        add(item)    - Simple storage: normalize → store → embed.
+                       Use for internal operations, derived items, and when pipeline is not needed.
 
     All linking operations should be accessed via SmartMemory methods only.
     Do not use Linking directly; it is an internal implementation detail.
@@ -63,12 +67,10 @@ class SmartMemory(MemoryBase):
         self._external_resolver = ExternalResolver()
 
         # Initialize temporal queries
-        from smartmemory.temporal.queries import TemporalQueries
-        from smartmemory.temporal.version_tracker import VersionTracker
         self.version_tracker = VersionTracker(self._graph)
         self.temporal = TemporalQueries(self)
         self._temporal_context = None  # For time-travel context manager
-
+        
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
         
@@ -149,94 +151,8 @@ class SmartMemory(MemoryBase):
         print("🎉 All memory storage backends cleared successfully!")
         return True
 
-    def ingest(self,
-               item,
-               context=None,
-               adapter_name=None,
-               converter_name=None,
-               extractor_name=None,
-               sync: Optional[bool] = None,
-               conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
-               user_id: Optional[str] = None):
-        """Ingest item. If sync is True or mode is local, run full pipeline; otherwise persist and enqueue background processing.
-        
-        Args:
-            item: Content to ingest
-            context: Additional context for processing
-            adapter_name: Specific adapter to use
-            converter_name: Specific converter to use
-            extractor_name: Specific extractor to use
-            sync: If True, run full pipeline synchronously; if False, enqueue for background processing
-            conversation_context: Conversation context for conversational memory
-            user_id: User ID for user isolation (sets item.user_id)
-            
-        Returns:
-            Union[Dict[str, Any], Any]: Pipeline result if sync=True, or {"item_id": str, "queued": bool} if sync=False
-        """
-        # Determine effective mode
-        if sync is None:
-            try:
-                from smartmemory.utils import get_config
-                mode = ((get_config('ingestion') or {}).get('mode') or '').lower()
-            except Exception:
-                mode = ''
-            sync = (mode == 'local')
-        
-        # Normalize item and set user_id if provided
-        from smartmemory.models.memory_item import MemoryItem
-        if not isinstance(item, MemoryItem):
-            item = self._crud.normalize_item(item)
-        if user_id is not None:
-            item.user_id = user_id
-
-        if sync:
-            if self._ingestion_flow is None:
-                self._ingestion_flow = MemoryIngestionFlow(
-                    self,
-                    linking=self._linking,
-                    enrichment=self._enrichment
-                )
-            # Merge conversation context into pipeline context if provided
-            if conversation_context is not None:
-                try:
-                    if context is None:
-                        context = {}
-                    if isinstance(conversation_context, ConversationContext):
-                        context['conversation'] = conversation_context.to_dict()
-                    elif isinstance(conversation_context, dict):
-                        context['conversation'] = dict(conversation_context)
-                except Exception as e:
-                    logger.debug(f"Failed to merge conversation_context into context: {e}")
-
-            result = self._ingestion_flow.run(
-                item,
-                context=context,
-                adapter_name=adapter_name,
-                converter_name=converter_name,
-                extractor_name=extractor_name,
-                enricher_names=getattr(self, '_enricher_pipeline', []),
-            )
-            self._evolution.run_evolution_cycle()
-            return result
-
-        # Async path: quick persist, emit message, do not run local background
-        normalized_item = self._crud.normalize_item(item)
-        add_result = self._crud.add(normalized_item)
-        if isinstance(add_result, dict):
-            item_id = add_result.get('memory_node_id')
-        else:
-            item_id = add_result
-        try:
-            from smartmemory.observability.events import RedisStreamQueue
-            q = RedisStreamQueue.for_enrich()
-            q.enqueue({'job_type': 'enrich', 'item_id': item_id})
-            queued = True
-        except Exception:
-            queued = False
-        return {'item_id': item_id, 'queued': queued}
-
     # Store management
-    def add(self,
+    def ingest(self,
             item,
             context=None,
             adapter_name=None,
@@ -245,14 +161,15 @@ class SmartMemory(MemoryBase):
             enricher_names=None,
             conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
             user_id: Optional[str] = None,
-            **kwargs) -> str:
+            sync: Optional[bool] = None,
+            **kwargs) -> Union[str, Dict[str, Any]]:
         """
-        Primary entry point for adding items to SmartMemory.
-        Runs the full canonical agentic memory ingestion flow with enrichment, linking, and semantic extraction.
-        For basic storage without the full pipeline, use _add_basic() internally.
+        Primary entry point for ingesting items into SmartMemory.
+        Runs the full canonical agentic memory ingestion flow with extraction, linking, enrichment, and evolution.
+        For basic storage without the full pipeline, use add().
         
         Args:
-            item: Content to add (str, dict, or MemoryItem)
+            item: Content to ingest (str, dict, or MemoryItem)
             context: Additional context for processing
             adapter_name: Specific adapter to use
             converter_name: Specific converter to use
@@ -260,11 +177,41 @@ class SmartMemory(MemoryBase):
             enricher_names: Specific enrichers to use
             conversation_context: Conversation context for conversational memory
             user_id: User ID for user isolation (sets normalized_item.user_id)
+            sync: If True, run full pipeline synchronously; if False, persist and queue for background processing.
+                  If None, defaults to sync=True (local mode).
             **kwargs: Additional processing options
             
         Returns:
-            str: The item_id of the stored memory item
+            str: The item_id of the stored memory item (sync=True)
+            dict: {"item_id": str, "queued": bool} (sync=False)
         """
+        # Determine effective mode
+        if sync is None:
+            try:
+                from smartmemory.utils import get_config
+                mode = ((get_config('ingestion') or {}).get('mode') or '').lower()
+                sync = (mode != 'async')  # Default to sync unless explicitly async
+            except Exception:
+                sync = True  # Default to sync
+        
+        # Async path: quick persist + queue for background processing
+        if not sync:
+            normalized_item = self._crud.normalize_item(item)
+            if user_id is not None:
+                normalized_item.user_id = user_id
+            add_result = self._crud.add(normalized_item)
+            if isinstance(add_result, dict):
+                item_id = add_result.get('memory_node_id')
+            else:
+                item_id = add_result
+            try:
+                from smartmemory.observability.events import RedisStreamQueue
+                q = RedisStreamQueue.for_enrich()
+                q.enqueue({'job_type': 'enrich', 'item_id': item_id})
+                queued = True
+            except Exception:
+                queued = False
+            return {'item_id': item_id, 'queued': queued}
         # Normalize item using CRUD component (eliminates mixed abstraction)
         normalized_item = self._crud.normalize_item(item)
         
@@ -302,7 +249,7 @@ class SmartMemory(MemoryBase):
         # Special handling for working memory - bypass ingestion pipeline
         memory_type = getattr(normalized_item, 'memory_type', 'semantic')
         if memory_type == 'working':
-            return self._add_basic(normalized_item, **kwargs)
+            return self.add(normalized_item, **kwargs)
 
         # Check for explicit versioning via original_id
         # This supports the temporal test patterns where add() is used to create new versions
@@ -325,7 +272,7 @@ class SmartMemory(MemoryBase):
 
         # If this is called from internal code that needs basic storage, check for bypass flag
         if kwargs.pop('_bypass_ingestion', False):
-            return self._add_basic(normalized_item, **kwargs)
+            return self.add(normalized_item, **kwargs)
 
         # Run full ingestion pipeline for public API
         pipeline = enricher_names if enricher_names is not None else getattr(self, '_enricher_pipeline', [])
@@ -390,10 +337,23 @@ class SmartMemory(MemoryBase):
                 
         return item_id
 
-    def _add_basic(self, item, **kwargs) -> str:
+    def add(self, item, **kwargs) -> str:
         """
-        Internal method for basic storage without the full ingestion pipeline.
-        Used by ingestion flow and evolution algorithms to avoid recursion.
+        Simple storage without the full ingestion pipeline.
+        
+        Use this for:
+        - Internal operations (evolution, enrichment creating derived items)
+        - Direct storage when extraction/linking/enrichment is not needed
+        - Avoiding recursion in pipeline stages
+        
+        For full agentic ingestion with all processing stages, use ingest().
+        
+        Args:
+            item: Content to store (str, dict, or MemoryItem)
+            **kwargs: Additional storage options
+            
+        Returns:
+            str: The item_id of the stored memory item
         """
         # Convert to MemoryItem if needed
         if hasattr(item, 'to_memory_item'):
@@ -443,7 +403,7 @@ class SmartMemory(MemoryBase):
             # For other memory types, use the standard CRUD
             return self._crud.add(item, **kwargs)
 
-    def _add_impl(self, item, **kwargs) -> str:
+    def add_impl(self, item, **kwargs) -> str:
         return self._crud.add(item, **kwargs)
 
     def _get_impl(self, key: str):
@@ -480,11 +440,6 @@ class SmartMemory(MemoryBase):
         except Exception as e:
             logger.error(f"archive_get failed for uri={archive_uri}: {e}")
             raise
-
-    # Public wrappers for internal operations to preserve encapsulation
-    def add_basic(self, item, **kwargs) -> str:
-        """Public wrapper for basic add (dual-node aware)."""
-        return self._add_basic(item, **kwargs)
 
     def update_properties(self, item_id: str, properties: dict, write_mode: str | None = None):
         """Public wrapper to update memory node properties with merge/replace semantics."""
@@ -887,7 +842,3 @@ class SmartMemory(MemoryBase):
         from smartmemory.temporal.context import time_travel
         return time_travel(self, to)
     
-    @property
-    def graph(self):
-        """Access to underlying graph for temporal queries."""
-        return self._graph

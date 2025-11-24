@@ -431,11 +431,10 @@ flowchart LR
   # Initialize SmartMemory
   memory = SmartMemory()
   
-  # Add memories
-  memory.add("I learned Python programming in 2020")
-  memory.add("Paris is the capital of France")
-  memory.add("Attention mechanisms allow models to focus on relevant input parts", memory_type="zettel")
-  memory.add("To make coffee: heat water, add grounds, brew for 4 minutes")
+  # Ingest memories (full pipeline: extract → store → link → enrich → evolve)
+  memory.ingest("I learned Python programming in 2020")
+  memory.ingest("Paris is the capital of France")
+  memory.ingest("To make coffee: heat water, add grounds, brew for 4 minutes")
   
   # Search memories
   results = memory.search("programming languages")
