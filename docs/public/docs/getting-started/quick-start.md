@@ -225,6 +225,25 @@ print(f"Merged {stats.get('merged_count', 0)} duplicate entities")
 # 3. LLM semantic clustering (Joe ↔ Joseph)
 ```
 
+### Assertion Challenging
+
+```python
+# Challenge a fact against existing knowledge
+result = memory.challenge("Paris is the capital of Germany")
+
+if result.has_conflicts:
+    for conflict in result.conflicts:
+        print(f"Contradicts: {conflict.existing_fact}")
+        print(f"Method: {conflict.explanation}")  # [LLM], [Graph], [Embedding], etc.
+
+# Auto-challenge during ingestion (smart triggering)
+memory.ingest("The speed of light is 300,000 km/s")  # Challenges factual claims
+
+# Control challenge behavior
+memory.ingest(content, auto_challenge=True)   # Always challenge
+memory.ingest(content, auto_challenge=False)  # Never challenge
+```
+
 ### Temporal Versioning
 
 ```python

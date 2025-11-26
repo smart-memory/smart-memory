@@ -21,6 +21,7 @@ SmartMemory is a **next-generation memory system** that goes far beyond simple s
 - **🎯 Entity Extraction**: LLM, SpaCy, GLiNER, and Relik extractors with automatic fallback
 - **🔗 Entity Clustering**: deduplication (SemHash + KMeans + LLM)
 - **🌐 Knowledge Grounding**: Automatic Wikipedia linking for entity provenance
+- **🔍 Assertion Challenging**: Detect contradictions between new and existing facts
 - **🔍 Semantic Search**: Vector embeddings + graph traversal + text fallbacks
 - **⏱️ Temporal Versioning**: Bi-temporal tracking with time-travel queries
 - **🌐 Framework Integration**: Works with LangChain, CrewAI, AutoGen, and more
@@ -213,6 +214,97 @@ flowchart LR
 | **Merge** | Graph node consolidation | Rewire edges, merge properties |
 
 **Runs automatically** after each `ingest()` call, or manually via `memory.run_clustering()`.
+
+---
+
+## ⚖️ **Assertion Challenging**
+
+SmartMemory detects contradictions between new facts and existing knowledge using a **multi-method detection cascade**:
+
+```
+LLM → Graph → Embedding → Heuristic
+```
+
+### Detection Methods
+
+| Method | Reliability | Speed | What It Catches |
+|--------|-------------|-------|-----------------|
+| **LLM** | ⭐⭐⭐⭐⭐ | Slow | Nuanced contradictions, context-dependent conflicts |
+| **Graph** | ⭐⭐⭐⭐ | Fast | Functional properties (capital, CEO, born in) |
+| **Embedding** | ⭐⭐⭐ | Medium | High similarity + opposite polarity |
+| **Heuristic** | ⭐⭐ | Fast | Obvious negations ("is" vs "is not") |
+
+### Usage
+
+```python
+# Challenge a new assertion
+result = memory.challenge("Paris is the capital of Germany")
+
+if result.has_conflicts:
+    for conflict in result.conflicts:
+        print(f"Contradicts: {conflict.existing_fact}")
+        print(f"Method: {conflict.explanation}")  # [LLM], [Graph], [Embedding], etc.
+        print(f"Confidence: {conflict.confidence}")
+
+# Auto-challenge during ingestion (smart triggering)
+memory.ingest("The speed of light is 300,000 km/s")  # Challenges if factual pattern detected
+
+# Force/skip challenge
+memory.ingest(content, auto_challenge=True)   # Always challenge
+memory.ingest(content, auto_challenge=False)  # Never challenge
+```
+
+### Smart Triggering
+
+Auto-challenge only runs for content that looks like factual claims:
+
+| Triggered ✅ | Skipped ❌ |
+|--------------|-----------|
+| "X is the Y" patterns | Opinions ("I think...") |
+| Numeric claims | Questions |
+| "capital of", "CEO of" | Greetings |
+| Absolute claims ("always", "never") | Temporal/personal ("today", "currently") |
+
+### Conflict Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `DIRECT_CONTRADICTION` | Opposite claims | "X is Y" vs "X is not Y" |
+| `TEMPORAL_CONFLICT` | Time-based conflict | "Was X" vs "Now Y" |
+| `NUMERIC_MISMATCH` | Different values | "Population is 14M" vs "37M" |
+| `ENTITY_CONFUSION` | Same name, different entities | "Apple (fruit)" vs "Apple (company)" |
+
+### Auto-Resolution
+
+Before deferring to human review, SmartMemory attempts automatic resolution:
+
+```
+Wikipedia Lookup → LLM Reasoning → Grounding Check → Recency Heuristic
+```
+
+| Method | What It Does | Confidence |
+|--------|--------------|------------|
+| **Wikipedia** | Looks up entities, checks which fact aligns | 0.85 |
+| **LLM Reasoning** | Asks GPT to fact-check with reasoning | 0.7+ |
+| **Grounding** | Checks existing provenance/trusted sources | 0.75 |
+| **Recency** | For temporal conflicts, prefers recent info | 0.65 |
+
+```python
+# Auto-resolve conflicts before human review
+result = challenger.resolve_conflict(conflict, auto_resolve=True)
+
+if result["auto_resolved"]:
+    print(f"Resolved via {result['method']}: {result['evidence']}")
+else:
+    print("Could not auto-resolve, needs human review")
+```
+
+### Manual Resolution Strategies
+
+- **KEEP_EXISTING**: Trust the existing fact
+- **ACCEPT_NEW**: Replace with new fact (decays old confidence)
+- **KEEP_BOTH**: Store both with conflict marker
+- **DEFER**: Flag for human review
 
 ---
 
