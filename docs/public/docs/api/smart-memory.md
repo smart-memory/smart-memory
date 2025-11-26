@@ -58,6 +58,7 @@ def ingest(
     conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
     user_id: Optional[str] = None,
     sync: Optional[bool] = None,
+    auto_challenge: Optional[bool] = None,
     **kwargs
 ) -> Union[str, Dict[str, Any]]
 ```
@@ -75,6 +76,7 @@ def ingest(
 | `conversation_context` | `Optional[Union[ConversationContext, Dict]]` | Conversation context |
 | `user_id` | `Optional[str]` | User ID for user isolation |
 | `sync` | `Optional[bool]` | If True (default), run synchronously. If False, queue for background processing |
+| `auto_challenge` | `Optional[bool]` | If True, always challenge. If False, never challenge. If None (default), use smart triggering |
 | `**kwargs` | `Any` | Additional processing options |
 
 #### Returns
@@ -609,6 +611,78 @@ def run_evolution_cycle(self) -> None
 # Trigger evolution cycle
 memory.run_evolution_cycle()
 ```
+
+#### `challenge()`
+
+Challenge an assertion against existing knowledge to detect contradictions using a multi-method detection cascade.
+
+```python
+def challenge(
+    self,
+    assertion: str,
+    memory_type: str = "semantic",
+    use_llm: bool = True
+) -> ChallengeResult
+```
+
+**Parameters:**
+- `assertion`: The new fact/assertion to challenge
+- `memory_type`: Type of memory to search (default: "semantic")
+- `use_llm`: Whether to use LLM for deep contradiction analysis
+
+**Returns:** `ChallengeResult` with detected conflicts
+
+**Detection Cascade:**
+1. **LLM** (if `use_llm=True`) - Most accurate, analyzes nuance and context
+2. **Graph** - Detects functional property conflicts (capital, CEO, born in)
+3. **Embedding** - High semantic similarity + opposite polarity
+4. **Heuristic** - Pattern matching fallback
+
+**Example:**
+```python
+result = memory.challenge("Paris is the capital of Germany")
+
+if result.has_conflicts:
+    for conflict in result.conflicts:
+        print(f"Contradicts: {conflict.existing_fact}")
+        print(f"Method: {conflict.explanation}")  # Shows [LLM], [Graph], etc.
+        print(f"Confidence: {conflict.confidence}")
+        
+# Fast challenge (skip LLM)
+result = memory.challenge("Some fact", use_llm=False)
+```
+
+**Using AssertionChallenger directly:**
+```python
+from smartmemory.reasoning import AssertionChallenger, ResolutionStrategy
+
+challenger = AssertionChallenger(
+    memory,
+    use_llm=True,      # LLM detection
+    use_graph=True,    # Graph structure analysis
+    use_embedding=True, # Semantic + polarity
+    use_heuristic=True  # Pattern matching
+)
+
+result = challenger.challenge("Paris is the capital of Germany")
+
+# Auto-resolve conflicts (tries Wikipedia, LLM, grounding, recency)
+for conflict in result.conflicts:
+    resolution = challenger.resolve_conflict(conflict, auto_resolve=True)
+    
+    if resolution["auto_resolved"]:
+        print(f"Auto-resolved via {resolution['method']}")
+        print(f"Evidence: {resolution['evidence']}")
+    else:
+        # Fall back to manual strategy
+        challenger.resolve_conflict(conflict, strategy=ResolutionStrategy.DEFER)
+```
+
+**Auto-Resolution Methods:**
+1. **Wikipedia** - Looks up entities, checks which fact aligns (0.85 confidence)
+2. **LLM Reasoning** - GPT fact-checks with reasoning (0.7+ confidence required)
+3. **Grounding** - Checks existing provenance/trusted sources (0.75 confidence)
+4. **Recency** - For temporal conflicts, prefers recent info (0.65 confidence)
 
 #### `run_clustering()`
 

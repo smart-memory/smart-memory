@@ -162,6 +162,7 @@ class SmartMemory(MemoryBase):
             conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
             user_id: Optional[str] = None,
             sync: Optional[bool] = None,
+            auto_challenge: Optional[bool] = None,
             **kwargs) -> Union[str, Dict[str, Any]]:
         """
         Primary entry point for ingesting items into SmartMemory.
@@ -179,6 +180,8 @@ class SmartMemory(MemoryBase):
             user_id: User ID for user isolation (sets normalized_item.user_id)
             sync: If True, run full pipeline synchronously; if False, persist and queue for background processing.
                   If None, defaults to sync=True (local mode).
+            auto_challenge: If True, automatically challenge factual claims before ingesting.
+                           If None, uses smart triggering (only challenges semantic facts with factual patterns).
             **kwargs: Additional processing options
             
         Returns:
@@ -250,6 +253,44 @@ class SmartMemory(MemoryBase):
         memory_type = getattr(normalized_item, 'memory_type', 'semantic')
         if memory_type == 'working':
             return self.add(normalized_item, **kwargs)
+
+        # Auto-challenge: detect contradictions before ingesting
+        # Only runs when: auto_challenge=True, or auto_challenge=None and smart triggering says yes
+        try:
+            from smartmemory.reasoning.challenger import should_challenge, AssertionChallenger
+            
+            content = normalized_item.content or ""
+            metadata = normalized_item.metadata or {}
+            source = metadata.get('source') or (context or {}).get('source')
+            
+            do_challenge = auto_challenge
+            if do_challenge is None:
+                # Smart triggering: only challenge semantic facts with factual patterns
+                do_challenge = should_challenge(
+                    content=content,
+                    memory_type=memory_type,
+                    source=source,
+                    metadata=metadata
+                )
+            
+            if do_challenge:
+                challenger = AssertionChallenger(self, use_llm=False)  # Heuristics for speed
+                challenge_result = challenger.challenge(content, memory_type=memory_type)
+                
+                if challenge_result.has_conflicts:
+                    # Store challenge result in metadata for downstream handling
+                    normalized_item.metadata['challenge_result'] = {
+                        'has_conflicts': True,
+                        'conflict_count': len(challenge_result.conflicts),
+                        'overall_confidence': challenge_result.overall_confidence,
+                        'conflicts': [c.to_dict() for c in challenge_result.conflicts[:3]]  # Limit stored
+                    }
+                    logger.info(
+                        f"Auto-challenge found {len(challenge_result.conflicts)} conflicts "
+                        f"for: {content[:50]}..."
+                    )
+        except Exception as e:
+            logger.debug(f"Auto-challenge failed (non-fatal): {e}")
 
         # Check for explicit versioning via original_id
         # This supports the temporal test patterns where add() is used to create new versions
@@ -700,6 +741,37 @@ class SmartMemory(MemoryBase):
             Dict with stats about merged entities
         """
         return self._clustering.run()
+
+    def challenge(
+        self,
+        assertion: str,
+        memory_type: str = "semantic",
+        use_llm: bool = True
+    ):
+        """
+        Challenge an assertion against existing knowledge to detect contradictions.
+        
+        Args:
+            assertion: The new fact/assertion to challenge
+            memory_type: Type of memory to search (default: semantic)
+            use_llm: Whether to use LLM for deep contradiction analysis
+            
+        Returns:
+            ChallengeResult with any detected conflicts
+            
+        Example:
+            >>> result = memory.challenge("Paris is the capital of Germany")
+            >>> if result.has_conflicts:
+            ...     for conflict in result.conflicts:
+            ...         print(f"Contradicts: {conflict.existing_fact}")
+        """
+        from smartmemory.reasoning.challenger import AssertionChallenger
+        
+        challenger = AssertionChallenger(
+            self,
+            use_llm=use_llm
+        )
+        return challenger.challenge(assertion, memory_type=memory_type)
 
     # Debug and troubleshooting methods
     def debug_search(self, query: str, top_k: int = 5) -> dict:
