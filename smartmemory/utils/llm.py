@@ -118,11 +118,9 @@ def call_llm(
 
     try:
         # Use DSPy transport exclusively
+        # For reasoning models (o1/o3/o4/gpt-5.x), temperature is handled by call_dspy
+        # which sets the required temperature=1.0 automatically
         temp_arg = temperature if (temperature is not None and _model_supports_temperature(model)) else None
-        if temperature is not None and temp_arg is None and temperature != 1:
-            logger.warning(
-                f"Model '{model}' does not support custom temperature; requested {temperature}. Using model default instead."
-            )
 
         resp = call_dspy(
             model=model,

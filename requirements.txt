@@ -1,4 +1,3 @@
-# chromadb - now optional, install with: pip install smartmemory[chromadb]
 smolagents
 wikipedia-api
 python-dateutil

@@ -1,6 +1,8 @@
 """
 ExtractorPipeline component for componentized memory ingestion pipeline.
 Handles entity/relation extraction with fallback chain and multiple extractor support.
+
+Includes automatic chunking for large texts.
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -13,6 +15,10 @@ from smartmemory.utils import get_config
 from smartmemory.utils.pipeline_utils import create_error_result
 
 logger = logging.getLogger(__name__)
+
+# Default chunk size for large text processing (characters)
+DEFAULT_CHUNK_SIZE = 8000
+DEFAULT_CHUNK_OVERLAP = 200
 
 
 class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
@@ -213,7 +219,15 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
             return self._extract_with_fallback(memory_item, fallback_order)
 
     def _extract_with_fallback(self, memory_item, fallback_order: List[str]) -> Dict[str, Any]:
-        """Try extractors in fallback order until one succeeds"""
+        """Try extractors in fallback order until one succeeds.
+        
+        Automatically uses chunking for large texts (> DEFAULT_CHUNK_SIZE).
+        """
+        # Check if text is large enough to require chunking
+        content = getattr(memory_item, 'content', str(memory_item))
+        if len(content) > DEFAULT_CHUNK_SIZE:
+            return self._extract_with_chunking(memory_item, fallback_order)
+        
         for fb_name in fallback_order:
             fb = self._resolve_extractor(fb_name)
             if not fb:
@@ -281,6 +295,101 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
         return {
             'entities': [],
             'relations': []
+        }
+
+    def _extract_with_chunking(self, memory_item, fallback_order: List[str]) -> Dict[str, Any]:
+        """
+        Extract from large text using chunking with parallel processing.
+        
+        chunk processing approach.
+        """
+        from smartmemory.utils.chunking import chunk_text, _extract_parallel
+        from smartmemory.memory.pipeline.stages.clustering import aggregate_graphs
+        
+        content = getattr(memory_item, 'content', str(memory_item))
+        user_id = getattr(memory_item, 'user_id', None)
+        
+        # Chunk the text
+        chunks = chunk_text(
+            content, 
+            chunk_size=DEFAULT_CHUNK_SIZE, 
+            overlap=DEFAULT_CHUNK_OVERLAP,
+            strategy="sentence"
+        )
+        
+        logger.info(f"Large text ({len(content)} chars) split into {len(chunks)} chunks")
+        
+        # Create extraction function for chunks
+        def extract_chunk(chunk_text: str) -> Dict[str, Any]:
+            # Create a temporary memory item for the chunk
+            chunk_item = MemoryItem(
+                content=chunk_text,
+                memory_type=getattr(memory_item, 'memory_type', 'semantic'),
+                metadata=dict(getattr(memory_item, 'metadata', {}))
+            )
+            if user_id:
+                chunk_item.user_id = user_id
+            
+            # Try extractors in order
+            for fb_name in fallback_order:
+                fb = self._resolve_extractor(fb_name)
+                if not fb:
+                    continue
+                try:
+                    fb_res = fb(chunk_item)
+                    if isinstance(fb_res, dict):
+                        return fb_res
+                    elif isinstance(fb_res, tuple) and len(fb_res) == 3:
+                        _, entities, relations = fb_res
+                        return {'entities': entities, 'relations': relations}
+                except Exception as e:
+                    logger.debug(f"Chunk extraction with {fb_name} failed: {e}")
+                    continue
+            return {'entities': [], 'relations': []}
+        
+        # Extract from chunks in parallel
+        if len(chunks) > 1:
+            chunk_results = _extract_parallel(extract_chunk, chunks, max_workers=4)
+        else:
+            chunk_results = [extract_chunk(chunks[0])] if chunks else []
+        
+        if not chunk_results:
+            return {'entities': [], 'relations': []}
+        
+        # Aggregate results with deduplication
+        aggregated = aggregate_graphs(chunk_results, cluster=True)
+        
+        # Convert entities to MemoryItem format
+        converted_entities = []
+        for ent in aggregated.get('entities', []):
+            if isinstance(ent, MemoryItem):
+                converted_entities.append(ent)
+            elif isinstance(ent, dict):
+                entity_content = ent.get('name', ent.get('text', 'entity'))
+                entity_type = ent.get('type', ent.get('entity_type', 'entity'))
+                metadata = {
+                    'name': ent.get('name', entity_content),
+                    'confidence': ent.get('confidence', 1.0),
+                    'source': 'chunked_extraction'
+                }
+                for k, v in ent.items():
+                    if k not in ['name', 'text', 'type', 'entity_type', 'confidence']:
+                        metadata[k] = v
+                converted_entities.append(MemoryItem(
+                    content=entity_content,
+                    memory_type=entity_type,
+                    metadata=metadata
+                ))
+        
+        logger.info(f"Chunked extraction: {len(converted_entities)} entities, "
+                   f"{len(aggregated.get('relations', []))} relations from {len(chunks)} chunks")
+        
+        return {
+            'entities': converted_entities,
+            'relations': aggregated.get('relations', []),
+            'chunk_count': len(chunks),
+            'entity_clusters': aggregated.get('entity_clusters', {}),
+            'edge_clusters': aggregated.get('edge_clusters', {})
         }
 
     def run(self, classification_state: ClassificationState, config: ExtractionConfig) -> ComponentResult:

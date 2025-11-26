@@ -226,8 +226,9 @@ class NodeTypeProcessor:
                     entity_type_str = 'entity'
 
                 # Extract entity properties
+                entity_name_final = entity_metadata.get('name', '') or entity_name
                 properties = {
-                    'name': entity_metadata.get('name', '') or entity_name,
+                    'name': entity_name_final,
                     'confidence': entity_metadata.get('confidence', 1.0),
                     'source': 'ontology_extraction'
                 }
@@ -236,6 +237,11 @@ class NodeTypeProcessor:
                 for key, value in entity_metadata.items():
                     if key not in ['name', 'confidence', 'source']:
                         properties[key] = value
+                
+                # Ensure canonical_key is set for entity resolution
+                if 'canonical_key' not in properties and entity_name_final:
+                    from smartmemory.utils.deduplication import get_canonical_key
+                    properties['canonical_key'] = get_canonical_key(entity_name_final, entity_type_str)
 
                 # Find relationships for this entity
                 entity_relationships = []

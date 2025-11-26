@@ -18,9 +18,51 @@ SmartMemory is a **next-generation memory system** that goes far beyond simple s
 
 - **🧠 Cognitive Memory Types**: Working, semantic, episodic, and procedural memory systems
 - **🔄 Automatic Evolution**: Memories improve and consolidate over time
-- **🎯 Intelligent Assertion Challenging**: LLM-based semantic analysis to detect and address contradictory statements
-- **🔍 Semantic Search**: Find information by meaning, not just keywords
+- **🎯 Entity Extraction**: LLM, SpaCy, GLiNER, and Relik extractors with automatic fallback
+- **🔗 Entity Clustering**: deduplication (SemHash + KMeans + LLM)
+- **🌐 Knowledge Grounding**: Automatic Wikipedia linking for entity provenance
+- **🔍 Semantic Search**: Vector embeddings + graph traversal + text fallbacks
+- **⏱️ Temporal Versioning**: Bi-temporal tracking with time-travel queries
 - **🌐 Framework Integration**: Works with LangChain, CrewAI, AutoGen, and more
+
+---
+
+## 🔄 **Ingestion Pipeline**
+
+When you call `memory.ingest()`, content flows through an **11-stage pipeline**:
+
+```mermaid
+flowchart LR
+    A["📥 Input"] --> B["🏷️ Classification"]
+    B --> C["🔍 Extraction"]
+    C --> D["💾 Storage"]
+    D --> E["🔗 Linking"]
+    E --> F["📊 Vector"]
+    F --> G["✨ Enrichment"]
+    G --> H["🌐 Grounding"]
+    H --> I["🔄 Evolution"]
+    I --> J["🧬 Clustering"]
+    J --> K["📜 Versioning"]
+    
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style C fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style J fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style K fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+```
+
+| Stage | Description |
+|-------|-------------|
+| **Input** | Accept str, dict, or MemoryItem |
+| **Classification** | Determine memory type (semantic, episodic, etc.) |
+| **Extraction** | Extract entities & relations (LLM → SpaCy → GLiNER fallback) |
+| **Storage** | Create memory node + entity nodes in FalkorDB |
+| **Linking** | Connect to related existing memories |
+| **Vector** | Generate embeddings, store in HNSW index |
+| **Enrichment** | Add Wikipedia summaries, categories |
+| **Grounding** | Create GROUNDED_IN edges to Wikipedia nodes |
+| **Evolution** | Promote working → episodic/procedural if thresholds met |
+| **Clustering** | SemHash + embedding deduplication of entities |
+| **Versioning** | Create bi-temporal version record |
 
 ---
 
@@ -145,6 +187,34 @@ flowchart LR
     style N fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     style Q fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 ```
+
+## 🧬 **Entity Clustering & Deduplication**
+
+SmartMemory provides multi-level entity resolution:
+
+```mermaid
+flowchart LR
+    A["🔤 Entities"] --> B["#️⃣ SemHash"]
+    B --> C["📊 KMeans"]
+    C --> D["🤖 LLM Clustering"]
+    D --> E["🔗 Merge Nodes"]
+    
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style B fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style D fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style E fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+```
+
+| Layer | Method | Purpose |
+|-------|--------|---------|
+| **SemHash** | Semantic hashing + singularization | Fast deterministic dedup (0.95 threshold) |
+| **KMeans** | Embedding clustering | Group similar entities (~128 per cluster) |
+| **LLM** | GPT-5-mini semantic analysis | Find aliases (Joe ↔ Joseph, ML ↔ machine learning) |
+| **Merge** | Graph node consolidation | Rewire edges, merge properties |
+
+**Runs automatically** after each `ingest()` call, or manually via `memory.run_clustering()`.
+
+---
 
 ## 🔍 **Advanced Search & Retrieval**
 
@@ -280,41 +350,48 @@ flowchart TD
     style R fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 ```
 
-## 💾 **Multi-Backend Storage Architecture**
+## 💾 **Storage Architecture**
 
-Flexible storage architecture supporting multiple database backends, allowing you to choose the optimal storage solution for your specific performance and scalability requirements.
+SmartMemory uses a **unified FalkorDB backend** for both graph and vector storage:
 
 ```mermaid
 flowchart TD
-    subgraph "Application Layer"
-        A["🤖 SmartMemory API"] --> B["🔧 Storage Abstraction Layer"]
+    subgraph "SmartMemory API"
+        A["🤖 SmartMemory"] --> B["📊 SmartGraph"]
+        A --> C["🗂️ VectorStore"]
     end
     
-    subgraph "Backend Selection"
-        B --> C{"Storage Type?"}
+    subgraph "FalkorDB (Unified Backend)"
+        B --> D["🕸️ Graph Storage"]
+        C --> E["📊 HNSW Vector Index"]
         
-        C -->|Graph| D["🕸️ Graph Backends"]
-        C -->|Vector| E["🗂️ Vector Backends"]
-        C -->|Metadata| F["📋 Metadata Backends"]
-        C -->|Hybrid| G["🔄 Hybrid Backends"]
+        D --> F["Memory Nodes"]
+        D --> G["Entity Nodes"]
+        D --> H["Wikipedia Nodes"]
+        D --> I["Version Nodes"]
+        D --> J["Edges (CONTAINS, GROUNDED_IN, HAS_VERSION)"]
+        
+        E --> K["vecf32 embeddings"]
+        E --> L["Cosine similarity"]
     end
     
-    subgraph "Performance Features"
-        D --> H["📈 Auto-Scaling"]
-        E --> H
-        F --> H
-        G --> H
-        
-        H --> I["⚡ Caching Layer"]
-        I --> J["🔄 Load Balancing"]
-        J --> K["📊 Performance Monitoring"]
+    subgraph "Redis Cache"
+        M["⚡ Embeddings"]
+        N["⚡ Search Results"]
+        O["⚡ Entity Extraction"]
     end
     
     style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style C fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    style H fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style K fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style D fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style E fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style M fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 ```
+
+**Key Features:**
+- **Dual-node pattern**: Memory nodes + separate entity nodes for reuse
+- **Global Wikipedia nodes**: Shared across users (`is_global=True`)
+- **HNSW vector index**: Native FalkorDB vector search with configurable M, efConstruction
+- **Multi-tenant isolation**: `ScopeProvider` filters all queries by tenant/user/workspace
 
 ## 🎯 **Agentic Framework Integration**
 
@@ -431,18 +508,24 @@ flowchart LR
   # Initialize SmartMemory
   memory = SmartMemory()
   
-  # Ingest memories (full pipeline: extract → store → link → enrich → evolve)
+  # Ingest memories (full 11-stage pipeline)
+  # Input → Classification → Extraction → Storage → Linking → 
+  # Vector → Enrichment → Grounding → Evolution → Clustering → Versioning
   memory.ingest("I learned Python programming in 2020")
   memory.ingest("Paris is the capital of France")
-  memory.ingest("To make coffee: heat water, add grounds, brew for 4 minutes")
+  memory.ingest("John works at Google as an engineer")
   
-  # Search memories
+  # Search memories (vector + graph + text fallbacks)
   results = memory.search("programming languages")
   print(results)
   
-  # Get related memories
+  # Get related memories via graph traversal
   related = memory.get_neighbors(results[0].item_id)
   print(related)
+  
+  # Run clustering to deduplicate entities
+  stats = memory.run_clustering()
+  print(f"Merged {stats['merged_count']} duplicate entities")
   ```
 |---------------------|-----------------|---------|----------|
 | **Core Memory Types** |
@@ -452,15 +535,16 @@ flowchart LR
 | Working Memory | ✅ Adaptive capacity | ❌ No | ❌ No |
 | Zettelkasten Memory | ✅ Atomic knowledge notes | ❌ No | ❌ No |
 | **Intelligence & Processing** |
-| Entity Extraction | ✅ Advanced NLP + LLM | ❌ Basic | ✅ Basic |
+| Entity Extraction | ✅ LLM + SpaCy + GLiNER + Relik (fallback chain) | ❌ Basic | ✅ Basic |
 | Relationship Discovery | ✅ Automatic + intelligent | ❌ Manual | ✅ Limited |
-| Grounding & Provenance | ✅ Full source attribution | ❌ No | ❌ Limited |
+| Entity Clustering | ✅ SemHash + KMeans + LLM | ❌ No | ❌ No |
+| Grounding & Provenance | ✅ Wikipedia linking + GROUNDED_IN edges | ❌ No | ❌ Limited |
 | Background Processing | ✅ Async + configurable | ❌ No | ✅ Basic |
 | Evolution Algorithms | ✅ 14+ sophisticated evolvers | ❌ No | ❌ Basic |
 | **Storage & Architecture** |
-| Storage Architecture | ✅ Hybrid (Graph+Vector+Meta) | ❌ Vector only | ✅ Vector + basic |
-| Graph Database Support | ✅ FalkorDB, Neo4j, Redis | ❌ No | ❌ Limited |
-| Vector Database Support | ✅ ChromaDB, Pinecone, etc. | ✅ Multiple | ✅ Multiple |
+| Storage Architecture | ✅ Unified FalkorDB (Graph + Vector) | ❌ Vector only | ✅ Vector + basic |
+| Graph Database Support | ✅ FalkorDB (primary), Neo4j | ❌ No | ❌ Limited |
+| Vector Database Support | ✅ FalkorDB HNSW (native), ChromaDB | ✅ Multiple | ✅ Multiple |
 | Multi-Backend Support | ✅ Pluggable backends | ❌ Limited | ✅ Yes |
 | Hybrid Search | ✅ Semantic + Graph + Metadata | ❌ Vector only | ✅ Semantic |
 | **AI Agent Integration** |
@@ -490,6 +574,7 @@ flowchart LR
 | **Enterprise Features** |
 | Multi-Tenancy | ✅ Secure namespace isolation | ❌ No | ✅ User isolation |
 | Audit Trails | ✅ Full provenance tracking | ❌ No | ❌ Limited |
+| Temporal Versioning | ✅ Bi-temporal with time-travel queries | ❌ No | ❌ No |
 | Security Model | ✅ Comprehensive access control | ❌ Basic | ✅ User-based |
 | Backup & Recovery | ✅ Point-in-time recovery | ❌ Manual | ✅ Cloud backup |
 | Compliance Support | ✅ GDPR + audit ready | ❌ No | ✅ Basic |

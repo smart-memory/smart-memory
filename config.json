@@ -42,7 +42,7 @@
       "ontogpt": {
         "enabled": "${ONTOLOGY_ONTOGPT_ENABLED:-false}",
         "provider": "${ONTOGPT_PROVIDER:-openai}",
-        "model": "${ONTOGPT_MODEL:-gpt-5.1-mini}",
+        "model": "${ONTOGPT_MODEL:-gpt-5-mini}",
         "api_base": "${ONTOGPT_API_BASE:-}",
         "api_version": "${ONTOGPT_API_VERSION:-}",
         "template": "${ONTOGPT_TEMPLATE:-}",
@@ -52,7 +52,11 @@
     }
   },
   "extractor": {
-    "default": "${EXTRACTOR_DEFAULT:-llm}",
+    "default": "${EXTRACTOR_DEFAULT:-gliner2}",
+    "gliner2": {
+      "model_name": "${GLINER2_MODEL:-fastino/gliner2-base-v1}",
+      "confidence_threshold": "${GLINER2_CONFIDENCE:-0.5}"
+    },
     "relik": {
       "model_name": "${RELIK_MODEL:-relik-ie/relik-relation-extraction-small-wikipedia-ner}"
     },
@@ -60,7 +64,7 @@
       "model_name": "${GLINER_MODEL:-urchade/gliner_base}"
     },
     "llm": {
-      "model_name": "${EXTRACTOR_LLM_MODEL:-gpt-5.1-mini}",
+      "model_name": "${EXTRACTOR_LLM_MODEL:-gpt-5-mini}",
       "openai_api_key": "${OPENAI_API_KEY:-}"
     },
     "spacy": {
@@ -70,14 +74,14 @@
       "model_name": "${REBEL_MODEL:-Babelscape/rebel-large}"
     },
     "gpt4o_triple": {
-      "model_name": "gpt-5.1-mini",
+      "model_name": "gpt-5-mini",
       "openai_api_key": "${OPENAI_API_KEY:-}"
     }
   },
   "enricher": {
     "default": "default",
     "temporal": {
-      "model_name": "${ENRICHER_TEMPORAL_MODEL:-gpt-5.1-mini}",
+      "model_name": "${ENRICHER_TEMPORAL_MODEL:-gpt-5-mini}",
       "openai_api_key": "${OPENAI_API_KEY:-}"
     }
   },

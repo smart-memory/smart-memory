@@ -7,7 +7,7 @@ Enhances entity and relation extraction with conversation context, enabling:
 - Speaker-entity relationship extraction
 - Entity continuity across conversation turns
 
-Inspired by KGGen's conversation-aware knowledge graph extraction.
+conversation-aware knowledge graph extraction.
 """
 
 import logging

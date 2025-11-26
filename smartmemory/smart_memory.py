@@ -15,7 +15,7 @@ from smartmemory.memory.pipeline.stages.linking import Linking
 from smartmemory.memory.pipeline.stages.monitoring import Monitoring
 from smartmemory.memory.pipeline.stages.personalization import Personalization
 from smartmemory.memory.pipeline.stages.search import Search
-from smartmemory.memory.pipeline.stages.clustering import GlobalClustering
+from smartmemory.clustering.global_cluster import GlobalClustering
 from smartmemory.temporal.queries import TemporalQueries
 from smartmemory.temporal.version_tracker import VersionTracker
 from smartmemory.models.memory_item import MemoryItem
@@ -90,13 +90,13 @@ class SmartMemory(MemoryBase):
         self._graph_ops.clear_all()
         print("✅ Cleared Graph Database (FalkorDB)")
 
-        # 2. Clear the vector database (ChromaDB)
+        # 2. Clear the vector database (FalkorDB vector index)
         from smartmemory.stores.vector.vector_store import VectorStore
         try:
             # Create vector store instance directly
             vector_store = VectorStore()
             vector_store.clear()
-            print("✅ Cleared Vector Store (ChromaDB)")
+            print("✅ Cleared Vector Store")
         except Exception as e:
             print(f"⚠️  Vector Store clear failed: {e}")
 
@@ -306,6 +306,12 @@ class SmartMemory(MemoryBase):
         # Delegate evolution to EvolutionOrchestrator (fail fast)
         self._evolution.run_evolution_cycle()
 
+        # Run clustering to deduplicate entities (can be optimized later with thresholds)
+        try:
+            self._clustering.run(use_semhash=True)
+        except Exception as e:
+            logger.debug(f"Clustering during ingestion failed (non-fatal): {e}")
+
         # Extract item_id from result
         item_id = None
         if isinstance(result, dict) and 'item' in result:
@@ -403,7 +409,8 @@ class SmartMemory(MemoryBase):
             # For other memory types, use the standard CRUD
             return self._crud.add(item, **kwargs)
 
-    def add_impl(self, item, **kwargs) -> str:
+    def _add_impl(self, item, **kwargs) -> str:
+        """Implement abstract method from MemoryBase."""
         return self._crud.add(item, **kwargs)
 
     def _get_impl(self, key: str):
