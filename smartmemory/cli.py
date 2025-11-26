@@ -34,10 +34,9 @@ def main():
         console.print()
         console.print("📦 Installation: [green]OK[/green]")
         
-        # Check optional dependencies
+        # Check core dependencies
         deps = {
-            "chromadb": "Vector database",
-            "falkordb": "Graph database",
+            "falkordb": "Graph and vector database",
             "spacy": "NLP processing",
             "litellm": "LLM integration"
         }

@@ -34,20 +34,12 @@ def _ensure_registry() -> None:
     
     _BACKENDS = {}
     
-    # FalkorDB is always available (core dependency)
+    # FalkorDB is the only supported vector backend
     try:
         from .falkor import FalkorVectorBackend
         _BACKENDS["falkordb"] = FalkorVectorBackend
     except ImportError as e:
         raise RuntimeError(f"FalkorDB backend is required but could not be loaded: {e}")
-    
-    # ChromaDB is optional
-    try:
-        from .chroma import ChromaVectorBackend
-        _BACKENDS["chromadb"] = ChromaVectorBackend
-    except ImportError:
-        # ChromaDB not installed - that's okay, it's optional
-        pass
 
 
 def create_backend(name: str, collection_name: str, persist_directory: Optional[str]) -> VectorBackend:
@@ -57,8 +49,7 @@ def create_backend(name: str, collection_name: str, persist_directory: Optional[
     if key not in _BACKENDS:
         available = ", ".join(_BACKENDS.keys())
         raise ValueError(
-            f"Unknown vector backend: '{name}'. Available backends: {available}. "
-            f"If you want to use ChromaDB, install it with: pip install smartmemory[chromadb]"
+            f"Unknown vector backend: '{name}'. Available backends: {available}."
         )
     cls = _BACKENDS[key]
     return cls(collection_name, persist_directory)

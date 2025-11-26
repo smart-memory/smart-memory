@@ -28,10 +28,12 @@ memory = SmartMemory()
 SmartMemory automatically processes and enriches memories through the full pipeline:
 
 ```python
-# Ingest memories (full pipeline: extract → store → link → enrich → evolve)
+# Ingest memories (full 11-stage pipeline)
+# Input → Classification → Extraction → Storage → Linking → 
+# Vector → Enrichment → Grounding → Evolution → Clustering → Versioning
 memory.ingest("I learned Python programming in 2020")
 memory.ingest("Paris is the capital of France")
-memory.ingest("To make coffee: heat water, add grounds, brew for 4 minutes")
+memory.ingest("John works at Google as an engineer")  # Entities extracted & clustered
 memory.ingest("Yesterday I had lunch with Sarah at the Italian restaurant")
 
 # Or use add() for simple storage without pipeline
@@ -204,6 +206,41 @@ memory.link(
 ```python
 # Trigger memory evolution (consolidation, pruning, enhancement)
 memory.run_evolution_cycle()
+
+# Promote working memory to episodic/procedural
+memory.commit_working_to_episodic()
+memory.commit_working_to_procedural()
+```
+
+### Entity Clustering
+
+```python
+# Run clustering to deduplicate entities
+stats = memory.run_clustering()
+print(f"Merged {stats.get('merged_count', 0)} duplicate entities")
+
+# Clustering uses:
+# 1. SemHash pre-deduplication (fast, 0.95 threshold)
+# 2. KMeans embedding clustering
+# 3. LLM semantic clustering (Joe ↔ Joseph)
+```
+
+### Temporal Versioning
+
+```python
+# Get version history for an item
+versions = memory.version_tracker.get_versions(item_id)
+
+# Get version at specific time (time-travel query)
+from datetime import datetime
+version = memory.version_tracker.get_version_at_time(
+    item_id, 
+    time=datetime(2024, 1, 15),
+    time_type='transaction'
+)
+
+# Compare versions
+diff = memory.version_tracker.compare_versions(item_id, version1=1, version2=2)
 ```
 
 ### Ontology Management

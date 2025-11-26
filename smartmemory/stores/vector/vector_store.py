@@ -97,16 +97,15 @@ class VectorStore:
             ws = ctx.get("workspace_id")
 
         base_collection = collection_name or vector_cfg.get("collection_name") or "semantic_memory"
-        # Chroma collections cannot contain ':'; use '_' as delimiter
         eff_collection = base_collection
         if ns:
             eff_collection = f"{eff_collection}_{ns}"
         if ws:
             eff_collection = f"{eff_collection}_{ws}"
 
-        # Resolve persist directory for Chroma only
+        # Resolve persist directory (unused for FalkorDB but kept for API compatibility)
         if persist_directory is None:
-            persist_directory = vector_cfg.get("persist_directory", ".chroma")
+            persist_directory = vector_cfg.get("persist_directory")
 
         backend_name = (vector_cfg.get('backend') or 'falkordb').lower()
         self._backend = create_backend(backend_name, eff_collection, persist_directory)
@@ -153,15 +152,15 @@ class VectorStore:
         if chunk_ids is not None:
             meta["chunk_ids"] = chunk_ids if isinstance(chunk_ids, list) else [chunk_ids]
 
-        # Ensure all metadata values are ChromaDB-compatible (str, int, float, bool)
-        def chroma_safe(val):
+        # Ensure all metadata values are storage-compatible (str, int, float, bool)
+        def storage_safe(val):
             if isinstance(val, (list, dict)):
                 return json.dumps(val, default=str)
             if isinstance(val, datetime):
                 return val.isoformat()
             return val
 
-        meta = {k: chroma_safe(v) for k, v in meta.items() if v is not None}
+        meta = {k: storage_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
         
         t0 = perf_counter()
@@ -188,15 +187,15 @@ class VectorStore:
         if chunk_ids is not None:
             meta["chunk_ids"] = chunk_ids if isinstance(chunk_ids, list) else [chunk_ids]
 
-        # Ensure all metadata values are ChromaDB-compatible (str, int, float, bool)
-        def chroma_safe(val):
+        # Ensure all metadata values are storage-compatible (str, int, float, bool)
+        def storage_safe(val):
             if isinstance(val, (list, dict)):
                 return json.dumps(val, default=str)
             if isinstance(val, datetime):
                 return val.isoformat()
             return val
 
-        meta = {k: chroma_safe(v) for k, v in meta.items() if v is not None}
+        meta = {k: storage_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
         
         t0 = perf_counter()

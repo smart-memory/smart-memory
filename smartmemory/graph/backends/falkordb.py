@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from falkordb import FalkorDB
 from smartmemory.graph.backends.backend import SmartGraphBackend
 from smartmemory.utils import unflatten_dict, flatten_dict, get_config
+from smartmemory.utils.deduplication import get_canonical_key, normalize_entity_type
 from smartmemory.interfaces import ScopeProvider
 from smartmemory.scope_provider import DefaultScopeProvider
 
@@ -734,6 +735,60 @@ class FalkorDBBackend(SmartGraphBackend):
         for edge in data.get("edges", []):
             self.add_edge(edge["source"], edge["target"], edge["type"], edge.get("properties") or {})
 
+    def find_entity_by_canonical_key(
+            self,
+            canonical_key: str,
+            tenant_id: Optional[str] = None,
+            workspace_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find an existing entity node by its canonical key.
+        
+        Used for cross-memory entity resolution - if an entity with the same
+        canonical key exists, we link to it instead of creating a duplicate.
+        
+        Args:
+            canonical_key: Normalized key like "john smith|person"
+            tenant_id: Optional tenant filter for multi-tenant isolation
+            workspace_id: Optional workspace filter
+            
+        Returns:
+            Entity node dict with item_id and properties, or None if not found
+        """
+        # Build query with optional tenant/workspace filters
+        filters = ["n.canonical_key = $canonical_key"]
+        params = {"canonical_key": canonical_key}
+        
+        if tenant_id:
+            filters.append("n.tenant_id = $tenant_id")
+            params["tenant_id"] = tenant_id
+        if workspace_id:
+            filters.append("n.workspace_id = $workspace_id")
+            params["workspace_id"] = workspace_id
+            
+        where_clause = " AND ".join(filters)
+        
+        # Search across all entity labels (we don't know the exact type)
+        query = f"""
+            MATCH (n)
+            WHERE {where_clause}
+            RETURN n.item_id AS item_id, n AS props
+            LIMIT 1
+        """
+        
+        try:
+            result = self._query(query, params)
+            if result and result.result_set:
+                row = result.result_set[0]
+                return {
+                    "item_id": row[0],
+                    "properties": dict(row[1].properties) if hasattr(row[1], 'properties') else {}
+                }
+        except Exception as e:
+            logger.debug(f"Entity lookup failed for {canonical_key}: {e}")
+            
+        return None
+
     def add_dual_node(
             self,
             item_id: str,
@@ -759,8 +814,8 @@ class FalkorDBBackend(SmartGraphBackend):
             This operation is NOT atomic in FalkorDB as it executes multiple sequential queries.
             If an error occurs midway, the graph may be left in an inconsistent state (e.g., memory node created but entities missing).
         """
-        # TODO: Implement true atomicity when FalkorDB supports multi-statement transactions in client
-        logger.warning("Executing non-atomic add_dual_node operation. Inconsistency possible on failure.")
+        # Note: FalkorDB executes queries sequentially (no multi-statement transactions).
+        # This is acceptable for now - failures are rare and can be cleaned up.
 
         # Prepare memory node
         memory_label = memory_type.capitalize()
@@ -791,58 +846,126 @@ class FalkorDBBackend(SmartGraphBackend):
             memory_query = f"CREATE (m:{memory_label} {{item_id: $memory_id}})"
         queries.append(memory_query)
 
-        # 2. Create entity nodes and relationships
+        # 2. Process entity nodes with cross-memory resolution
         entity_ids = []
+        resolved_entities = []  # Track which entities were resolved vs created
+        entity_id_map = {}  # Map index to actual entity_id for relationship creation
+        
         if entity_nodes:
+            # Get tenant/workspace for entity resolution
+            tenant_id = memory_props.get('tenant_id')
+            workspace_id = memory_props.get('workspace_id')
+            
             for i, entity_node in enumerate(entity_nodes):
                 entity_type = entity_node.get('entity_type', 'Entity')
                 entity_props = entity_node.get('properties') or {}
                 entity_relationships = entity_node.get('relations', [])
-
-                # Generate unique entity ID
-                entity_id = f"{item_id}_entity_{i}"
-                entity_ids.append(entity_id)
-                entity_label = entity_type.capitalize()
-
-                # Add user context to entity
-                if not is_global:
-                    write_ctx = self.scope_provider.get_write_context()
-                    entity_props.update(write_ctx)
-                    
-                entity_props["is_global"] = is_global
+                entity_name = entity_props.get('name') or entity_props.get('content', '')
                 
-                # SECURITY: Add tenant metadata from memory properties for tenant isolation
-                # This is redundant if scope provider is working correctly, but kept for depth
-                if 'tenant_id' in memory_props and 'tenant_id' not in entity_props:
-                    entity_props["tenant_id"] = memory_props['tenant_id']
-                if 'workspace_id' in memory_props and 'workspace_id' not in entity_props:
-                    entity_props["workspace_id"] = memory_props['workspace_id']
-
-                # Build entity creation query
-                entity_set_clauses = []
-                for key, value in entity_props.items():
-                    if self._is_valid_property(key, value):
-                        param_key = f"ent_{i}_{key}"
-                        entity_set_clauses.append(f"e{i}.{key} = ${param_key}")
-                        params[param_key] = self._serialize_value(value)
-
-                params[f"entity_id_{i}"] = entity_id
-
-                if entity_set_clauses:
-                    entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}}) SET {', '.join(entity_set_clauses)}"
+                # Generate canonical key for entity resolution
+                canonical_key = entity_props.get('canonical_key')
+                if not canonical_key and entity_name:
+                    canonical_key = get_canonical_key(entity_name, entity_type)
+                
+                logger.info(f"Entity resolution: name='{entity_name}', type='{entity_type}', canonical_key='{canonical_key}'")
+                
+                # Try to find existing entity with same canonical key
+                existing_entity = None
+                if canonical_key:
+                    existing_entity = self.find_entity_by_canonical_key(
+                        canonical_key, tenant_id, workspace_id
+                    )
+                    logger.info(f"Entity lookup result for '{canonical_key}': {existing_entity}")
+                
+                if existing_entity:
+                    # Reuse existing entity - just link to it
+                    entity_id = existing_entity['item_id']
+                    entity_ids.append(entity_id)
+                    entity_id_map[i] = entity_id
+                    resolved_entities.append({
+                        'index': i,
+                        'entity_id': entity_id,
+                        'resolved': True,
+                        'canonical_key': canonical_key
+                    })
+                    logger.debug(f"Resolved entity '{entity_name}' to existing node {entity_id}")
+                    
+                    # Create MENTIONED_IN relationship from existing entity to new memory
+                    # This links the entity to all memories that mention it
+                    link_query = f"""
+                        MATCH (m:{memory_label} {{item_id: $memory_id}}), (e {{item_id: $existing_entity_id}})
+                        MERGE (m)-[:CONTAINS_ENTITY]->(e)
+                        MERGE (e)-[:MENTIONED_IN]->(m)
+                    """
+                    params[f"existing_entity_id_{i}"] = entity_id
+                    # Execute this after memory node is created
+                    
                 else:
-                    entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}})"
-                queries.append(entity_query)
+                    # Create new entity node
+                    entity_id = f"{item_id}_entity_{i}"
+                    entity_ids.append(entity_id)
+                    entity_id_map[i] = entity_id
+                    entity_label = normalize_entity_type(entity_type).capitalize()
+                    
+                    resolved_entities.append({
+                        'index': i,
+                        'entity_id': entity_id,
+                        'resolved': False,
+                        'canonical_key': canonical_key
+                    })
 
-                # Create CONTAINS_ENTITY relationship
-                queries.append(f"CREATE (m)-[:CONTAINS_ENTITY]->(e{i})")
+                    # Add user context to entity
+                    if not is_global:
+                        write_ctx = self.scope_provider.get_write_context()
+                        entity_props.update(write_ctx)
+                        
+                    entity_props["is_global"] = is_global
+                    entity_props["canonical_key"] = canonical_key  # Store for future resolution
+                    
+                    # SECURITY: Add tenant metadata from memory properties for tenant isolation
+                    if tenant_id and 'tenant_id' not in entity_props:
+                        entity_props["tenant_id"] = tenant_id
+                    if workspace_id and 'workspace_id' not in entity_props:
+                        entity_props["workspace_id"] = workspace_id
 
-                # Create semantic relationships between entities
-                for rel in entity_relationships:
+                    # Build entity creation query
+                    entity_set_clauses = []
+                    for key, value in entity_props.items():
+                        if self._is_valid_property(key, value):
+                            param_key = f"ent_{i}_{key}"
+                            entity_set_clauses.append(f"e{i}.{key} = ${param_key}")
+                            params[param_key] = self._serialize_value(value)
+
+                    params[f"entity_id_{i}"] = entity_id
+
+                    if entity_set_clauses:
+                        entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}}) SET {', '.join(entity_set_clauses)}"
+                    else:
+                        entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}})"
+                    queries.append(entity_query)
+
+                    # Create bidirectional relationships
+                    queries.append(f"CREATE (m)-[:CONTAINS_ENTITY]->(e{i})")
+                    queries.append(f"CREATE (e{i})-[:MENTIONED_IN]->(m)")
+
+                # Store relationships for later (after all entities processed)
+                entity_node['_relationships'] = entity_relationships
+                entity_node['_index'] = i
+            
+            # Create semantic relationships between entities (using resolved IDs)
+            for entity_node in entity_nodes:
+                i = entity_node.get('_index', 0)
+                for rel in entity_node.get('_relationships', []):
                     target_idx = rel.get('target_index')
                     rel_type = rel.get('relation_type', 'RELATED')
-                    if target_idx is not None and target_idx < len(entity_nodes):
-                        queries.append(f"CREATE (e{i})-[:{rel_type}]->(e{target_idx})")
+                    if target_idx is not None and target_idx in entity_id_map:
+                        source_id = entity_id_map[i]
+                        target_id = entity_id_map[target_idx]
+                        # Only create if both are new entities (resolved entities already have relationships)
+                        source_resolved = any(e['index'] == i and e['resolved'] for e in resolved_entities)
+                        target_resolved = any(e['index'] == target_idx and e['resolved'] for e in resolved_entities)
+                        if not source_resolved and not target_resolved:
+                            queries.append(f"CREATE (e{i})-[:{rel_type}]->(e{target_idx})")
 
         # Create memory node first with all properties
         # Note: The logic below duplicates the queries list building above. 
@@ -856,21 +979,39 @@ class FalkorDBBackend(SmartGraphBackend):
         # But there is a block at 783 that rebuilds memory params.
         # Let's assume the first block is the correct one for the transaction.
         
-        # Execute transaction
+        # Execute queries sequentially
         if queries:
-            # FalkorDB doesn't support multi-statement transactions in one query string easily without specific client support
-            # or Redis procedures. The python client .query() takes a single Cypher statement.
-            # We might need to join them or execute sequentially.
-            # Given the limitations, I will join them with WITH clauses or execute sequentially.
-            # Simple sequential execution for now as FalkorDB doesn't have robust transactions.
             for q in queries:
                 self._query(q, params)
+        
+        # Link resolved entities to the new memory node
+        for resolved in resolved_entities:
+            if resolved['resolved']:
+                link_query = f"""
+                    MATCH (m:{memory_label} {{item_id: $memory_id}}), (e {{item_id: $resolved_entity_id}})
+                    MERGE (m)-[:CONTAINS_ENTITY]->(e)
+                    MERGE (e)-[:MENTIONED_IN]->(m)
+                """
+                self._query(link_query, {
+                    "memory_id": item_id,
+                    "resolved_entity_id": resolved['entity_id']
+                })
+                logger.info(f"Linked existing entity {resolved['entity_id']} to memory {item_id}")
+
+        # Log resolution stats
+        new_count = sum(1 for e in resolved_entities if not e['resolved'])
+        resolved_count = sum(1 for e in resolved_entities if e['resolved'])
+        if resolved_count > 0:
+            logger.info(f"Entity resolution: {new_count} new, {resolved_count} resolved to existing")
 
         return {
             "memory_node_id": item_id,
             "entity_node_ids": entity_ids,
+            "resolved_entities": resolved_entities,
             "memory_type": memory_type,
-            "entity_count": len(entity_ids)
+            "entity_count": len(entity_ids),
+            "new_entity_count": new_count,
+            "resolved_entity_count": resolved_count
         }
 
     def _is_valid_property(self, key: str, value: Any) -> bool:

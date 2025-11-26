@@ -34,7 +34,7 @@ def unit_isolation_patches():
         # Config returns attribute-accessible sections
         cfg = AttrDict({
             'graph_db': AttrDict({'backend_class': 'FalkorDBBackend', 'host': 'localhost', 'port': 6379}),
-            'vector_store': AttrDict({'backend': 'chromadb'}),
+            'vector_store': AttrDict({'backend': 'falkordb'}),
             'cache': AttrDict({'redis': AttrDict({'host': 'localhost', 'port': 6379, 'db': 15})}),
         })
         mock_get_config.side_effect = lambda section=None: cfg.get(section) if section else cfg
