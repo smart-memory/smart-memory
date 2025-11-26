@@ -387,6 +387,7 @@ SmartMemory follows a modular, component-based architecture:
 - **Grounding**: Provenance linking to external knowledge
 - **Evolution**: Memory promotion (working → episodic/procedural)
 - **Clustering**: Entity deduplication (SemHash + KMeans + LLM)
+- **Challenging**: Contradiction detection (LLM → Graph → Embedding → Heuristic cascade)
 - **Versioning**: Bi-temporal tracking with time-travel queries
 - **Monitoring**: Performance and health tracking
 
