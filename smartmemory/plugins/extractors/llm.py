@@ -5,7 +5,7 @@ This module extracts entities and SPO triples from text using a two-step process
 1. Extract entities (nodes)
 2. Extract relations (edges) between those specific entities
 
-This approach (inspired by kg-gen) reduces hallucinations and ensures referential integrity.
+This approach reduces hallucinations and ensures referential integrity.
 """
 
 import hashlib
@@ -49,7 +49,7 @@ class TripleOut(BaseModel):
 @dataclass
 class LLMExtractorConfig(MemoryBaseModel):
     """Typed config for the LLM extractor."""
-    model_name: str = "gpt-5.1-mini"
+    model_name: str = "gpt-5-mini"
     api_key_env: str = "OPENAI_API_KEY"
     temperature: float = 0.0
     max_tokens: int = 1000

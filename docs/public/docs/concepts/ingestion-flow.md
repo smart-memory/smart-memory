@@ -4,15 +4,19 @@ SmartMemory's ingestion pipeline transforms raw input into enriched, interconnec
 
 ## Overview
 
-The ingestion flow consists of several stages that process memories from initial input to final storage:
+The ingestion flow consists of **11 stages** that process memories from initial input to final storage:
 
-1. **Input Processing** - Parse and validate input
-2. **Content Analysis** - Extract entities and relationships
-3. **Memory Classification** - Determine memory type
-4. **Enrichment** - Add semantic and contextual information
-5. **Linking** - Connect to existing memories
-6. **Storage** - Persist to appropriate backends
-7. **Background Processing** - Asynchronous optimization
+1. **Input Adaptation** - Parse and validate input (str, dict, MemoryItem)
+2. **Classification** - Determine memory type (semantic, episodic, procedural, working)
+3. **Extraction** - Extract entities and relationships (LLM → SpaCy → GLiNER → Relik fallback)
+4. **Storage** - Create memory node + entity nodes in FalkorDB
+5. **Linking** - Connect to related existing memories
+6. **Vector Storage** - Generate embeddings, store in HNSW index
+7. **Enrichment** - Add Wikipedia summaries, categories, metadata
+8. **Grounding** - Create GROUNDED_IN edges to Wikipedia nodes
+9. **Evolution** - Promote working → episodic/procedural if thresholds met
+10. **Clustering** - SemHash + embedding deduplication of entities
+11. **Versioning** - Create bi-temporal version record
 
 ## Stage Details
 
@@ -115,7 +119,7 @@ SmartMemory supports multiple extractors for entity and relationship extraction,
 }
 ```
 
-**4. LLM Extractor (`llm`)**
+**4. LLM Extractor (`llm`)** - **Default**
 - **Purpose**: AI-powered extraction using large language models
 - **Capabilities**: Entities, relationships, contextual understanding
 - **Relationships**: Sophisticated triple extraction with reasoning
@@ -126,12 +130,52 @@ SmartMemory supports multiple extractors for entity and relationship extraction,
 # Configuration
 "extractor": {
   "default": "llm",
+  "fallback_order": ["llm", "relik", "gliner", "spacy"],
   "llm": {
-    "model_name": "gpt-5.1-mini",
+    "model_name": "gpt-5-mini",
     "openai_api_key": "your-api-key"
   }
 }
 ```
+
+**5. GLiNER Extractor (`gliner`)**
+- **Purpose**: Fast local entity extraction using GLiNER2
+- **Capabilities**: Schema-driven extraction with entity type descriptions
+- **Relationships**: Co-occurrence based relations
+- **Performance**: Fast, CPU-optimized, privacy-preserving (no API calls)
+- **Use Case**: Privacy-sensitive applications, offline processing
+
+```python
+# Configuration
+"extractor": {
+  "default": "gliner",
+  "gliner": {
+    "model_name": "gliner-multitask-large-v0.5"
+  }
+}
+```
+
+#### Fallback Chain
+
+Extractors are tried in order until one succeeds:
+
+```
+LLM → Relik → GLiNER → SpaCy
+```
+
+Configure via:
+```python
+"extractor": {
+  "fallback_order": ["llm", "relik", "gliner", "spacy"]
+}
+```
+
+#### Large Text Handling
+
+Texts > 8000 characters are automatically chunked:
+- Split by sentence boundaries
+- Processed in parallel (ThreadPoolExecutor)
+- Results aggregated with entity deduplication
 
 ### 3. Memory Classification
 
@@ -174,27 +218,51 @@ memory.add(content, memory_type="semantic", force=True)
 - Temporal sequences
 - Conceptual hierarchies
 
-### 6. Storage
+### 6. Vector Storage
 
-**Multi-Backend Persistence:**
-- Graph database for relationships
-- Vector store for semantic search
-- Metadata stores for structured data
-- Full-text search indices
+**FalkorDB HNSW Index:**
+- Native vector indexing with `vecf32` type
+- Configurable HNSW parameters (M, efConstruction, efRuntime)
+- Cosine similarity search
+- Automatic tenant isolation via ScopeProvider
 
-**Atomic Operations:**
-- Transactional consistency
-- Rollback on failure
-- Duplicate detection
-- Version management
+### 7. Enrichment
 
-### 7. Background Processing
+**Wikipedia Integration:**
+- Lookup entities in Wikipedia
+- Add summaries, categories, URLs
+- Create enrichment metadata
 
-**Asynchronous Optimization:**
-- Memory consolidation
-- Relationship refinement
-- Index optimization
-- Evolution algorithm application
+### 8. Grounding
+
+**Provenance Linking:**
+- Create Wikipedia nodes (shared globally)
+- Create GROUNDED_IN edges from entities to Wikipedia
+- Track source attribution
+
+### 9. Evolution
+
+**Memory Promotion:**
+- Working → Episodic (threshold: 3+ items)
+- Working → Procedural (threshold: 5+ items)
+- Episodic → Semantic (stable facts)
+- Episodic decay and archival
+
+### 10. Clustering
+
+**Entity Deduplication:**
+- SemHash pre-deduplication (0.95 threshold)
+- KMeans embedding clustering (~128 items per cluster)
+- LLM semantic clustering (Joe ↔ Joseph)
+- Graph node merging
+
+### 11. Versioning
+
+**Bi-Temporal Tracking:**
+- Valid time (when fact was true)
+- Transaction time (when recorded)
+- Version history with HAS_VERSION edges
+- Time-travel queries
 
 ## Configuration
 

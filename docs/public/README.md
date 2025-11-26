@@ -44,33 +44,37 @@ If you are using GitHub pages for hosting, this command is a convenient way to b
 
 ```
 docs/
-├── intro.md                    # Main introduction
+├── intro.md                    # Main introduction (11-stage pipeline overview)
 ├── getting-started/
 │   ├── installation.md         # Installation guide
 │   ├── quick-start.md          # Quick start tutorial
 │   └── configuration.md        # Configuration options
 ├── concepts/
 │   ├── overview.md             # Core concepts overview
-│   ├── memory-types.md         # Memory type details
-│   ├── ingestion-flow.md       # Processing pipeline
+│   ├── memory-types.md         # Memory type details (semantic, episodic, procedural, working)
+│   ├── ingestion-flow.md       # 11-stage processing pipeline
+│   ├── extraction.md           # Entity extraction (LLM, SpaCy, GLiNER, Relik)
+│   ├── clustering.md           # Entity clustering (SemHash, KMeans, LLM)
+│   ├── grounding.md            # Wikipedia grounding & provenance
 │   ├── evolution-algorithms.md # Memory evolution
-│   └── similarity-framework.md # Similarity metrics
+│   └── versioning.md           # Bi-temporal versioning
 ├── architecture/
 │   ├── system-overview.md      # System architecture
 │   ├── smart-memory.md         # SmartMemory class
-│   ├── graph-backend.md        # Graph database layer
+│   ├── falkordb-backend.md     # FalkorDB graph + vector backend
 │   ├── components.md           # Component architecture
+│   ├── scoping.md              # Multi-tenancy & ScopeProvider
 │   └── background-processing.md # Background processing
 ├── api/
 │   ├── smart-memory.md         # SmartMemory API
 │   ├── memory-types.md         # Memory type APIs
-│   ├── factories.md            # Factory pattern APIs
+│   ├── clustering.md           # Clustering module API
 │   ├── components.md           # Component APIs
 │   └── tools.md                # MCP tools and integrations
 ├── guides/
 │   ├── basic-usage.md          # Basic usage patterns
 │   ├── advanced-features.md    # Advanced capabilities
-│   ├── ontology-management.md  # Ontology system
+│   ├── entity-resolution.md    # Entity clustering & deduplication
 │   ├── mcp-integration.md      # MCP integration
 │   ├── background-processing.md # Background processing
 │   └── performance-tuning.md   # Performance optimization
@@ -81,7 +85,7 @@ docs/
 │   └── knowledge-graph.md      # Knowledge graphs
 ├── advanced/
 │   ├── custom-evolvers.md      # Custom evolution algorithms
-│   ├── similarity-metrics.md   # Custom similarity metrics
+│   ├── custom-extractors.md    # Custom entity extractors
 │   ├── graph-operations.md     # Graph operations
 │   ├── benchmarking.md         # Performance benchmarking
 │   └── debugging.md            # Debugging guide

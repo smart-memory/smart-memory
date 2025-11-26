@@ -12,7 +12,6 @@ The main flow is reduced to ~200 lines of pure orchestration.
 """
 import logging
 import time
-from typing import TYPE_CHECKING
 
 from smartmemory.memory.context_types import IngestionContext
 from smartmemory.memory.ingestion import utils as ingestion_utils
@@ -29,8 +28,8 @@ from smartmemory.memory.pipeline.config import (
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.observability.instrumentation import emit_after
 
-if TYPE_CHECKING:
-    pass
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryIngestionFlow:
@@ -43,7 +42,6 @@ class MemoryIngestionFlow:
 
     def __init__(self, memory: "SmartMemory", linking, enrichment, adapters=None, converters=None, extractors=None, enrichers=None):
         """Initialize the ingestion flow with pipeline modules."""
-        self._logger = logging.getLogger(__name__)
         self.memory = memory
         self.linking = linking
         self.enrichment = enrichment

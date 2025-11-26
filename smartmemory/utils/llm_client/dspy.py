@@ -4,6 +4,8 @@ DSPy client adapter.
 A thin wrapper around DSPy (https://github.com/stanfordnlp/dspy) to invoke LLMs
 through DSPy's language model interface. Focuses on transport only and returns
 raw text; parsing/validation is the caller's responsibility.
+
+Includes automatic token usage tracking via smartmemory.utils.token_tracking.
 """
 import logging
 import threading
@@ -14,10 +16,78 @@ try:
 except Exception as import_err:  # pragma: no cover
     dspy = None  # type: ignore
 
+# Lazy import for token tracking to avoid circular imports
+_token_tracker = None
+
+def _get_token_tracker():
+    """Lazy load token tracker."""
+    global _token_tracker
+    if _token_tracker is None:
+        try:
+            from smartmemory.utils.token_tracking import get_global_tracker
+            _token_tracker = get_global_tracker()
+        except ImportError:
+            _token_tracker = False  # Mark as unavailable
+    return _token_tracker if _token_tracker else None
+
 logger = logging.getLogger(__name__)
 
 # Thread-local storage for DSPy configuration to prevent threading issues
 _thread_local = threading.local()
+
+
+def _track_dspy_usage(lm: Any, model: str) -> None:
+    """
+    Extract and track token usage from DSPy LM history.
+    """
+    tracker = _get_token_tracker()
+    if not tracker:
+        return
+    
+    try:
+        # DSPy stores call history in lm.history
+        history = getattr(lm, 'history', None)
+        if not history:
+            return
+        
+        # Get the most recent entry (last call)
+        if isinstance(history, list) and history:
+            entry = history[-1]
+        else:
+            return
+        
+        # Extract usage from entry
+        usage = None
+        if isinstance(entry, dict):
+            usage = entry.get('usage') or entry.get('response', {}).get('usage')
+        elif hasattr(entry, 'usage'):
+            usage = entry.usage
+        
+        if usage:
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            
+            if isinstance(usage, dict):
+                prompt_tokens = usage.get('prompt_tokens', 0)
+                completion_tokens = usage.get('completion_tokens', 0)
+                total_tokens = usage.get('total_tokens', 0)
+            elif hasattr(usage, 'prompt_tokens'):
+                prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+                completion_tokens = getattr(usage, 'completion_tokens', 0)
+                total_tokens = getattr(usage, 'total_tokens', 0)
+            
+            if total_tokens > 0 or prompt_tokens > 0:
+                tracker.track(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    model=model
+                )
+                logger.debug(f"Tracked {total_tokens} tokens for {model}")
+    except Exception as e:
+        # Don't fail the main call if tracking fails
+        logger.debug(f"Token tracking failed: {e}")
 
 
 def _lm_config_changed(current_lm, new_lm) -> bool:
@@ -77,14 +147,24 @@ def call_dspy(
     # Configure DSPy LM using provider/model spec string
     # Per DSPy docs: dspy.configure(lm=dspy.LM("openai/<model>", api_key=...))
     provider_model = f"openai/{model}" if "/" not in model else model
+    
+    # Check if this is a reasoning model (o1/o3/o4/gpt-5.x)
+    mn = model.lower().strip()
+    is_reasoning_model = mn.startswith("o1") or mn.startswith("o3") or mn.startswith("o4") or mn.startswith("gpt-5")
+    
     lm_kwargs: Dict[str, Any] = {}
     if api_key:
         lm_kwargs["api_key"] = api_key
-    if temperature is not None:
-        lm_kwargs["temperature"] = temperature
-    # Some versions accept max_tokens via kwargs
-    if max_output_tokens:
-        lm_kwargs["max_tokens"] = max_output_tokens
+    
+    if is_reasoning_model:
+        # Reasoning models require temperature=1.0 and max_tokens >= 16000
+        lm_kwargs["temperature"] = 1.0
+        lm_kwargs["max_tokens"] = max(max_output_tokens or 0, 16000)
+    else:
+        if temperature is not None:
+            lm_kwargs["temperature"] = temperature
+        if max_output_tokens:
+            lm_kwargs["max_tokens"] = max_output_tokens
 
     try:
         lm = dspy.LM(provider_model, **lm_kwargs)  # type: ignore[attr-defined]
@@ -110,6 +190,10 @@ def call_dspy(
             result = lm.complete(joined)  # type: ignore[attr-defined]
         else:
             result = lm(joined)  # type: ignore[misc]
+        
+        # Track token usage from DSPy history
+        _track_dspy_usage(lm, model)
+        
         # Try common attributes to get the text content
         for attr in ("text", "completion", "output_text"):
             val = getattr(result, attr, None)

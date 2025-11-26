@@ -2,219 +2,138 @@
 Global Clustering Stage.
 
 This stage performs global deduplication by clustering entities based on their vector embeddings
-and merging duplicates in the graph.
+and optionally using LLM for semantic clustering.
+
+Features:
+- Embedding-based clustering for fast similarity detection
+- LLM-based clustering for semantic equivalence (Joe ↔ Joseph, ML ↔ machine learning)
+- Edge/relation clustering for predicate normalization
+- Context-aware clustering with domain hints
 """
 
 import logging
-from typing import List, Dict, Any, Set, Optional
+from typing import List, Dict, Any, Optional
 
-from smartmemory.stores.vector.vector_store import VectorStore
-from smartmemory.models.memory_item import MemoryItem
 
 logger = logging.getLogger(__name__)
 
 
-class GlobalClustering:
+def cluster_extraction_result(
+    extraction_result: Dict[str, Any],
+    context: Optional[str] = None,
+    model_name: str = "gpt-5-mini"
+) -> Dict[str, Any]:
     """
-    Pipeline stage that clusters entities across the entire graph and merges duplicates.
-    This is typically run as a background maintenance task, not on every ingestion.
+    Apply LLM clustering to an extraction result.
+    
+    This is a convenience function that clusters both entities and relations
+    in a single extraction result.
+    
+    Args:
+        extraction_result: Dict with 'entities' and 'relations' keys
+        context: Optional domain context for clustering
+        model_name: LLM model to use
+        
+    Returns:
+        Extraction result with clustered entities/relations and cluster mappings
     """
-
-    def __init__(self, memory_instance):
-        self.memory = memory_instance
-        self.vector_store = VectorStore()
-
-    def run(self) -> Dict[str, Any]:
-        """
-        Run clustering with automatic scope filtering via ScopeProvider.
+    from smartmemory.clustering.llm import LLMClustering
+    clusterer = LLMClustering(model_name=model_name, context=context)
+    
+    entities = extraction_result.get('entities', [])
+    relations = extraction_result.get('relations', [])
+    
+    result = dict(extraction_result)
+    
+    # Cluster entities
+    if entities and len(entities) >= 2:
+        entity_clusters = clusterer.cluster_entities(entities, context)
+        if entity_clusters:
+            deduplicated, name_mapping = clusterer.apply_entity_clusters(entities, entity_clusters)
+            result['entities'] = deduplicated
+            result['entity_clusters'] = {k: list(v) for k, v in entity_clusters.items()}
+            
+            # Update relation references to use canonical names
+            for rel in relations:
+                for key in ['subject', 'source', 'source_name']:
+                    if key in rel:
+                        rel[key] = name_mapping.get(rel[key].lower(), rel[key])
+                for key in ['object', 'target', 'target_name']:
+                    if key in rel:
+                        rel[key] = name_mapping.get(rel[key].lower(), rel[key])
+    
+    # Cluster relations
+    if relations and len(relations) >= 2:
+        predicates = []
+        for rel in relations:
+            pred = rel.get('predicate') or rel.get('relation_type', '')
+            if pred:
+                predicates.append(pred)
         
-        Filtering is determined by the ScopeProvider that was injected into SmartMemory
-        at initialization. This ensures consistent tenant/workspace/user isolation.
+        if len(set(predicates)) >= 2:
+            relation_clusters = clusterer.cluster_relations(predicates, context)
+            if relation_clusters:
+                result['relations'] = clusterer.apply_relation_clusters(relations, relation_clusters)
+                result['edge_clusters'] = {k: list(v) for k, v in relation_clusters.items()}
+    
+    return result
+
+
+def aggregate_graphs(
+    graphs: List[Dict[str, Any]],
+    cluster: bool = False,
+    context: Optional[str] = None,
+    merge_strategy: str = "union"
+) -> Dict[str, Any]:
+    """
+    Convenience function to aggregate multiple extraction results.
+    
+    Args:
+        graphs: List of extraction results to combine
+        cluster: Whether to apply LLM clustering after aggregation
+        context: Optional domain context for clustering
+        merge_strategy: How to handle conflicts ("union", "latest", "highest_confidence")
         
-        Returns a dict with stats about merged entities:
-        - merged_count: Number of entities merged
-        - clusters_found: Number of clusters identified
-        - total_entities: Total number of entities processed
-        """
-        try:
-            # Get isolation filters from ScopeProvider (single source of truth)
-            filters = {}
-            if hasattr(self.memory, 'scope_provider') and self.memory.scope_provider:
-                filters = self.memory.scope_provider.get_isolation_filters()
-            
-            # 1. Fetch all items with embeddings using backend-agnostic approach
-            ids = []
-            embeddings = []
-            
-            # Use SmartMemory's graph abstraction instead of direct backend access
-            all_items = self.memory.get_all_items_debug()
-            
-            for item_id in self._get_all_item_ids():
-                item = self.memory.get(item_id)
-                if not item:
-                    continue
-                    
-                # Get embedding from item or vector store
-                embedding = self._get_embedding(item_id, item)
-                if embedding:
-                    ids.append(item_id)
-                    embeddings.append(embedding)
-            
-            if not ids:
-                return {"merged_count": 0, "clusters_found": 0, "total_entities": 0, **filters}
-
-            # 2. Cluster embeddings
-            # We use a simple greedy clustering approach leveraging the vector index
-            clusters = self._find_clusters(ids, embeddings)
-            
-            # 3. Merge clusters
-            merged_count = 0
-            for cluster in clusters:
-                if len(cluster) < 2:
-                    continue
-                    
-                # Identify canonical entity (e.g., longest name or specific criteria)
-                canonical_id = self._identify_canonical(cluster)
-                source_ids = [pid for pid in cluster if pid != canonical_id]
-                
-                if not source_ids:
-                    continue
-                    
-                # Merge in graph
-                success = self.memory._graph.backend.merge_nodes(canonical_id, source_ids)
-                if success:
-                    merged_count += len(source_ids)
-                    
-                    # Also remove merged vectors from vector store
-                    self.vector_store.delete(source_ids)
-
-            return {
-                "merged_count": merged_count, 
-                "clusters_found": len(clusters),
-                "total_entities": len(ids)
-            }
-
-        except Exception as e:
-            logger.error(f"Global clustering failed: {e}")
-            return {"error": str(e)}
-
-    def _get_all_item_ids(self) -> List[str]:
-        """Get all item IDs using backend-agnostic approach."""
-        try:
-            # Use graph's nodes interface
-            if hasattr(self.memory._graph, 'nodes') and hasattr(self.memory._graph.nodes, 'nodes'):
-                return list(self.memory._graph.nodes.nodes())
-            # Fallback to get_all_items_debug
-            debug_info = self.memory.get_all_items_debug()
-            return [s.get('item_id') for s in debug_info.get('sample_items', [])]
-        except Exception as e:
-            logger.warning(f"Failed to get item IDs: {e}")
-            return []
-
-    def _get_embedding(self, item_id: str, item: Any) -> List[float]:
-        """Get embedding for an item from item or vector store."""
-        # Try item's embedding attribute first
-        if hasattr(item, 'embedding') and item.embedding is not None:
-            emb = item.embedding
-            return emb.tolist() if hasattr(emb, 'tolist') else list(emb)
+    Returns:
+        Combined extraction result
         
-        # Try vector store lookup
-        try:
-            result = self.vector_store.get(item_id)
-            if result and 'embedding' in result:
-                return result['embedding']
-        except Exception:
-            pass
+    Example:
+        graph1 = extractor.extract("Linda is Joe's mother.")
+        graph2 = extractor.extract("Joseph is Andrew's son.")  # Joseph = Joe
+        combined = aggregate_graphs([graph1, graph2], cluster=True, context="Family")
+        # combined['entity_clusters'] = {'Joseph': ['Joe', 'Joseph']}
+    """
+    from smartmemory.clustering import GraphAggregator
+    aggregator = GraphAggregator(merge_strategy=merge_strategy)
+    return aggregator.aggregate(graphs, cluster=cluster, context=context)
+
+
+# ============================================================================
+# KMeans Pre-clustering for Efficient LLM Deduplication
+# ============================================================================
+
+
+def deduplicate_extraction(
+    extraction_result: Dict[str, Any],
+    method: str = "full",
+    semhash_threshold: float = 0.95,
+    context: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Convenience function for hybrid deduplication.
+    
+    Args:
+        extraction_result: Dict with 'entities' and 'relations'
+        method: "semhash", "kmeans_llm", or "full"
+        semhash_threshold: SemHash similarity threshold
+        context: Optional domain context
         
-        return None
-
-    def _find_clusters(self, ids: List[str], embeddings: List[List[float]]) -> List[List[str]]:
-        """
-        Find clusters of similar entities.
-        Returns a list of clusters, where each cluster is a list of item_ids.
-        """
-        clusters = []
-        processed_indices: Set[int] = set()
-        
-        # Distance threshold for clustering (lower = more similar)
-        # Most vector stores return distance scores where 0 = identical
-        distance_threshold = 0.1 
-
-        for i, embedding in enumerate(embeddings):
-            if i in processed_indices:
-                continue
-                
-            current_id = ids[i]
-            
-            # Search for similar items using the vector store
-            # We use the embedding directly
-            results = self.vector_store.search(embedding, top_k=10, is_global=True)
-            
-            cluster = [current_id]
-            processed_indices.add(i)
-            
-            for result in results:
-                res_id = result['id']
-                score = result.get('score', 1.0) 
-                
-                # Check if result is the item itself
-                if res_id == current_id:
-                    continue
-                    
-                # Find index of res_id in our local list to mark as processed
-                try:
-                    res_idx = ids.index(res_id)
-                except ValueError:
-                    continue 
-                    
-                if res_idx in processed_indices:
-                    continue
-
-                # Check similarity
-                if score < distance_threshold: # Very close
-                     cluster.append(res_id)
-                     processed_indices.add(res_idx)
-
-            if len(cluster) > 1:
-                clusters.append(cluster)
-                
-        return clusters
-
-    def _identify_canonical(self, cluster_ids: List[str]) -> str:
-        """
-        Identify the canonical entity ID from a cluster.
-        Strategy: Prefer the one with the longest name (most descriptive), 
-        or highest confidence if available.
-        """
-        # Fetch full nodes to check properties
-        candidates = []
-        for item_id in cluster_ids:
-            node = self.memory.get(item_id)
-            if node:
-                candidates.append(node)
-        
-        if not candidates:
-            return cluster_ids[0]
-            
-        # Sort by name length (descending) as a proxy for completeness
-        # Also consider 'confidence' metadata if present
-        def score_candidate(item):
-            name = ""
-            if isinstance(item, MemoryItem):
-                name = item.metadata.get('name', item.content)
-            elif isinstance(item, dict):
-                name = item.get('name', item.get('content', ''))
-            else:
-                name = str(item)
-                
-            return len(name)
-
-        candidates.sort(key=score_candidate, reverse=True)
-        
-        best = candidates[0]
-        if isinstance(best, MemoryItem):
-            return best.item_id
-        elif isinstance(best, dict):
-            return best.get('item_id')
-        else:
-            return cluster_ids[0]
+    Returns:
+        Deduplicated extraction result
+    """
+    from smartmemory.clustering.deduplicator import HybridDeduplicator
+    deduplicator = HybridDeduplicator(
+        semhash_threshold=semhash_threshold,
+        context=context
+    )
+    return deduplicator.deduplicate(extraction_result, method=method)

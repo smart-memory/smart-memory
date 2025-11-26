@@ -146,8 +146,15 @@ class PluginManager:
                 RebelExtractor,
                 LLMExtractor,
                 RelikExtractor,
-                ConversationAwareLLMExtractor
+                ConversationAwareLLMExtractor,
             ]
+            
+            # Try to load GLiNER2 extractor (optional dependency)
+            try:
+                from smartmemory.plugins.extractors.gliner2 import GLiNER2Extractor
+                class_based_extractors.append(GLiNER2Extractor)
+            except ImportError:
+                logger.debug("GLiNER2 extractor not available (gliner2 package not installed)")
             
             for extractor_class in class_based_extractors:
                 try:

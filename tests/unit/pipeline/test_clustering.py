@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from smartmemory.memory.pipeline.stages.clustering import GlobalClustering
+from smartmemory.clustering.global_cluster import GlobalClustering
 from smartmemory.memory.pipeline.state import ExtractionState
 from smartmemory.configuration import MemoryConfig
 from smartmemory.models.memory_item import MemoryItem

@@ -20,7 +20,6 @@ class TestSmartMemoryRealBackendIntegration:
     These tests require:
     - Running Redis instance (localhost:6379 or configured port)
     - Running FalkorDB instance (localhost:6379 or configured port) 
-    - ChromaDB (file-based, auto-created)
     - Optional: OpenAI API key for embedding tests
     
     Run with: pytest -m integration --tb=short
@@ -67,7 +66,6 @@ class TestSmartMemoryRealBackendIntegration:
     
     def test_memory_to_vector_store_integration(self, real_smartmemory_for_integration):
         """Test memory storage and retrieval with real vector store."""
-        pytest.skip("ChromaDB is optional - skipping vector store tests")
         memory = real_smartmemory_for_integration
         
         # Create memory items with different content for similarity testing

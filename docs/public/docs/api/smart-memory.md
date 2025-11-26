@@ -39,7 +39,12 @@ memory = SmartMemory(config={
 
 ### ingest()
 
-Ingest content with full intelligent processing pipeline (extract → store → link → enrich → evolve).
+Ingest content with full 11-stage intelligent processing pipeline:
+
+```
+Input → Classification → Extraction → Storage → Linking → 
+Vector → Enrichment → Grounding → Evolution → Clustering → Versioning
+```
 
 ```python
 def ingest(
@@ -605,6 +610,30 @@ def run_evolution_cycle(self) -> None
 memory.run_evolution_cycle()
 ```
 
+#### `run_clustering()`
+
+Run entity clustering to deduplicate entities across the graph.
+
+```python
+def run_clustering(self) -> dict
+```
+
+**Returns:** Dictionary with clustering statistics
+
+**Example:**
+```python
+# Run clustering (SemHash + embedding + LLM)
+stats = memory.run_clustering()
+print(f"Merged {stats.get('merged_count', 0)} duplicate entities")
+print(f"Found {stats.get('clusters_found', 0)} clusters")
+```
+
+**Clustering Pipeline:**
+1. **SemHash pre-deduplication** - Fast deterministic dedup (0.95 threshold)
+2. **KMeans embedding clustering** - Group similar entities (~128 per cluster)
+3. **LLM semantic clustering** - Find aliases (Joe ↔ Joseph, ML ↔ machine learning)
+4. **Graph node merging** - Rewire edges, merge properties
+
 #### `commit_working_to_episodic()`
 
 Commit working memory items to episodic memory.
@@ -702,6 +731,48 @@ def time_travel(self, to: str) -> ContextManager
 with memory.time_travel("2024-09-01"):
     results = memory.search("Python")
     # Results reflect state on Sept 1st, 2024
+```
+
+### Version Tracking
+
+SmartMemory provides bi-temporal versioning via `version_tracker`:
+
+#### `version_tracker.get_versions()`
+
+Get all versions of a memory item.
+
+```python
+versions = memory.version_tracker.get_versions(item_id)
+for v in versions:
+    print(f"Version {v.version_number}: {v.content[:50]}...")
+```
+
+#### `version_tracker.get_version_at_time()`
+
+Get the version that was current at a specific time.
+
+```python
+from datetime import datetime
+
+version = memory.version_tracker.get_version_at_time(
+    item_id="mem_123",
+    time=datetime(2024, 1, 15),
+    time_type='transaction'  # or 'valid'
+)
+```
+
+#### `version_tracker.compare_versions()`
+
+Compare two versions of an item.
+
+```python
+diff = memory.version_tracker.compare_versions(
+    item_id="mem_123",
+    version1=1,
+    version2=2
+)
+print(f"Content changed: {diff['content_changed']}")
+print(f"Metadata changes: {diff['metadata_changes']}")
 ```
 
 ### Archive Operations

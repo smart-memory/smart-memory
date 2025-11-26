@@ -175,6 +175,10 @@ class SmartMemory(UnifiedMemoryBase):
         self._search = Search(self._graph)
         self._monitoring = Monitoring(self._graph)
         self._evolution = EvolutionOrchestrator(self)
+        self._clustering = GlobalClustering(self._graph)
+        
+        # Temporal versioning
+        self.version_tracker = VersionTracker(self._graph)
         
         # Processing flows
         self._ingestion_flow = MemoryIngestionFlow(self, ...)
@@ -219,22 +223,24 @@ class SmartMemory(UnifiedMemoryBase):
 
 ### Processing Pipeline
 
-#### Ingestion Flow
+#### Ingestion Flow (11 Stages)
 ```
-Input → Adaptation → Classification → Routing → Creation → 
-Extraction → Linking → Activation → Enrichment → Storage
+Input → Classification → Extraction → Storage → Linking → 
+Vector → Enrichment → Grounding → Evolution → Clustering → Versioning
 ```
 
 **Stages:**
-1. **Adaptation**: Convert input to standard format
-2. **Classification**: Determine memory type and processing needs
-3. **Routing**: Select appropriate processing components
-4. **Creation**: Generate memory item structure
-5. **Extraction**: Extract entities, relationships, and semantics
-6. **Linking**: Connect to existing memories
-7. **Activation**: Update relevance and access patterns
-8. **Enrichment**: Add metadata and derived information
-9. **Storage**: Persist to graph and vector stores
+1. **Input Adaptation**: Convert str/dict/MemoryItem to standard format
+2. **Classification**: Determine memory type (semantic, episodic, procedural, working)
+3. **Extraction**: Extract entities & relations (LLM → SpaCy → GLiNER → Relik fallback)
+4. **Storage**: Create memory node + entity nodes in FalkorDB
+5. **Linking**: Connect to related existing memories
+6. **Vector Storage**: Generate embeddings, store in HNSW index
+7. **Enrichment**: Add Wikipedia summaries, categories, metadata
+8. **Grounding**: Create GROUNDED_IN edges to Wikipedia nodes
+9. **Evolution**: Promote working → episodic/procedural if thresholds met
+10. **Clustering**: SemHash + embedding deduplication of entities
+11. **Versioning**: Create bi-temporal version record
 
 #### Fast Ingestion Flow
 ```
@@ -308,16 +314,18 @@ Evolution Algorithms → Updated Storage
 
 ## Storage Architecture
 
-### Graph Database Layer
+### Graph Database Layer (FalkorDB)
 
 **Node Types:**
 - **Memory Nodes**: Core memory items with content and metadata
-- **Entity Nodes**: Extracted entities with properties
-- **Concept Nodes**: Abstract concepts and categories
-- **User Nodes**: User profiles and preferences
+- **Entity Nodes**: Extracted entities with properties (dual-node pattern)
+- **Wikipedia Nodes**: Global grounding nodes (shared across users)
+- **Version Nodes**: Bi-temporal version records
 
 **Relationship Types:**
 - **CONTAINS**: Memory contains entity
+- **GROUNDED_IN**: Entity grounded to Wikipedia
+- **HAS_VERSION**: Memory has version history
 - **RELATES_TO**: Semantic relationships
 - **FOLLOWS**: Temporal sequences
 - **PART_OF**: Hierarchical structures
@@ -329,19 +337,22 @@ Evolution Algorithms → Updated Storage
 - **Metadata**: User context, source information
 - **Embeddings**: Vector representations for similarity
 
-### Vector Storage Layer
+### Vector Storage Layer (FalkorDB HNSW)
+
+**Unified Backend:**
+- FalkorDB provides both graph and vector storage
+- Native HNSW index with `vecf32` type
+- Configurable parameters: M, efConstruction, efRuntime
+- Cosine similarity search
 
 **Embedding Types:**
-- **Content Embeddings**: Full text semantic vectors
+- **Content Embeddings**: Full text semantic vectors (sentence-transformers)
 - **Entity Embeddings**: Specific entity representations
-- **Relationship Embeddings**: Structural relationship vectors
-- **Temporal Embeddings**: Time-aware representations
 
 **Indexing Strategy:**
-- **Hierarchical Indexing**: Multi-level similarity search
-- **Metadata Filtering**: Efficient attribute-based filtering
+- **HNSW Index**: Hierarchical Navigable Small World graphs
+- **Tenant Isolation**: ScopeProvider filters all queries
 - **Incremental Updates**: Real-time index maintenance
-- **Distributed Storage**: Scalable vector management
 
 ## Performance Architecture
 

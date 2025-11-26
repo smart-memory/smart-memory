@@ -10,7 +10,6 @@ from typing import Dict, List, Optional
 from unittest.mock import Mock, patch
 import os
 
-from smartmemory.smart_memory import SmartMemory
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.conversation.manager import ConversationManager
 from smartmemory.conversation.context import ConversationContext
@@ -27,8 +26,7 @@ def test_config():
             "database": "test_smartmemory"
         },
         "vector_store": {
-            "backend": "chromadb",
-            "persist_directory": tempfile.mkdtemp(prefix="test_chroma_"),
+            "backend": "falkordb",
             "collection_name": "test_collection"
         },
         "cache": {
@@ -52,8 +50,7 @@ def integration_config():
             "database": "integration_test_smartmemory"
         },
         "vector_store": {
-            "backend": "chromadb",
-            "persist_directory": "./test_data/integration_chroma",
+            "backend": "falkordb",
             "collection_name": "integration_test_collection"
         },
         "cache": {

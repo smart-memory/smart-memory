@@ -151,49 +151,63 @@ graph TD
 
 ### Intelligent Processing Pipeline
 
-### 1. Ingestion Flow
+### 1. Ingestion Flow (11 Stages)
 
-When you add information to SmartMemory, it goes through a sophisticated processing pipeline:
+When you call `memory.ingest()`, content flows through an **11-stage pipeline**:
 
 ```
-Input → Adaptation → Classification → Extraction → Linking → Grounding → Enrichment → Storage
+Input → Classification → Extraction → Storage → Linking → 
+Vector → Enrichment → Grounding → Evolution → Clustering → Versioning
 ```
 
-#### Adaptation
-Converts various input formats (text, structured data, objects) into a standardized `MemoryItem` format.
+| Stage | Description |
+|-------|-------------|
+| **1. Input Adaptation** | Convert str/dict/MemoryItem to standard format |
+| **2. Classification** | Determine memory type (semantic, episodic, procedural, working) |
+| **3. Extraction** | Extract entities & relations (LLM → SpaCy → GLiNER → Relik fallback) |
+| **4. Storage** | Create memory node + entity nodes in FalkorDB |
+| **5. Linking** | Connect to related existing memories |
+| **6. Vector Storage** | Generate embeddings, store in HNSW index |
+| **7. Enrichment** | Add Wikipedia summaries, categories, metadata |
+| **8. Grounding** | Create GROUNDED_IN edges to Wikipedia nodes |
+| **9. Evolution** | Promote working → episodic/procedural if thresholds met |
+| **10. Clustering** | SemHash + embedding deduplication of entities |
+| **11. Versioning** | Create bi-temporal version record |
 
-#### Classification
-Determines the appropriate memory type (semantic, episodic, procedural, working) based on content analysis.
+#### Extraction (Fallback Chain)
 
-#### Extraction
-Identifies entities, relationships, and semantic patterns using NLP and LLM techniques.
+SmartMemory uses multiple extractors with automatic fallback:
 
-#### Linking
-Discovers connections with existing memories using similarity analysis and relationship detection.
-
-#### Grounding
-Establishes provenance by linking memories to their external sources. This enables:
-- **Source verification**: Track where information came from
-- **Fact checking**: Validate against authoritative sources  
-- **Audit trails**: Maintain transparency for AI decisions
-- **Quality assurance**: Associate confidence and validation metadata
-
-```python
-# Grounding can be done automatically during ingestion
-memory.add("Paris is the capital of France", context={
-    "source_url": "https://wikipedia.org/wiki/Paris",
-    "confidence": 0.95
-})
-
-# Or manually after the fact
-memory.ground("fact_123", "https://authoritative-source.com")
+```
+LLM (GPT-5-mini) → Relik → GLiNER → SpaCy
 ```
 
-#### Enrichment
-Enhances the memory with additional context, metadata, and derived information.
+- **LLM Extractor**: Highest accuracy, uses GPT-5-mini for entity/relation extraction
+- **Relik Extractor**: Neural entity linking with Wikipedia knowledge
+- **GLiNER Extractor**: Fast local CPU inference, privacy-preserving
+- **SpaCy Extractor**: NER + dependency parsing with regex fallback
 
-#### Storage
-Persists the enriched memory in graph and vector databases with proper indexing.
+#### Grounding (Wikipedia)
+
+Establishes provenance by linking entities to Wikipedia:
+- Creates shared Wikipedia nodes (`is_global=True`)
+- Creates `GROUNDED_IN` edges from entities to Wikipedia
+- Enables source verification and fact checking
+
+#### Clustering
+
+Deduplicates entities using multi-level resolution:
+1. **SemHash**: Fast deterministic dedup (0.95 threshold)
+2. **KMeans**: Embedding clustering (~128 items per cluster)
+3. **LLM**: Semantic clustering (Joe ↔ Joseph, ML ↔ machine learning)
+4. **Merge**: Graph node consolidation
+
+#### Versioning (Bi-Temporal)
+
+Tracks all changes with two time dimensions:
+- **Valid time**: When the fact was true in the real world
+- **Transaction time**: When the fact was recorded in the system
+- Enables time-travel queries and version comparison
 
 ### 2. Entity and Relationship Extraction
 
@@ -280,12 +294,15 @@ SmartMemory uses graph databases to model complex relationships:
 
 ### Node Types
 - **Memory Nodes**: Individual memories with content and metadata
-- **Entity Nodes**: Extracted entities (people, places, concepts)
-- **Concept Nodes**: Abstract concepts and categories
+- **Entity Nodes**: Extracted entities (dual-node pattern for reuse)
+- **Wikipedia Nodes**: Global grounding nodes (shared across users)
+- **Version Nodes**: Bi-temporal version records
 
 ### Relationship Types
+- **CONTAINS**: Memory contains entity
+- **GROUNDED_IN**: Entity grounded to Wikipedia
+- **HAS_VERSION**: Memory has version history
 - **RELATED_TO**: General semantic relationships
-- **CONTAINS**: Hierarchical containment
 - **PRECEDES/FOLLOWS**: Temporal sequences
 - **CAUSED_BY/CAUSES**: Causal relationships
 - **PART_OF/HAS_PART**: Compositional relationships
@@ -364,10 +381,13 @@ SmartMemory follows a modular, component-based architecture:
 
 ### Core Components
 - **CRUD**: Create, Read, Update, Delete operations
-- **Search**: Multi-strategy search implementation
+- **Search**: Multi-strategy search (vector + graph + text fallbacks)
 - **Linking**: Relationship discovery and management
-- **Enrichment**: Memory enhancement and context addition
-- **Evolution**: Memory optimization algorithms
+- **Enrichment**: Wikipedia integration and metadata enhancement
+- **Grounding**: Provenance linking to external knowledge
+- **Evolution**: Memory promotion (working → episodic/procedural)
+- **Clustering**: Entity deduplication (SemHash + KMeans + LLM)
+- **Versioning**: Bi-temporal tracking with time-travel queries
 - **Monitoring**: Performance and health tracking
 
 ### Benefits
