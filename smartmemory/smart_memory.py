@@ -1,7 +1,9 @@
 import logging
+from time import perf_counter
 from typing import Optional, List, Union, Any, Dict
 
 from smartmemory.conversation.context import ConversationContext
+from smartmemory.observability.instrumentation import make_emitter
 from smartmemory.graph.smartgraph import SmartGraph
 from smartmemory.integration.archive.archive_provider import get_archive_provider
 from smartmemory.memory.base import MemoryBase
@@ -39,6 +41,9 @@ class SmartMemory(MemoryBase):
     All linking operations should be accessed via SmartMemory methods only.
     Do not use Linking directly; it is an internal implementation detail.
     """
+
+    # Preconfigured emitter for memory operations
+    _MEM_EMIT = make_emitter(component="smart_memory", default_type="memory_operation")
 
     def __init__(self, scope_provider: Optional[ScopeProvider] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -448,7 +453,16 @@ class SmartMemory(MemoryBase):
                 return item.item_id
         else:
             # For other memory types, use the standard CRUD
-            return self._crud.add(item, **kwargs)
+            t0 = perf_counter()
+            result = self._crud.add(item, **kwargs)
+            # Emit memory_store event for observability
+            SmartMemory._MEM_EMIT("memory_store", "add", {
+                "item_id": result,
+                "memory_type": memory_type,
+                "content_length": len(getattr(item, 'content', '') or ''),
+                "duration_ms": (perf_counter() - t0) * 1000.0
+            })
+            return result
 
     def _add_impl(self, item, **kwargs) -> str:
         """Implement abstract method from MemoryBase."""
@@ -462,7 +476,15 @@ class SmartMemory(MemoryBase):
         return self._crud.update(item, **kwargs)
 
     def get(self, item_id: str, **kwargs):
-        return self._crud.get(item_id)
+        t0 = perf_counter()
+        result = self._crud.get(item_id)
+        # Emit memory_retrieve event for observability
+        SmartMemory._MEM_EMIT("memory_retrieve", "get", {
+            "item_id": item_id,
+            "found": result is not None,
+            "duration_ms": (perf_counter() - t0) * 1000.0
+        })
+        return result
 
     # Archive facades (provider hidden behind SmartMemory interface)
     def archive_put(self, conversation_id: str, payload: Union[bytes, Dict[str, Any]], metadata: Dict[str, Any]) -> Dict[str, str]:
@@ -521,7 +543,15 @@ class SmartMemory(MemoryBase):
         return item_id
 
     def delete(self, item_id: str, **kwargs) -> bool:
-        return self._crud.delete(item_id)
+        t0 = perf_counter()
+        result = self._crud.delete(item_id)
+        # Emit memory_delete event for observability
+        SmartMemory._MEM_EMIT("memory_delete", "delete", {
+            "item_id": item_id,
+            "success": result,
+            "duration_ms": (perf_counter() - t0) * 1000.0
+        })
+        return result
 
     def resolve_external(self, node: MemoryItem) -> Optional[list]:
         """Delegate resolve_external to ExternalResolver submodule."""
@@ -608,7 +638,17 @@ class SmartMemory(MemoryBase):
 
         # Use canonical search component directly
         # ScopeProvider handles all tenant/workspace/user filtering automatically
+        t0 = perf_counter()
         results = self._search.search(query, top_k=top_k, memory_type=memory_type)
+        
+        # Emit memory_retrieve event for observability
+        SmartMemory._MEM_EMIT("memory_retrieve", "search", {
+            "query_length": len(query) if query else 0,
+            "top_k": top_k,
+            "memory_type": memory_type,
+            "results_count": len(results) if results else 0,
+            "duration_ms": (perf_counter() - t0) * 1000.0
+        })
         
         return results[:top_k]
 
