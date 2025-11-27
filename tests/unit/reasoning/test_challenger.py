@@ -387,5 +387,274 @@ class TestSmartTriggering:
         ) is True
 
 
+class TestConfidenceDecay:
+    """Test confidence decay tracking."""
+    
+    def test_apply_confidence_decay_basic(self, challenger, mock_smart_memory):
+        """Test basic confidence decay application."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Paris is the capital of France",
+            memory_type="semantic",
+            metadata={"confidence": 1.0}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.apply_confidence_decay("fact_1", decay_factor=0.2)
+        
+        assert result is True
+        assert existing_item.metadata["confidence"] == 0.8
+        assert existing_item.metadata["challenged"] is True
+        assert existing_item.metadata["challenge_count"] == 1
+        assert "last_challenged_at" in existing_item.metadata
+        mock_smart_memory.update.assert_called_once_with(existing_item)
+    
+    def test_apply_confidence_decay_with_reason(self, challenger, mock_smart_memory):
+        """Test confidence decay with reason tracking."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Paris is the capital of France",
+            memory_type="semantic",
+            metadata={"confidence": 0.9}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.apply_confidence_decay(
+            "fact_1", 
+            decay_factor=0.1,
+            reason="auto_resolved:wikipedia",
+            conflicting_fact="Paris is the capital of Germany"
+        )
+        
+        assert result is True
+        assert existing_item.metadata["confidence"] == 0.8
+        assert "confidence_history" in existing_item.metadata
+        assert len(existing_item.metadata["confidence_history"]) == 1
+        
+        event = existing_item.metadata["confidence_history"][0]
+        assert event["old_confidence"] == 0.9
+        assert event["new_confidence"] == 0.8
+        assert event["reason"] == "auto_resolved:wikipedia"
+        assert event["conflicting_fact"] == "Paris is the capital of Germany"
+    
+    def test_apply_confidence_decay_cumulative(self, challenger, mock_smart_memory):
+        """Test cumulative confidence decay."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Paris is the capital of France",
+            memory_type="semantic",
+            metadata={
+                "confidence": 0.7,
+                "challenged": True,
+                "challenge_count": 2,
+                "confidence_history": [
+                    {"timestamp": "2024-01-01T00:00:00Z", "old_confidence": 1.0, "new_confidence": 0.9},
+                    {"timestamp": "2024-01-02T00:00:00Z", "old_confidence": 0.9, "new_confidence": 0.7}
+                ]
+            }
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.apply_confidence_decay("fact_1", decay_factor=0.2)
+        
+        assert result is True
+        assert abs(existing_item.metadata["confidence"] - 0.5) < 0.001  # Float tolerance
+        assert existing_item.metadata["challenge_count"] == 3
+        assert len(existing_item.metadata["confidence_history"]) == 3
+    
+    def test_apply_confidence_decay_floor(self, challenger, mock_smart_memory):
+        """Test confidence doesn't go below 0."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Some fact",
+            memory_type="semantic",
+            metadata={"confidence": 0.1}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.apply_confidence_decay("fact_1", decay_factor=0.5)
+        
+        assert result is True
+        assert existing_item.metadata["confidence"] == 0.0
+    
+    def test_apply_confidence_decay_item_not_found(self, challenger, mock_smart_memory):
+        """Test decay when item doesn't exist."""
+        mock_smart_memory.get.return_value = None
+        
+        result = challenger.apply_confidence_decay("nonexistent")
+        
+        assert result is False
+    
+    def test_apply_confidence_decay_history_limit(self, challenger, mock_smart_memory):
+        """Test confidence history is limited to 20 events."""
+        # Create item with 19 history events
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Some fact",
+            memory_type="semantic",
+            metadata={
+                "confidence": 0.5,
+                "challenge_count": 19,
+                "confidence_history": [
+                    {"timestamp": f"2024-01-{i:02d}T00:00:00Z", "old_confidence": 1.0 - i*0.02, "new_confidence": 1.0 - (i+1)*0.02}
+                    for i in range(19)
+                ]
+            }
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        # Apply decay twice more
+        challenger.apply_confidence_decay("fact_1", decay_factor=0.1)
+        challenger.apply_confidence_decay("fact_1", decay_factor=0.1)
+        
+        # Should be capped at 20
+        assert len(existing_item.metadata["confidence_history"]) == 20
+    
+    def test_get_confidence_history(self, challenger, mock_smart_memory):
+        """Test retrieving confidence history."""
+        history = [
+            {"timestamp": "2024-01-01T00:00:00Z", "old_confidence": 1.0, "new_confidence": 0.9},
+            {"timestamp": "2024-01-02T00:00:00Z", "old_confidence": 0.9, "new_confidence": 0.7}
+        ]
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Some fact",
+            memory_type="semantic",
+            metadata={"confidence_history": history}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.get_confidence_history("fact_1")
+        
+        assert result == history
+    
+    def test_get_confidence_history_empty(self, challenger, mock_smart_memory):
+        """Test retrieving empty confidence history."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Some fact",
+            memory_type="semantic",
+            metadata={}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        result = challenger.get_confidence_history("fact_1")
+        
+        assert result == []
+    
+    def test_get_confidence_history_not_found(self, challenger, mock_smart_memory):
+        """Test retrieving history for nonexistent item."""
+        mock_smart_memory.get.return_value = None
+        
+        result = challenger.get_confidence_history("nonexistent")
+        
+        assert result == []
+    
+    def test_get_low_confidence_items(self, challenger, mock_smart_memory):
+        """Test getting low confidence items."""
+        items = [
+            MemoryItem(item_id="1", content="Fact 1", memory_type="semantic", metadata={"confidence": 0.3}),
+            MemoryItem(item_id="2", content="Fact 2", memory_type="semantic", metadata={"confidence": 0.8}),
+            MemoryItem(item_id="3", content="Fact 3", memory_type="semantic", metadata={"confidence": 0.2}),
+            MemoryItem(item_id="4", content="Fact 4", memory_type="semantic", metadata={}),  # Default 1.0
+        ]
+        mock_smart_memory.search.return_value = items
+        
+        result = challenger.get_low_confidence_items(threshold=0.5)
+        
+        assert len(result) == 2
+        # Should be sorted by confidence (lowest first)
+        assert result[0].item_id == "3"  # 0.2
+        assert result[1].item_id == "1"  # 0.3
+
+
+class TestAutoResolve:
+    """Test auto-resolution functionality."""
+    
+    def test_auto_resolve_via_recency(self, challenger, mock_smart_memory):
+        """Test auto-resolution via recency heuristic."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="The CEO of Twitter is Jack Dorsey",
+            memory_type="semantic",
+            metadata={"timestamp": "2020-01-01T00:00:00Z"}  # Need timestamp for recency check
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        conflict = Conflict(
+            existing_item=existing_item,
+            existing_fact="The CEO of Twitter is Jack Dorsey",
+            new_fact="The CEO of Twitter is now Elon Musk",
+            conflict_type=ConflictType.TEMPORAL_CONFLICT,
+            confidence=0.8,
+            explanation="Leadership change",
+            suggested_resolution=ResolutionStrategy.DEFER
+        )
+        
+        result = challenger.auto_resolve(conflict, use_wikipedia=False, use_llm=False)
+        
+        # Should resolve via recency (new fact has "now")
+        assert result["auto_resolved"] is True
+        assert result["method"] == "recency"
+        assert result["resolution"] == ResolutionStrategy.ACCEPT_NEW
+    
+    def test_auto_resolve_via_grounding(self, challenger, mock_smart_memory):
+        """Test auto-resolution via grounding check."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="Paris is the capital of France",
+            memory_type="semantic",
+            metadata={
+                "grounded_to": "https://en.wikipedia.org/wiki/Paris",  # Correct field
+                "provenance": {"wikipedia_id": "Paris"}
+            }
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        conflict = Conflict(
+            existing_item=existing_item,
+            existing_fact="Paris is the capital of France",
+            new_fact="Lyon is the capital of France",
+            conflict_type=ConflictType.DIRECT_CONTRADICTION,
+            confidence=0.8,
+            explanation="Different capitals",
+            suggested_resolution=ResolutionStrategy.DEFER
+        )
+        
+        result = challenger.auto_resolve(conflict, use_wikipedia=False, use_llm=False)
+        
+        # Should resolve via grounding (existing has grounded_to)
+        assert result["auto_resolved"] is True
+        assert result["method"] == "grounding"
+        assert result["resolution"] == ResolutionStrategy.KEEP_EXISTING
+    
+    def test_auto_resolve_defers_when_no_method_works(self, challenger, mock_smart_memory):
+        """Test auto-resolution defers when no method can resolve."""
+        existing_item = MemoryItem(
+            item_id="fact_1",
+            content="The best programming language is Python",
+            memory_type="semantic",
+            metadata={}
+        )
+        mock_smart_memory.get.return_value = existing_item
+        
+        conflict = Conflict(
+            existing_item=existing_item,
+            existing_fact="The best programming language is Python",
+            new_fact="The best programming language is Rust",
+            conflict_type=ConflictType.DIRECT_CONTRADICTION,
+            confidence=0.7,
+            explanation="Subjective claim",
+            suggested_resolution=ResolutionStrategy.DEFER
+        )
+        
+        result = challenger.auto_resolve(conflict, use_wikipedia=False, use_llm=False)
+        
+        # Should defer - subjective claims can't be auto-resolved
+        assert result["auto_resolved"] is False
+        # No resolution set when deferring
+        assert result["resolution"] is None
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
