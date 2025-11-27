@@ -32,7 +32,7 @@ except:
     __version_info__ = (0, 1, 6)
 
 # Version history:
-# 0.1.20 - SSG integration, user signature support, documentation updates, DRY version management (VERSION file as single source of truth)
+# 0.1.21 - SSG integration, user signature support, documentation updates, DRY version management (VERSION file as single source of truth)
 # 0.1.14 - Tenant isolation bug fix
 # 0.1.13 - Tenant isolation bug fix
 # 0.1.12 - Tenant isolation improvements
