@@ -695,18 +695,31 @@ Only respond with the JSON, no other text."""
     def apply_confidence_decay(
         self,
         item_id: str,
-        decay_factor: float = 0.1
+        decay_factor: float = 0.1,
+        reason: Optional[str] = None,
+        conflicting_fact: Optional[str] = None
     ) -> bool:
         """
-        Apply confidence decay to a challenged fact.
+        Apply confidence decay to a challenged fact with full tracking.
         
         Args:
             item_id: ID of the memory item to decay
             decay_factor: How much to reduce confidence (0.0-1.0)
+            reason: Why the decay was applied
+            conflicting_fact: The fact that caused the challenge
             
         Returns:
             True if decay was applied successfully
+            
+        Tracks:
+            - confidence: Current confidence score (0.0-1.0)
+            - challenged: Boolean flag
+            - challenge_count: Number of times challenged
+            - confidence_history: List of {timestamp, old, new, reason, conflicting_fact}
+            - last_challenged_at: ISO timestamp of last challenge
         """
+        from datetime import datetime
+        
         try:
             item = self.sm.get(item_id)
             if not item:
@@ -715,23 +728,107 @@ Only respond with the JSON, no other text."""
             
             current_confidence = item.metadata.get('confidence', 1.0)
             new_confidence = max(0.0, current_confidence - decay_factor)
+            now = datetime.utcnow().isoformat() + 'Z'
             
-            # Update metadata
+            # Initialize confidence history if not present
+            if 'confidence_history' not in item.metadata:
+                item.metadata['confidence_history'] = []
+            
+            # Record this decay event
+            decay_event = {
+                'timestamp': now,
+                'old_confidence': current_confidence,
+                'new_confidence': new_confidence,
+                'decay_factor': decay_factor,
+                'reason': reason or 'challenged',
+            }
+            if conflicting_fact:
+                decay_event['conflicting_fact'] = conflicting_fact[:200]  # Truncate
+            
+            item.metadata['confidence_history'].append(decay_event)
+            
+            # Keep only last 20 events to avoid bloat
+            if len(item.metadata['confidence_history']) > 20:
+                item.metadata['confidence_history'] = item.metadata['confidence_history'][-20:]
+            
+            # Update current state
             item.metadata['confidence'] = new_confidence
             item.metadata['challenged'] = True
             item.metadata['challenge_count'] = item.metadata.get('challenge_count', 0) + 1
+            item.metadata['last_challenged_at'] = now
             
             self.sm.update(item)
             
             logger.info(
                 f"Applied confidence decay to {item_id}: "
-                f"{current_confidence:.2f} -> {new_confidence:.2f}"
+                f"{current_confidence:.2f} -> {new_confidence:.2f} "
+                f"(challenge #{item.metadata['challenge_count']})"
             )
             return True
             
         except Exception as e:
             logger.error(f"Failed to apply confidence decay: {e}")
             return False
+    
+    def get_confidence_history(self, item_id: str) -> List[Dict[str, Any]]:
+        """
+        Get the confidence decay history for an item.
+        
+        Args:
+            item_id: ID of the memory item
+            
+        Returns:
+            List of decay events with timestamps
+        """
+        try:
+            item = self.sm.get(item_id)
+            if not item:
+                return []
+            
+            return item.metadata.get('confidence_history', [])
+        except Exception as e:
+            logger.error(f"Failed to get confidence history: {e}")
+            return []
+    
+    def get_low_confidence_items(
+        self,
+        threshold: float = 0.5,
+        memory_type: str = "semantic",
+        limit: int = 50
+    ) -> List[MemoryItem]:
+        """
+        Get items with confidence below threshold.
+        
+        Useful for finding facts that have been challenged multiple times
+        and may need review or removal.
+        
+        Args:
+            threshold: Confidence threshold (items below this are returned)
+            memory_type: Type of memory to search
+            limit: Maximum items to return
+            
+        Returns:
+            List of low-confidence items sorted by confidence (lowest first)
+        """
+        try:
+            # Search for all items and filter by confidence
+            # TODO: This could be optimized with a graph query
+            results = self.sm.search("", top_k=limit * 3, memory_type=memory_type)
+            
+            low_confidence = []
+            for item in results:
+                confidence = item.metadata.get('confidence', 1.0)
+                if confidence < threshold:
+                    low_confidence.append(item)
+            
+            # Sort by confidence (lowest first)
+            low_confidence.sort(key=lambda x: x.metadata.get('confidence', 1.0))
+            
+            return low_confidence[:limit]
+            
+        except Exception as e:
+            logger.error(f"Failed to get low confidence items: {e}")
+            return []
     
     def auto_resolve(
         self,
@@ -1054,8 +1151,13 @@ Only respond with the JSON, no other text."""
             resolution["actions_taken"].append("Marked existing fact as verified")
             
         elif strategy == ResolutionStrategy.ACCEPT_NEW:
-            # Decay existing fact confidence
-            self.apply_confidence_decay(conflict.existing_item.item_id, decay_factor=0.4)
+            # Decay existing fact confidence with tracking
+            self.apply_confidence_decay(
+                conflict.existing_item.item_id, 
+                decay_factor=0.4,
+                reason=f"auto_resolved:{resolution.get('method', 'unknown')}",
+                conflicting_fact=conflict.new_fact
+            )
             conflict.existing_item.metadata['superseded_by'] = conflict.new_fact
             conflict.existing_item.metadata['superseded_reason'] = resolution.get("evidence")
             self.sm.update(conflict.existing_item)
@@ -1100,7 +1202,12 @@ Only respond with the JSON, no other text."""
             
         elif strategy == ResolutionStrategy.ACCEPT_NEW:
             # Mark old as superseded, add new
-            self.apply_confidence_decay(conflict.existing_item.item_id, decay_factor=0.5)
+            self.apply_confidence_decay(
+                conflict.existing_item.item_id, 
+                decay_factor=0.5,
+                reason="manual_resolution:accept_new",
+                conflicting_fact=conflict.new_fact
+            )
             result["actions_taken"].append(
                 f"Decayed confidence of existing fact {conflict.existing_item.item_id}"
             )
