@@ -378,6 +378,6 @@ class CRUD(BaseHandler):
                     memory_items.append(self.normalize_item(result))
 
             return memory_items
-        except Exception as e:
+        except Exception:
             # Return empty list on search failure to maintain API contract
             return []

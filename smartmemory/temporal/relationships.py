@@ -535,6 +535,6 @@ class TemporalRelationshipQueries:
             if isinstance(time_str, datetime):
                 return time_str
             return datetime.fromisoformat(time_str)
-        except Exception as e:
+        except Exception:
             logger.warning(f"Could not parse time: {time_str}")
             return None

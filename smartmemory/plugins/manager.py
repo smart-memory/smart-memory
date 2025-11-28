@@ -5,6 +5,7 @@ Handles plugin discovery, loading, and lifecycle management.
 """
 
 import logging
+import sys
 import importlib.metadata
 from pathlib import Path
 from typing import Optional, List, Set, Dict, Any

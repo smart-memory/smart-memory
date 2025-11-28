@@ -7,6 +7,7 @@ from typing import Optional, List, Any, Dict
 from smartmemory.models.base import MemoryBaseModel
 from smartmemory.models.compat.dataclass_model import get_field_names
 from smartmemory.models.status import StatusLoggerMixin
+from smartmemory.utils import flatten_dict, unflatten_dict
 
 
 # --- MemoryItem ---

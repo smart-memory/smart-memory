@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     import dspy  # type: ignore
-except Exception as import_err:  # pragma: no cover
+except Exception:  # pragma: no cover
     dspy = None  # type: ignore
 
 # Lazy import for token tracking to avoid circular imports
