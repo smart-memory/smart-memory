@@ -79,7 +79,7 @@ class FastIngestionFlow(MemoryIngestionFlow):
                         'entities': entities,
                         'relations': relations,
                     }
-            except Exception as e:
+            except Exception:
                 # Fail fast on extraction errors in fast path
                 raise
 
@@ -140,7 +140,7 @@ class FastIngestionFlow(MemoryIngestionFlow):
         # 4. Basic vector store (fast - can be async later)
         try:
             self._save_to_vector_store_fast(context)
-        except Exception as e:
+        except Exception:
             # Fail fast on vector store errors
             raise
 
@@ -212,7 +212,7 @@ class FastIngestionFlow(MemoryIngestionFlow):
                     except Exception:
                         pass
                 context['background_queued'] = True
-            except Exception as e:
+            except Exception:
                 # Fail fast on background job enqueue failures
                 raise
 
@@ -268,7 +268,7 @@ class FastIngestionFlow(MemoryIngestionFlow):
                 else:
                     # If local mode is configured but loop isn't running, consider it a failure
                     raise RuntimeError("Background processor loop not running; cannot enqueue tasks")
-            except Exception as e:
+            except Exception:
                 # Fail fast on local background queuing failures
                 raise
 
@@ -300,7 +300,7 @@ class FastIngestionFlow(MemoryIngestionFlow):
             except Exception:
                 selected_default = fast_default_cfg or 'llm'
             return self.extract_semantics(item, extractor_name or selected_default)
-        except Exception as e:
+        except Exception:
             # Fail fast if fast extraction fails
             raise
 

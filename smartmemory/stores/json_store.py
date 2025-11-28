@@ -196,23 +196,6 @@ class JSONStore(BaseHandler[Dict]):
                     return False
         return True
 
-        item_id = item.get('id')
-        if not item_id:
-            return False
-
-        if item_id not in self._items:
-            return False
-
-        # Apply auto-timestamping if enabled
-        item_copy = dict(item)
-        if getattr(self, 'auto_timestamp', False):
-            item_copy['updated_at'] = datetime.now(timezone.utc).isoformat()
-
-        self._items[item_id] = item_copy
-        self._save_all_items()
-
-        return item_copy
-
     def delete(self, item_id: str, **kwargs) -> bool:
         """Delete a dict item from the store."""
         if not item_id or item_id not in self._items:
