@@ -51,7 +51,7 @@ def get_smolagents_tools():
             else:
                 tool_instance.tags = ['external']
             tools.append(tool_instance)
-        except Exception as e:
+        except Exception:
             pass  # Skip if can't instantiate without args
     return tools
 

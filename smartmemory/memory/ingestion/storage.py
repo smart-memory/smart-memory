@@ -132,7 +132,7 @@ class StoragePipeline:
                 )
 
             except Exception as e:
-                print(f"⚠️  Failed to process triple {triple}: {e}")
+                print(f"⚠️  Failed to process triple {relation}: {e}")
                 continue  # Skip failed triples but continue processing others
 
     def ensure_entity_node(self, entity_name: str, context: Dict[str, Any]) -> str:

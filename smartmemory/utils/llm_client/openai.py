@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     from openai import OpenAI  # type: ignore
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore
 
 
