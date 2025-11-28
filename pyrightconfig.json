@@ -1,0 +1,26 @@
+{
+  "include": [
+    "smartmemory"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__",
+    "**/node_modules",
+    "tests"
+  ],
+  "venvPath": "/Users/ruze/miniconda3/envs",
+  "venv": "memory",
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.11",
+  "useLibraryCodeForTypes": true,
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownParameterType": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownLambdaType": "none",
+  "reportPrivateUsage": "none",
+  "reportCallInDefaultInitializer": "warning",
+  "reportGeneralTypeIssues": "warning"
+}
