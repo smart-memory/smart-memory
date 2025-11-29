@@ -51,7 +51,7 @@ class OntologyExtractor:
                 # Get field names from dataclass or Pydantic via compatibility helper
                 fields_list = []
                 for field_name in get_field_names(node_class):
-                    if field_name not in ['item_id', 'created_at', 'updated_at', 'user_id', 'confidence', 'source', 'name', 'description']:
+                    if field_name not in ['item_id', 'created_at', 'updated_at', 'confidence', 'source', 'name', 'description']:
                         fields_list.append(field_name)
 
                 node_types_desc.append(f"- {node_type.value}: {node_class.__doc__ or 'No description'}")
@@ -76,7 +76,6 @@ class OntologyExtractor:
     def extract_entities_and_relations(
             self,
             text: str,
-            user_id: Optional[str] = None,
             prompt: Optional[str] = None,
             model: Optional[str] = None,
             temperature: Optional[float] = None,
@@ -170,7 +169,7 @@ class OntologyExtractor:
                         llm_data = {"entities": [], "relations": []}
 
             # Convert LLM output to ontology nodes
-            entities = self._create_ontology_nodes(llm_data.get('entities', []), user_id)
+            entities = self._create_ontology_nodes(llm_data.get('entities', []))
             relations = self._process_relations(llm_data.get('relations', []), entities)
 
             result = {
@@ -213,7 +212,7 @@ class OntologyExtractor:
             props = {}
             try:
                 for k, v in ent.__dict__.items():
-                    if k not in {"item_id", "id", "name", "text", "dynamic_node_type", "node_type", "confidence", "user_id", "source"}:
+                    if k not in {"item_id", "id", "name", "text", "dynamic_node_type", "node_type", "confidence", "source"}:
                         props[k] = v
             except Exception:
                 props = {}
@@ -356,7 +355,7 @@ class OntologyExtractor:
             "strict": False,
         }
 
-    def _create_ontology_nodes(self, llm_entities: List[Dict], user_id: Optional[str]) -> List[OntologyNode]:
+    def _create_ontology_nodes(self, llm_entities: List[Dict]) -> List[OntologyNode]:
         """Convert LLM entity output to proper ontology nodes."""
         nodes = []
 
@@ -382,10 +381,10 @@ class OntologyExtractor:
             import uuid
 
             # Create node with LLM-extracted properties
+            # Auth context (user_id, tenant_id) is added by scope_provider, not here
             node_kwargs = {
                 'item_id': str(uuid.uuid4()),
                 'name': name,
-                'user_id': user_id,
                 'source': 'llm_ontology_extractor',
                 'confidence': 0.8
             }

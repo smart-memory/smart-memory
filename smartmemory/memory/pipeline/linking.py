@@ -202,16 +202,63 @@ class LinkingEngine(PipelineComponent[LinkingConfig]):
                 except Exception:
                     return str(s)
 
-            # Build clusters by explicit id or normalized name
+            # Determine clustering mode from config
+            clustering_mode = getattr(config, 'clustering_mode', 'basic')
+            
+            # Build clusters based on mode
             clusters = {}
-            for ent in sem_entities:
-                ent_id = ent.get('id') or ent.get('item_id')
-                name = ent.get('name') or ent.get('label') or ent.get('title')
-                key = ent_id or _norm_label(name)
-                if not key:
-                    # fallback to any stable repr
-                    key = _norm_label(str(ent))
-                clusters.setdefault(key, []).append(ent)
+            if clustering_mode == 'semantic' and len(sem_entities) >= 2:
+                # Use LLM-based semantic clustering
+                try:
+                    from smartmemory.clustering.llm import LLMClustering
+                    clustering_model = getattr(config, 'clustering_model', None)
+                    clustering_context = getattr(config, 'clustering_context', None)
+                    clusterer = LLMClustering(
+                        model_name=clustering_model or "gpt-5-mini",
+                        context=clustering_context
+                    )
+                    # Get semantic clusters (canonical_name -> set of equivalent names)
+                    semantic_clusters = clusterer.cluster_entities(sem_entities, clustering_context)
+                    
+                    # Convert to our cluster format (key -> list of entities)
+                    name_to_entities = {}
+                    for ent in sem_entities:
+                        name = ent.get('name') or ent.get('label') or ent.get('title') or ''
+                        name_to_entities.setdefault(_norm_label(name), []).append(ent)
+                    
+                    for canonical, equivalents in semantic_clusters.items():
+                        cluster_entities = []
+                        for eq_name in equivalents:
+                            cluster_entities.extend(name_to_entities.get(_norm_label(eq_name), []))
+                        if cluster_entities:
+                            clusters[_norm_label(canonical)] = cluster_entities
+                    
+                    # Add any entities not in semantic clusters
+                    clustered_names = set()
+                    for equivalents in semantic_clusters.values():
+                        clustered_names.update(_norm_label(n) for n in equivalents)
+                    for ent in sem_entities:
+                        name = ent.get('name') or ent.get('label') or ent.get('title') or ''
+                        if _norm_label(name) not in clustered_names:
+                            ent_id = ent.get('id') or ent.get('item_id')
+                            key = ent_id or _norm_label(name) or _norm_label(str(ent))
+                            clusters.setdefault(key, []).append(ent)
+                    
+                    logger.info(f"Semantic clustering found {len(semantic_clusters)} clusters")
+                except Exception as e:
+                    logger.warning(f"Semantic clustering failed, falling back to basic: {e}")
+                    clustering_mode = 'basic'  # Fallback
+            
+            if clustering_mode == 'basic' or not clusters:
+                # Basic clustering by explicit id or normalized name
+                for ent in sem_entities:
+                    ent_id = ent.get('id') or ent.get('item_id')
+                    name = ent.get('name') or ent.get('label') or ent.get('title')
+                    key = ent_id or _norm_label(name)
+                    if not key:
+                        # fallback to any stable repr
+                        key = _norm_label(str(ent))
+                    clusters.setdefault(key, []).append(ent)
 
             canonical_map = {}  # original_id/name -> canonical_id
             is_a_edges_added = 0

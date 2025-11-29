@@ -22,7 +22,6 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     memory_type: str = 'semantic'  # Default type is now 'semantic'; canonical removed
     item_id: str = dc_field(default_factory=lambda: str(uuid.uuid4()))
     content: str = ""
-    user_id: Optional[str] = None
     embedding: Optional[List[float]] = None
     
     group_id: Optional[str] = None
@@ -35,13 +34,13 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     metadata: dict = dc_field(default_factory=dict)  # Arbitrary metadata
     
     # Track which fields are immutable after first set
-    _immutable_fields: set = dc_field(default_factory=lambda: {'content', 'user_id', 'embedding'}, repr=False, init=False)
+    _immutable_fields: set = dc_field(default_factory=lambda: {'content', 'embedding'}, repr=False, init=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """
         Enforce immutability for specific fields after initial set.
         
-        Fields in _immutable_fields (content, user_id, embedding) can only be set once.
+        Fields in _immutable_fields (content, embedding) can only be set once.
         Attempting to modify them after initial set raises ValueError.
         """
         # Allow setting _immutable_fields itself during init
@@ -78,7 +77,6 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
             type: Optional[str] = None,
             memory_type: Optional[str] = None,
             item_id: Optional[str] = None,
-            user_id: Optional[str] = None,
             group_id: Optional[str] = None,
             valid_start_time: Optional[datetime] = None,
             valid_end_time: Optional[datetime] = None,
@@ -90,13 +88,12 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
             **kwargs: Any,
     ) -> None:
         # Initialize immutability tracking first
-        object.__setattr__(self, '_immutable_fields', {'content', 'user_id', 'embedding'})
+        object.__setattr__(self, '_immutable_fields', {'content', 'embedding'})
         
         # Initialize core fields with defaults
         self.memory_type = (memory_type or type or 'semantic')
         self.content = content if content is not None else ""
         self.item_id = item_id or str(uuid.uuid4())
-        self.user_id = user_id
         self.group_id = group_id
         self.valid_start_time = valid_start_time
         self.valid_end_time = valid_end_time

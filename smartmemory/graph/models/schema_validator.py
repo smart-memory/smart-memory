@@ -220,12 +220,12 @@ class GraphSchemaValidator:
         self.register_node_schema(NodeSchema(
             node_type="user_input",
             required_fields={"item_id", "content"},
-            optional_fields={"timestamp", "user_id", "session_context", "type"},
+            optional_fields={"timestamp", "session_context", "type"},
             field_types={
                 "item_id": str,
                 "content": str,
                 "timestamp": str,
-                "user_id": str,
+                
                 "session_context": str,
                 "type": str
             }
@@ -235,12 +235,12 @@ class GraphSchemaValidator:
         self.register_node_schema(NodeSchema(
             node_type="assistant_response",
             required_fields={"item_id", "content"},
-            optional_fields={"timestamp", "user_id", "session_context", "type"},
+            optional_fields={"timestamp", "session_context", "type"},
             field_types={
                 "item_id": str,
                 "content": str,
                 "timestamp": str,
-                "user_id": str,
+                
                 "session_context": str,
                 "type": str
             }
@@ -250,12 +250,12 @@ class GraphSchemaValidator:
         self.register_node_schema(NodeSchema(
             node_type="user_preference",
             required_fields={"item_id", "content"},
-            optional_fields={"timestamp", "user_id", "type", "preference_type"},
+            optional_fields={"timestamp", "type", "preference_type"},
             field_types={
                 "item_id": str,
                 "content": str,
                 "timestamp": str,
-                "user_id": str,
+                
                 "type": str,
                 "preference_type": str
             }
@@ -265,7 +265,7 @@ class GraphSchemaValidator:
         self.register_node_schema(NodeSchema(
             node_type="person",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "email", "phone", "age", "occupation", "skills", "interests", "location", "confidence", "source", "user_id"},
+            optional_fields={"name", "email", "phone", "age", "occupation", "skills", "interests", "location", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -279,14 +279,14 @@ class GraphSchemaValidator:
                 "location": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="organization",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "industry", "size", "founded", "headquarters", "website", "type", "confidence", "source", "user_id"},
+            optional_fields={"name", "industry", "size", "founded", "headquarters", "website", "type", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -299,14 +299,14 @@ class GraphSchemaValidator:
                 "type": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="location",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "address", "coordinates", "location_type", "capacity", "timezone", "confidence", "source", "user_id"},
+            optional_fields={"name", "address", "coordinates", "location_type", "capacity", "timezone", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -318,14 +318,14 @@ class GraphSchemaValidator:
                 "timezone": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="concept",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "description", "category", "confidence", "source", "user_id"},
+            optional_fields={"name", "description", "category", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -334,14 +334,14 @@ class GraphSchemaValidator:
                 "category": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="event",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "date", "location", "participants", "outcome", "confidence", "source", "user_id"},
+            optional_fields={"name", "date", "location", "participants", "outcome", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -352,14 +352,14 @@ class GraphSchemaValidator:
                 "outcome": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="tool",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "version", "description", "category", "confidence", "source", "user_id"},
+            optional_fields={"name", "version", "description", "category", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -369,14 +369,14 @@ class GraphSchemaValidator:
                 "category": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 
         self.register_node_schema(NodeSchema(
             node_type="skill",
             required_fields={"item_id", "content"},
-            optional_fields={"name", "description", "category", "confidence", "source", "user_id"},
+            optional_fields={"name", "description", "category", "confidence", "source"},
             field_types={
                 "item_id": str,
                 "content": str,
@@ -385,7 +385,7 @@ class GraphSchemaValidator:
                 "category": (str, type(None)),
                 "confidence": (float, type(None)),
                 "source": (str, type(None)),
-                "user_id": (str, type(None))
+                
             }
         ))
 

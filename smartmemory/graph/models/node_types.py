@@ -150,21 +150,10 @@ class NodeTypeProcessor:
         # Create memory node spec
         memory_type = self._determine_memory_type(item)
 
-        # Preserve user_id and other critical properties
+        # Properties and metadata are passed through as-is
+        # Auth context (user_id, tenant_id, etc.) is in metadata, set by scope_provider
         properties = {}
         metadata = item.metadata or {}
-
-        # Extract user_id from multiple sources for robust preservation
-        user_id = None
-        if hasattr(item, 'user_id') and item.user_id:
-            user_id = item.user_id
-        elif metadata.get('user_id'):
-            user_id = metadata.get('user_id')
-
-        # Preserve user_id in both properties and metadata for reliable retrieval
-        if user_id:
-            properties['user_id'] = user_id
-            metadata['user_id'] = user_id
 
         memory_spec = MemoryNodeSpec(
             item_id=item.item_id,

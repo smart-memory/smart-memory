@@ -46,13 +46,12 @@ class RelikExtractor(ExtractorPlugin):
             self.model = Relik.from_pretrained(model_name)
             self.model_name = model_name
     
-    def extract(self, text: str, user_id: Optional[str] = None) -> dict:
+    def extract(self, text: str) -> dict:
         """
         Extract entities and relations from text.
         
         Args:
             text: The text to extract from
-            user_id: Optional user ID for context
         
         Returns:
             dict: Dictionary with 'entities' and 'relations' keys

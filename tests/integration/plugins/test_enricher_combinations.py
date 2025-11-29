@@ -43,31 +43,31 @@ class TestEnricherCombinations:
             'sentiment_text': MemoryItem(
                 content="I absolutely love machine learning! It's fascinating how neural networks can learn patterns.",
                 memory_type="semantic",
-                user_id="enricher_test_user",
+                
                 metadata={"test_type": "sentiment"}
             ),
             'temporal_text': MemoryItem(
                 content="Yesterday I learned Python programming. Tomorrow I will study deep learning algorithms.",
                 memory_type="episodic", 
-                user_id="enricher_test_user",
+                
                 metadata={"test_type": "temporal"}
             ),
             'skills_text': MemoryItem(
                 content="I used TensorFlow and PyTorch to build neural networks. Also worked with Docker and Kubernetes.",
                 memory_type="procedural",
-                user_id="enricher_test_user", 
+                 
                 metadata={"test_type": "skills_tools"}
             ),
             'topic_text': MemoryItem(
                 content="Artificial intelligence encompasses machine learning, natural language processing, and computer vision.",
                 memory_type="semantic",
-                user_id="enricher_test_user",
+                
                 metadata={"test_type": "topic"}
             ),
             'wikipedia_text': MemoryItem(
                 content="Albert Einstein developed the theory of relativity and won the Nobel Prize in Physics.",
                 memory_type="semantic", 
-                user_id="enricher_test_user",
+                
                 metadata={"test_type": "wikipedia"}
             )
         }
@@ -274,7 +274,7 @@ class TestEnricherCombinations:
         # Search should work with content (enrichers may enhance searchability)
         search_results = enricher_memory.search(
             "TensorFlow PyTorch", 
-            user_id="enricher_test_user",
+            
             top_k=5
         )
         # Search may or may not return results depending on embedding availability
@@ -296,7 +296,7 @@ class TestEnricherCombinations:
         empty_item = MemoryItem(
             content="",
             memory_type="semantic", 
-            user_id="enricher_test_user"
+            
         )
         
         for enricher in enrichers:
@@ -314,7 +314,7 @@ class TestEnricherCombinations:
         none_item = MemoryItem(
             content=None,
             memory_type="semantic",
-            user_id="enricher_test_user"
+            
         )
         
         for enricher in enrichers:

@@ -109,7 +109,6 @@ class GLiNER2Extractor(ExtractorPlugin):
     def extract(
         self,
         text: str,
-        user_id: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -117,7 +116,6 @@ class GLiNER2Extractor(ExtractorPlugin):
         
         Args:
             text: Input text to extract entities from
-            user_id: Optional user ID for context
             **kwargs: Additional arguments (ignored)
             
         Returns:

@@ -41,7 +41,7 @@ class ZettelConverter(MemoryItemConverter):
             'item_id': item.item_id,
             'content': item.content,
             'type': item.memory_type,
-            'user_id': getattr(item, 'user_id', None),
+            
             'group_id': getattr(item, 'group_id', None),
             'transaction_time': getattr(item, 'transaction_time', None),
             'valid_start_time': getattr(item, 'valid_start_time', None),
@@ -144,7 +144,7 @@ class ZettelConverter(MemoryItemConverter):
             'item_id': data['item_id'],
             'content': data.get('content', data.get('zettel_body', '')),
             'type': data.get('type', 'zettel'),
-            'user_id': data.get('user_id'),
+            
             'group_id': data.get('group_id'),
             'transaction_time': data.get('transaction_time'),
             'valid_start_time': data.get('valid_start_time'),

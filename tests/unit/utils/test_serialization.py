@@ -13,7 +13,6 @@ class TestMemoryItemSerializer:
         """Test that metadata is correctly flattened."""
         item = MemoryItem(
             content="Test Content",
-            user_id="user1",
             metadata={
                 "simple": "value",
                 "nested": {"key": "nested_value"},
@@ -24,7 +23,6 @@ class TestMemoryItemSerializer:
         storage_data = MemoryItemSerializer.to_storage(item)
         
         assert storage_data["content"] == "Test Content"
-        assert storage_data["user_id"] == "user1"
         assert storage_data["simple"] == "value"
         assert storage_data["nested__key"] == "nested_value"
         assert storage_data["deep__level1__level2"] == "deep_value"
@@ -34,10 +32,8 @@ class TestMemoryItemSerializer:
         """Test that metadata cannot overwrite system fields."""
         item = MemoryItem(
             content="System Content",
-            user_id="user1",
             metadata={
                 "content": "Metadata Content",  # Should be ignored/dropped from top level
-                "user_id": "fake_user"
             }
         )
         
@@ -45,7 +41,6 @@ class TestMemoryItemSerializer:
         
         # System fields should be preserved
         assert storage_data["content"] == "System Content"
-        assert storage_data["user_id"] == "user1"
         # Metadata fields that clash are not in top level
         # They should have been filtered out by the safe_metadata logic
         assert "content" in storage_data
@@ -55,7 +50,6 @@ class TestMemoryItemSerializer:
         """Test that storage data is correctly unflattened into MemoryItem."""
         data = {
             "content": "Test Content",
-            "user_id": "user1",
             "simple": "value",
             "nested__key": "nested_value",
             "deep__level1__level2": "deep_value"
@@ -64,7 +58,6 @@ class TestMemoryItemSerializer:
         item = MemoryItemSerializer.from_storage(MemoryItem, data)
         
         assert item.content == "Test Content"
-        assert item.user_id == "user1"
         assert item.metadata["simple"] == "value"
         assert item.metadata["nested"]["key"] == "nested_value"
         assert item.metadata["deep"]["level1"]["level2"] == "deep_value"
@@ -73,7 +66,6 @@ class TestMemoryItemSerializer:
         """Test roundtrip serialization with complex data types."""
         item = MemoryItem(
             content="Complex Content",
-            user_id="user1",
             metadata={
                 "list_data": [1, 2, 3],
                 "dict_data": {"a": 1, "b": 2},
@@ -85,7 +77,7 @@ class TestMemoryItemSerializer:
 
     def test_internal_field_filtering(self):
         """Test that internal fields are not serialized."""
-        item = MemoryItem(content="Test", user_id="user1")
+        item = MemoryItem(content="Test")
         # Simulate internal field existence if it's not there by default
         # But MemoryItem might have _immutable_fields
         
@@ -118,7 +110,7 @@ class TestMemoryItemSerializer:
                 d['extra_attr'] = 'extra_value'
                 return d
                 
-        item = ExtendedMemoryItem(content="Test", user_id="user1")
+        item = ExtendedMemoryItem(content="Test")
         storage_data = MemoryItemSerializer.to_storage(item)
         
         # extra_attr is not a SYSTEM_FIELD, so it should be in metadata (flat)

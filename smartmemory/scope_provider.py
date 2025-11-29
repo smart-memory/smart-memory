@@ -53,3 +53,18 @@ class DefaultScopeProvider(ScopeProvider):
             ctx["team_id"] = self.team_id
             
         return ctx
+
+    def get_global_search_filters(self) -> Dict[str, Any]:
+        """
+        Return isolation filters for global/shared data searches.
+        For default provider, returns all filters except user-level.
+        """
+        filters = self.get_isolation_filters()
+        filters.pop("user_id", None)
+        return filters
+
+    def get_user_isolation_key(self) -> str:
+        """
+        Return the field name used for user-level isolation.
+        """
+        return "user_id"

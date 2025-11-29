@@ -111,7 +111,6 @@ class OntologyNode(MemoryBaseModel, ABC):
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    user_id: Optional[str] = None
     confidence: float = 1.0
     source: Optional[str] = None  # Where this node came from
 

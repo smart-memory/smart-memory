@@ -111,14 +111,10 @@ class SmartGraphSearch:
             # Get algorithm from config or kwargs
             algorithm = kwargs.get('ssg_algorithm') or ssg_config.get('default_algorithm', 'query_traversal')
             
-            # Get workspace_id from kwargs if available
-            workspace_id = kwargs.get('workspace_id')
-            user_id = kwargs.get('user_id')
-            
             # Need SmartMemory instance - get from parent if available
+            # Tenant isolation is handled by the SmartMemory's scope_provider
             smart_memory = getattr(self, 'smart_memory', None)
             if smart_memory is None:
-                # Try to construct from backend
                 logger.debug("No SmartMemory instance available, cannot use SSG")
                 return None
             
@@ -127,26 +123,12 @@ class SmartGraphSearch:
             
             # Execute selected algorithm
             if algorithm == "query_traversal":
-                results = ssg.query_traversal(
-                    query_str, 
-                    max_results=top_k,
-                    user_id=user_id,
-                    workspace_id=workspace_id
-                )
+                results = ssg.query_traversal(query_str, max_results=top_k)
             elif algorithm == "triangulation_fulldim":
-                results = ssg.triangulation_fulldim(
-                    query_str,
-                    max_results=top_k,
-                    workspace_id=workspace_id
-                )
+                results = ssg.triangulation_fulldim(query_str, max_results=top_k)
             else:
                 logger.warning(f"Unknown SSG algorithm: {algorithm}, falling back to query_traversal")
-                results = ssg.query_traversal(
-                    query_str,
-                    max_results=top_k,
-                    user_id=user_id,
-                    workspace_id=workspace_id
-                )
+                results = ssg.query_traversal(query_str, max_results=top_k)
             
             if results:
                 logger.info(f"SSG {algorithm} search found {len(results)} results for query: {query_str}")
