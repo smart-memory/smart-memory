@@ -29,17 +29,31 @@ class ClassificationConfig(MemoryBaseModel):
 
 @dataclass
 class LinkingConfig(MemoryBaseModel):
-    """Configuration for LinkingEngine stage."""
+    """Configuration for LinkingEngine stage.
+    
+    Linking performs deduplication and cross-reference resolution.
+    Two modes available:
+    - basic: Fast embedding-based similarity matching
+    - semantic: LLM-based semantic equivalence (catches "Joe" ↔ "Joseph")
+    """
     linking_algorithm: str = "default"
     similarity_threshold: float = 0.8
     deduplication_enabled: bool = True
     cross_reference_resolution: bool = True
     working_memory_activation: bool = True
+    # Clustering options
+    clustering_mode: str = "basic"  # "basic" | "semantic"
+    clustering_model: Optional[str] = None  # LLM model for semantic clustering
+    clustering_context: Optional[str] = None  # Domain context hint for clustering
 
     def __post_init__(self):
         # Validate threshold range
         if not 0.0 <= self.similarity_threshold <= 1.0:
             raise ValueError(f"similarity_threshold must be between 0.0 and 1.0, got {self.similarity_threshold}")
+        # Validate clustering mode
+        valid_modes = {"basic", "semantic", "none"}
+        if self.clustering_mode not in valid_modes:
+            raise ValueError(f"clustering_mode must be one of {valid_modes}, got '{self.clustering_mode}'")
 
 
 @dataclass

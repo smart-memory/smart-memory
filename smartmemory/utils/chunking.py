@@ -385,7 +385,6 @@ class ChunkedExtractor:
     def extract(
         self,
         text: str,
-        user_id: Optional[str] = None,
         context: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
@@ -394,7 +393,6 @@ class ChunkedExtractor:
         
         Args:
             text: Input text (any size)
-            user_id: Optional user ID
             context: Optional domain context for clustering
             **kwargs: Additional arguments passed to base extractor
             
@@ -403,7 +401,7 @@ class ChunkedExtractor:
         """
         # Define extraction function
         def extract_fn(chunk_text: str) -> Dict[str, Any]:
-            return self.extractor.extract(chunk_text, user_id=user_id, **kwargs)
+            return self.extractor.extract(chunk_text, **kwargs)
         
         return extract_with_chunking(
             text,

@@ -192,7 +192,8 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                             }
                         }))
                 else:
-                    add_result = self.memory._crud.add(
+                    # Use memory.add() to ensure tenant metadata injection via SecureSmartMemory
+                    add_result = self.memory.add(
                         memory_item,
                         ontology_extraction=ontology_extraction
                     )

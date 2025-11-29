@@ -65,9 +65,7 @@ class SimilarityGraphTraversal:
     def query_traversal(
         self, 
         query: str, 
-        max_results: Optional[int] = None,
-        user_id: Optional[str] = None,
-        workspace_id: Optional[str] = None
+        max_results: Optional[int] = None
     ) -> List[MemoryItem]:
         """
         Query-guided graph traversal algorithm.
@@ -84,11 +82,11 @@ class SimilarityGraphTraversal:
         
         Early stopping: When best extracted item > best candidate
         
+        Note: Tenant isolation is handled by the underlying graph's scope_provider.
+        
         Args:
             query: Search query string
             max_results: Maximum number of results (default from config)
-            user_id: User context for multi-tenancy
-            workspace_id: Workspace context for multi-tenancy
             
         Returns:
             List of MemoryItem objects ranked by relevance
@@ -135,7 +133,7 @@ class SimilarityGraphTraversal:
                 logger.debug(f"Extracted item {current_chunk_id}, total: {len(extracted_items)}")
             
             # Get neighbor candidates
-            neighbors = self._get_neighbors(current_chunk_id, visited_chunks, workspace_id)
+            neighbors = self._get_neighbors(current_chunk_id, visited_chunks)
             if not neighbors:
                 logger.info(f"No more neighbors, stopping at {len(extracted_items)} results")
                 break
@@ -165,8 +163,7 @@ class SimilarityGraphTraversal:
     def triangulation_fulldim(
         self, 
         query: str, 
-        max_results: Optional[int] = None,
-        workspace_id: Optional[str] = None
+        max_results: Optional[int] = None
     ) -> List[MemoryItem]:
         """
         Full-dimensional geometric triangulation algorithm.
@@ -181,10 +178,11 @@ class SimilarityGraphTraversal:
         3. Select candidate with centroid closest to query
         4. Repeat until max_results
         
+        Note: Tenant isolation is handled by the underlying graph's scope_provider.
+        
         Args:
             query: Search query string
             max_results: Maximum number of results
-            workspace_id: Workspace context for multi-tenancy
             
         Returns:
             List of MemoryItem objects ranked by relevance
@@ -227,7 +225,7 @@ class SimilarityGraphTraversal:
                 visited_chunks.add(current_chunk_id)
             
             # Get neighbors
-            neighbors = self._get_neighbors(current_chunk_id, visited_chunks, workspace_id)
+            neighbors = self._get_neighbors(current_chunk_id, visited_chunks)
             if not neighbors:
                 logger.info(f"No more neighbors, stopping at {len(extracted_items)} results")
                 break
@@ -297,8 +295,7 @@ class SimilarityGraphTraversal:
     def _get_neighbors(
         self, 
         chunk_id: str, 
-        visited: Set[str],
-        workspace_id: Optional[str] = None
+        visited: Set[str]
     ) -> List[str]:
         """
         Get unvisited neighbors from both graph relationships and vector similarity.
@@ -307,10 +304,11 @@ class SimilarityGraphTraversal:
         1. Graph-based neighbors (explicit relationships)
         2. Vector-based neighbors (semantic similarity)
         
+        Note: Tenant isolation is handled by the underlying graph's scope_provider.
+        
         Args:
             chunk_id: Current chunk ID
             visited: Set of already visited chunk IDs
-            workspace_id: Workspace context for filtering
             
         Returns:
             List of neighbor chunk IDs (limited by config)

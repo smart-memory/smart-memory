@@ -69,7 +69,6 @@ class ConversationAwareLLMExtractor(LLMExtractor):
     def extract(
         self, 
         text: str, 
-        user_id: Optional[str] = None,
         conversation_context: Optional[ConversationContext] = None
     ) -> dict:
         """
@@ -77,7 +76,6 @@ class ConversationAwareLLMExtractor(LLMExtractor):
         
         Args:
             text: Current message text
-            user_id: Optional user ID
             conversation_context: Conversation context with history and entities
             
         Returns:
@@ -85,7 +83,7 @@ class ConversationAwareLLMExtractor(LLMExtractor):
         """
         # If no conversation context, fall back to base extraction
         if not conversation_context:
-            return super().extract(text, user_id)
+            return super().extract(text)
         
         # Build context text from conversation history
         context_text = self._build_context_text(conversation_context)

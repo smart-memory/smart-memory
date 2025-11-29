@@ -79,7 +79,7 @@ class TestMemoryIngestionFlow:
         item = MemoryItem(content="Test content", memory_type="working")
         conv_context = ConversationContext(
             conversation_id="conv_123",
-            user_id="user_456",
+            
             extra={"topic": "testing"}
         )
         

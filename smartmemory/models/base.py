@@ -5,41 +5,13 @@ from smartmemory.models.compat.dataclass_model import DataclassModelMixin
 
 
 @dataclass
-class User(DataclassModelMixin):
-    id: str = ""
-    name: str = ""
-    email: str = ""
-    workspace_id: str = "default_workspace"  # Multi-tenant workspace identifier
-    roles: List[str] = field(default_factory=lambda: ["user"])
-    is_active: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)  # Additional user metadata (tenant_id, etc.)
-
-
-@dataclass
 class MemoryBaseModel(DataclassModelMixin):
     """
-    Base models for all internal business logic models.
+    Base class for all internal business logic models.
     
-    Provides user context and common functionality while using
-    dataclasses for simplicity and performance.
+    Provides common functionality using dataclasses for simplicity and performance.
+    Auth context is handled by scope_provider in the service layer, not here.
     """
-    user: Optional[User] = field(default=None, metadata={"description": "User ID for multi-tenant context"})
-
-    @property
-    def user_id(self) -> Optional[str]:
-        """Convenience property to get user_id from the authenticated user."""
-        return self.user.id if self.user else None
-
-    def set_user(self, user: User) -> None:
-        """Set the authenticated user for this request."""
-        if user is None:
-            from fastapi import HTTPException
-            raise HTTPException(
-                status_code=401,
-                detail="Authentication failed: user cannot be None",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        self.user = user
 
     # ---- Merge helpers on base model so all typed configs inherit them -----
     T = TypeVar("T", bound="MemoryBaseModel")

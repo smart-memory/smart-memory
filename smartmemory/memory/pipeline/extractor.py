@@ -168,7 +168,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
             extractor = self._resolve_extractor('ontology')
             if extractor is None:
                 raise ImportError("ontology extractor not available")
-            user_id = getattr(memory_item, 'user_id', None) or memory_item.metadata.get('user_id')
             # Pull optional knobs from the last validated config if available
             # (Run() sets config; here we grab from a private attr if present, else default)
             cfg = getattr(self, "_current_cfg", None)
@@ -193,7 +192,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                     pass
             result = extractor.extract_entities_and_relations(
                 memory_item.content,
-                user_id,
                 **kwargs,
             )
 
@@ -307,7 +305,6 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
         from smartmemory.memory.pipeline.stages.clustering import aggregate_graphs
         
         content = getattr(memory_item, 'content', str(memory_item))
-        user_id = getattr(memory_item, 'user_id', None)
         
         # Chunk the text
         chunks = chunk_text(
@@ -322,13 +319,12 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
         # Create extraction function for chunks
         def extract_chunk(chunk_text: str) -> Dict[str, Any]:
             # Create a temporary memory item for the chunk
+            # Metadata (including any auth context) is copied from parent
             chunk_item = MemoryItem(
                 content=chunk_text,
                 memory_type=getattr(memory_item, 'memory_type', 'semantic'),
                 metadata=dict(getattr(memory_item, 'metadata', {}))
             )
-            if user_id:
-                chunk_item.user_id = user_id
             
             # Try extractors in order
             for fb_name in fallback_order:

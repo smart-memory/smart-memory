@@ -82,8 +82,7 @@ class ExtractionPipeline:
                                config: ExtractionConfig) -> Dict[str, Any]:
         """Handle ontology-aware extraction with fallback support."""
         try:
-            user_id = getattr(item, 'user_id', None) or item.metadata.get('user_id')
-            result = extractor.extract_entities_and_relations(item.content, user_id)
+            result = extractor.extract_entities_and_relations(item.content)
 
             # Convert OntologyNode objects to MemoryItem objects
             entities = []

@@ -27,7 +27,7 @@ class TestConversationAwareLLMExtractor:
         """Create sample conversation context."""
         context = ConversationContext(
             conversation_id="test_conv",
-            user_id="test_user"
+            
         )
         
         # Add conversation history

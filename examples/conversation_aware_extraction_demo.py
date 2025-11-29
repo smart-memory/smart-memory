@@ -26,7 +26,7 @@ def main():
     
     # Create a new conversation session
     session = conv_manager.create_session(
-        user_id="demo_user",
+        participant_id="demo_user",
         conversation_type="learning"
     )
     context = session.context

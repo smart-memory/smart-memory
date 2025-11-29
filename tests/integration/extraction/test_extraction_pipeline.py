@@ -45,7 +45,7 @@ class TestExtractionPipeline:
             item = MemoryItem(
                 content=text,
                 memory_type="semantic",
-                user_id="test_user"
+                
             )
             
             # Extract entities
@@ -155,7 +155,7 @@ class TestExtractionPipeline:
             MockExtractor.return_value = mock_extractor
             
             # Extract with user context
-            result = mock_extractor.extract(text, user_id=user_id)
+            result = mock_extractor.extract(text)
             
             assert len(result['entities']) == 2
 

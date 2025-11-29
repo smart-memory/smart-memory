@@ -25,3 +25,19 @@ class ScopeProvider(ABC):
         Used for WRITE operations (CREATE, MERGE).
         """
         pass
+
+    @abstractmethod
+    def get_global_search_filters(self) -> Dict[str, Any]:
+        """
+        Return isolation filters for global/shared data searches.
+        Excludes user-level isolation but keeps tenant/workspace boundaries.
+        """
+        pass
+
+    @abstractmethod
+    def get_user_isolation_key(self) -> str:
+        """
+        Return the field name used for user-level isolation.
+        Allows backends to check for user-scoped vs global data without hardcoding.
+        """
+        pass

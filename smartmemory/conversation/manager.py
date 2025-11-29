@@ -24,7 +24,7 @@ class ConversationManager:
 
     def create_session(
             self,
-            user_id: Optional[str] = None,
+            participant_id: Optional[str] = None,
             conversation_type: str = "default",
             session_id: Optional[str] = None,
             context: Optional[ConversationContext] = None,
@@ -33,10 +33,10 @@ class ConversationManager:
         Create a new conversation session with a fresh ConversationContext (unless provided).
         """
         sid = session_id or str(uuid.uuid4())
-        ctx = context or ConversationContext(conversation_id=sid, user_id=user_id)
+        ctx = context or ConversationContext(conversation_id=sid, participant_id=participant_id)
         session = ConversationSession(
             session_id=sid,
-            user_id=user_id,
+            participant_id=participant_id,
             conversation_type=conversation_type,
             context=ctx,
         )

@@ -33,7 +33,7 @@ class TestRealTemporalSearch:
         item = MemoryItem(
             content="Initial content v1",
             memory_type="semantic",
-            user_id="temporal_user",
+            
             metadata={"version": 1}
         )
         item_id = self.memory.add(item)
@@ -105,7 +105,7 @@ class TestRealTemporalSearch:
         # In this test setup, we are manually creating versions, but search_temporal
         # also does a memory.search() first. So we need the item to exist in memory.
         
-        self.memory.add(MemoryItem(content="Content Phase 2", item_id=item_id, user_id="temporal_user"))
+        self.memory.add(MemoryItem(content="Content Phase 2", item_id=item_id, ))
         
         # Search 
         start_time = (t1 - timedelta(seconds=5)).isoformat()

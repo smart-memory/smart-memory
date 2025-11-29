@@ -16,7 +16,7 @@ def test_basic_usage():
     item = MemoryItem(
         content="User prefers Python for data analysis tasks",
         memory_type="semantic",
-        user_id="user123",
+        
         metadata={'topic': 'preferences', 'domain': 'programming'}
     )
     memory.add(item)

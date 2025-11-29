@@ -15,13 +15,24 @@ logger = logging.getLogger(__name__)
 class OntologyRegistry:
     """FalkorDB-based ontology registry manager with graph storage."""
 
-    def __init__(self, config: MemoryConfig = None):
+    def __init__(self, config: MemoryConfig = None, scope_provider=None):
         if config is None:
             config = MemoryConfig()
 
         self.config = config
+        self.scope_provider = scope_provider
         self._init_falkordb_connection()
         self._ensure_registry_schema()
+    
+    def _get_audit_user(self) -> str:
+        """Get user identifier for audit trail from scope_provider."""
+        if self.scope_provider:
+            ctx = self.scope_provider.get_write_context()
+            # Use whatever user identifier the scope_provider provides
+            for key in ctx:
+                if 'user' in key.lower() or 'created_by' in key.lower():
+                    return str(ctx[key])
+        return "unknown"
 
     def _init_falkordb_connection(self):
         """Initialize FalkorDB connection."""
@@ -107,7 +118,7 @@ class OntologyRegistry:
             return ""
         return s.replace("'", "\\'").replace('"', '\\"')
 
-    def create_registry(self, name: str, description: str, domain: str, user_id: str) -> str:
+    def create_registry(self, name: str, description: str, domain: str) -> str:
         """Create a new ontology registry in FalkorDB."""
         if not self.graph:
             raise RuntimeError("FalkorDB not available")
@@ -125,7 +136,8 @@ class OntologyRegistry:
         # Create registry node
         now = datetime.now().isoformat()
         escaped_desc = self._escape_string(description)
-        escaped_user = self._escape_string(user_id)
+        audit_user = self._get_audit_user()
+        escaped_user = self._escape_string(audit_user)
 
         query = f"""
         CREATE (r:Registry {{
@@ -148,10 +160,10 @@ class OntologyRegistry:
             concepts=[], relations=[], taxonomy=[],
             audit=Audit(version="v1.0.0")
         )
-        self._save_snapshot(registry_id, "v1.0.0", empty_ontology, user_id, f"Initial version of {name}")
+        self._save_snapshot(registry_id, "v1.0.0", empty_ontology, f"Initial version of {name}")
 
         # Add initial changelog entry
-        self._add_changelog_entry(registry_id, "v1.0.0", "create", {}, user_id, f"Created registry '{name}'")
+        self._add_changelog_entry(registry_id, "v1.0.0", "create", {}, f"Created registry '{name}'")
 
         return registry_id
 
@@ -187,7 +199,7 @@ class OntologyRegistry:
                 # Get changelog
                 changelog_query = f"""
                 MATCH (c:ChangelogEntry {{registry_id: '{escaped_id}'}})
-                RETURN c.version as version, c.timestamp as timestamp, c.user_id as user_id,
+                RETURN c.version as version, c.timestamp as timestamp, c.changed_by as changed_by,
                        c.message as message, c.action as action, c.changes_summary as changes_summary
                 ORDER BY c.timestamp DESC
                 """
@@ -197,7 +209,7 @@ class OntologyRegistry:
                     changelog.append({
                         "version": cl_row[0],
                         "timestamp": cl_row[1],
-                        "user_id": cl_row[2],
+                        "changed_by": cl_row[2],
                         "message": cl_row[3],
                         "action": cl_row[4],
                         "changes_summary": json.loads(cl_row[5]) if cl_row[5] else {}
@@ -326,7 +338,7 @@ class OntologyRegistry:
                 "metadata": {"error": str(e)}
             }
 
-    def _save_snapshot(self, registry_id: str, version: str, ontology: OntologyIR, user_id: str, message: str):
+    def _save_snapshot(self, registry_id: str, version: str, ontology: OntologyIR, message: str):
         """Save a snapshot to FalkorDB."""
         if not self.graph:
             raise RuntimeError("FalkorDB not available")
@@ -334,7 +346,8 @@ class OntologyRegistry:
         try:
             escaped_id = self._escape_string(registry_id)
             escaped_version = self._escape_string(version)
-            escaped_user = self._escape_string(user_id)
+            audit_user = self._get_audit_user()
+            escaped_user = self._escape_string(audit_user)
             escaped_message = self._escape_string(message)
             ontology_json = self._escape_string(json.dumps(ontology.to_dict()))
             now = datetime.now().isoformat()
@@ -370,7 +383,7 @@ class OntologyRegistry:
             logger.error(f"Failed to save snapshot {registry_id}@{version}: {e}")
             raise
 
-    def _add_changelog_entry(self, registry_id: str, version: str, action: str, changes_summary: Dict, user_id: str, message: str):
+    def _add_changelog_entry(self, registry_id: str, version: str, action: str, changes_summary: Dict, message: str):
         """Add changelog entry to FalkorDB."""
         if not self.graph:
             return
@@ -379,7 +392,8 @@ class OntologyRegistry:
             escaped_id = self._escape_string(registry_id)
             escaped_version = self._escape_string(version)
             escaped_action = self._escape_string(action)
-            escaped_user = self._escape_string(user_id)
+            audit_user = self._get_audit_user()
+            escaped_user = self._escape_string(audit_user)
             escaped_message = self._escape_string(message)
             changes_json = self._escape_string(json.dumps(changes_summary))
             now = datetime.now().isoformat()
@@ -390,7 +404,7 @@ class OntologyRegistry:
                 registry_id: '{escaped_id}',
                 version: '{escaped_version}',
                 timestamp: '{now}',
-                user_id: '{escaped_user}',
+                changed_by: '{escaped_user}',
                 message: '{escaped_message}',
                 action: '{escaped_action}',
                 changes_summary: '{changes_json}'
@@ -411,7 +425,7 @@ class OntologyRegistry:
         except Exception as e:
             logger.error(f"Failed to add changelog entry: {e}")
 
-    def apply_changeset(self, registry_id: str, base_version: str, changeset_dict: Dict[str, Any], user_id: str, message: str = "") -> str:
+    def apply_changeset(self, registry_id: str, base_version: str, changeset_dict: Dict[str, Any], message: str = "") -> str:
         """Apply a changeset to create a new version."""
         registry = self.get_registry(registry_id)
 
@@ -428,7 +442,7 @@ class OntologyRegistry:
         merged_ontology.version = new_version
 
         # Save snapshot
-        self._save_snapshot(registry_id, new_version, merged_ontology, user_id, message or f"Applied changeset from {base_version}")
+        self._save_snapshot(registry_id, new_version, merged_ontology, message or f"Applied changeset from {base_version}")
 
         # Update registry current version
         self._update_registry_version(registry_id, new_version)
@@ -442,7 +456,7 @@ class OntologyRegistry:
 
         self._add_changelog_entry(
             registry_id, new_version, "apply_changeset", changes_summary,
-            user_id, message or f"Applied changeset from {base_version}"
+            message or f"Applied changeset from {base_version}"
         )
 
         return new_version

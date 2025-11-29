@@ -47,7 +47,7 @@ class MemoryItemSerializer:
     
     # System fields that should remain at top level (not in metadata)
     SYSTEM_FIELDS = {
-        'item_id', 'content', 'user_id', 'memory_type', 'group_id',
+        'item_id', 'content', 'memory_type', 'group_id',
         'valid_start_time', 'valid_end_time', 'transaction_time',
         'embedding', 'entities', 'relations', 'node_category'
     }
@@ -157,7 +157,6 @@ class MemoryItemSerializer:
         
         # Validate critical fields
         assert restored.content == item.content, "Content mismatch"
-        assert restored.user_id == item.user_id, "User ID mismatch"
         assert restored.item_id == item.item_id, "Item ID mismatch"
         assert restored.memory_type == item.memory_type, "Memory type mismatch"
         

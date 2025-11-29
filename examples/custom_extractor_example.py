@@ -40,13 +40,12 @@ class RegexExtractor(ExtractorPlugin):
             'phone': re.compile(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'),
         }
     
-    def extract(self, text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def extract(self, text: str) -> Dict[str, Any]:
         """
         Extract entities from text using regex patterns.
         
         Args:
             text: The text to extract from
-            user_id: Optional user ID for context
         
         Returns:
             Dictionary with 'entities' and 'relations' keys
@@ -125,13 +124,12 @@ class CustomNERExtractor(ExtractorPlugin):
             'LLM', 'RAG', 'Vector Database', 'Embedding'
         }
     
-    def extract(self, text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def extract(self, text: str) -> Dict[str, Any]:
         """
         Extract domain-specific entities from text.
         
         Args:
             text: The text to extract from
-            user_id: Optional user ID for context
         
         Returns:
             Dictionary with 'entities' and 'relations' keys

@@ -526,26 +526,21 @@ class FalkorDBBackend(SmartGraphBackend):
             params[param_key] = v
 
         # Apply Scope Provider Isolation
-        filters = self.scope_provider.get_isolation_filters()
-        
         if is_global:
             # Global search: Explicitly exclude user-scoped nodes (Public/Shared nodes)
-            # But enforce Tenant/Workspace boundaries if they exist in context
-            clauses.append("(n.user_id IS NULL)")
+            user_key = self.scope_provider.get_user_isolation_key()
+            clauses.append(f"(n.{user_key} IS NULL)")
             
-            # Enforce Tenant/Workspace isolation even for global searches
-            if "tenant_id" in filters:
-                clauses.append("n.tenant_id = $ctx_tenant_id")
-                params["ctx_tenant_id"] = filters["tenant_id"]
-            if "workspace_id" in filters:
-                clauses.append("n.workspace_id = $ctx_workspace_id")
-                params["ctx_workspace_id"] = filters["workspace_id"]
+            # Enforce isolation filters for global searches (excludes user-level)
+            filters = self.scope_provider.get_global_search_filters()
+            for k, v in filters.items():
+                clauses.append(f"n.{k} = $ctx_{k}")
+                params[f"ctx_{k}"] = v
         else:
             # Scoped search: Enforce all isolation filters (User + Tenant + Workspace)
-            # Note: If user provides a query param that clashes with isolation, isolation wins (AND logic)
+            filters = self.scope_provider.get_isolation_filters()
             for k, v in filters.items():
-                # Skip if the query itself explicitly filters on this key (user overrides? risky)
-                # Ideally isolation is mandatory. We append it as AND.
+                # Skip if the query itself explicitly filters on this key
                 if k not in query:
                     clauses.append(f"n.{k} = $ctx_{k}")
                     params[f"ctx_{k}"] = v
@@ -593,19 +588,17 @@ class FalkorDBBackend(SmartGraphBackend):
         clauses.append(or_clause)
 
         # Apply Scope Provider Isolation
-        filters = self.scope_provider.get_isolation_filters()
-
         if is_global:
             # Global search constraints
-            clauses.append("(n.user_id IS NULL)")
-            if "tenant_id" in filters:
-                clauses.append("n.tenant_id = $ctx_tenant_id")
-                params["ctx_tenant_id"] = filters["tenant_id"]
-            if "workspace_id" in filters:
-                clauses.append("n.workspace_id = $ctx_workspace_id")
-                params["ctx_workspace_id"] = filters["workspace_id"]
+            user_key = self.scope_provider.get_user_isolation_key()
+            clauses.append(f"(n.{user_key} IS NULL)")
+            filters = self.scope_provider.get_global_search_filters()
+            for k, v in filters.items():
+                clauses.append(f"n.{k} = $ctx_{k}")
+                params[f"ctx_{k}"] = v
         else:
             # Scoped search constraints
+            filters = self.scope_provider.get_isolation_filters()
             for k, v in filters.items():
                 clauses.append(f"n.{k} = $ctx_{k}")
                 params[f"ctx_{k}"] = v
@@ -738,8 +731,6 @@ class FalkorDBBackend(SmartGraphBackend):
     def find_entity_by_canonical_key(
             self,
             canonical_key: str,
-            tenant_id: Optional[str] = None,
-            workspace_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Find an existing entity node by its canonical key.
@@ -749,22 +740,19 @@ class FalkorDBBackend(SmartGraphBackend):
         
         Args:
             canonical_key: Normalized key like "john smith|person"
-            tenant_id: Optional tenant filter for multi-tenant isolation
-            workspace_id: Optional workspace filter
             
         Returns:
             Entity node dict with item_id and properties, or None if not found
         """
-        # Build query with optional tenant/workspace filters
+        # Build query with scope isolation filters
         filters = ["n.canonical_key = $canonical_key"]
         params = {"canonical_key": canonical_key}
         
-        if tenant_id:
-            filters.append("n.tenant_id = $tenant_id")
-            params["tenant_id"] = tenant_id
-        if workspace_id:
-            filters.append("n.workspace_id = $workspace_id")
-            params["workspace_id"] = workspace_id
+        # Apply scope provider isolation
+        isolation_filters = self.scope_provider.get_isolation_filters()
+        for k, v in isolation_filters.items():
+            filters.append(f"n.{k} = $ctx_{k}")
+            params[f"ctx_{k}"] = v
             
         where_clause = " AND ".join(filters)
         
@@ -852,10 +840,6 @@ class FalkorDBBackend(SmartGraphBackend):
         entity_id_map = {}  # Map index to actual entity_id for relationship creation
         
         if entity_nodes:
-            # Get tenant/workspace for entity resolution
-            tenant_id = memory_props.get('tenant_id')
-            workspace_id = memory_props.get('workspace_id')
-            
             for i, entity_node in enumerate(entity_nodes):
                 entity_type = entity_node.get('entity_type', 'Entity')
                 entity_props = entity_node.get('properties') or {}
@@ -869,12 +853,10 @@ class FalkorDBBackend(SmartGraphBackend):
                 
                 logger.info(f"Entity resolution: name='{entity_name}', type='{entity_type}', canonical_key='{canonical_key}'")
                 
-                # Try to find existing entity with same canonical key
+                # Try to find existing entity with same canonical key (uses scope_provider for isolation)
                 existing_entity = None
                 if canonical_key:
-                    existing_entity = self.find_entity_by_canonical_key(
-                        canonical_key, tenant_id, workspace_id
-                    )
+                    existing_entity = self.find_entity_by_canonical_key(canonical_key)
                     logger.info(f"Entity lookup result for '{canonical_key}': {existing_entity}")
                 
                 if existing_entity:
@@ -914,19 +896,13 @@ class FalkorDBBackend(SmartGraphBackend):
                         'canonical_key': canonical_key
                     })
 
-                    # Add user context to entity
+                    # Add user context to entity via scope provider
                     if not is_global:
                         write_ctx = self.scope_provider.get_write_context()
                         entity_props.update(write_ctx)
                         
                     entity_props["is_global"] = is_global
                     entity_props["canonical_key"] = canonical_key  # Store for future resolution
-                    
-                    # SECURITY: Add tenant metadata from memory properties for tenant isolation
-                    if tenant_id and 'tenant_id' not in entity_props:
-                        entity_props["tenant_id"] = tenant_id
-                    if workspace_id and 'workspace_id' not in entity_props:
-                        entity_props["workspace_id"] = workspace_id
 
                     # Build entity creation query
                     entity_set_clauses = []

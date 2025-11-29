@@ -116,13 +116,12 @@ class SpacyExtractor(ExtractorPlugin):
             return 'organization'
         return 'concept'
 
-    def extract(self, text: str, user_id: Optional[str] = None) -> dict:
+    def extract(self, text: str) -> dict:
         """
         Extract entities and relationships from text.
         
         Args:
             text: The text to extract from
-            user_id: Optional user ID for context
         
         Returns:
             dict: Dictionary with 'entities' and 'relations' keys

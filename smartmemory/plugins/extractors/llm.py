@@ -86,7 +86,7 @@ class LLMExtractor(ExtractorPlugin):
         self.overrides: Dict[str, Any] = dict(prompt_overrides or {})
         self.cfg = config or LLMExtractorConfig()
     
-    def extract(self, text: str, user_id: Optional[str] = None) -> dict:
+    def extract(self, text: str) -> dict:
         """
         Extract entities and relations from text using two-step LLM process.
         """

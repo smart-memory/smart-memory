@@ -121,7 +121,7 @@ class VectorStore:
         - metadata: dict of additional metadata
         - node_ids: single string or list of graph node IDs
         - chunk_ids: single string or list of chunk IDs
-        - is_global: if True, forcibly remove user_id from metadata (though provider might override)
+        - is_global: if True, skip scope_provider context injection
         
         Filtering is handled automatically by ScopeProvider.
         All IDs are stored in metadata as lists for robust cross-referencing.
@@ -171,7 +171,7 @@ class VectorStore:
     def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False):
         """
         Upsert an embedding to the vector store. Overwrites if the id exists, inserts if not.
-        - is_global: if True, forcibly remove user_id from metadata
+        - is_global: if True, skip scope_provider context injection
         
         Filtering is handled automatically by ScopeProvider.
         """
@@ -251,25 +251,21 @@ class VectorStore:
         hits = []
         count = 0
         
-        # Get context from provider (single source of truth)
-        filters = self.scope_provider.get_isolation_filters()
-        effective_user_id = filters.get("user_id")
-        effective_workspace_id = filters.get("workspace_id")
+        # Get isolation filters from provider (single source of truth)
+        # Provider returns field names and values without core library knowing what they mean
+        filters = {} if is_global else self.scope_provider.get_isolation_filters()
         
         for i, res in enumerate(backend_results):
             id_ = res.get("id")
             meta = res.get("metadata", {})
             
-            # Global searches return everything regardless of scope
-            if effective_user_id is None or is_global:
-                if "user_id" in meta:
-                    continue  # skip user-scoped vectors
-            else:
-                if meta.get("user_id") != effective_user_id:
-                    continue
-                    
-            # If a workspace_id is set, enforce match
-            if effective_workspace_id is not None and meta.get("workspace_id") != effective_workspace_id:
+            # Apply all isolation filters generically
+            skip = False
+            for filter_key, filter_value in filters.items():
+                if filter_value is not None and meta.get(filter_key) != filter_value:
+                    skip = True
+                    break
+            if skip:
                 continue
                 
             hit = {"id": id_}

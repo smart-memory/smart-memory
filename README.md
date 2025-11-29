@@ -570,7 +570,7 @@ The following features are currently under active development:
 
 ## ✅ Recently Completed
 
-### Multi-Tenancy & Scoping (v0.1.23)
+### Multi-Tenancy & Scoping (v0.1.24)
 - ✅ **Complete ScopeProvider architecture**: All filtering through single source of truth
 - ✅ **Optional scoping**: OSS works without configuration, service layer enforces isolation
 - ✅ **Zero hardcoded parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods

@@ -31,9 +31,11 @@ class GovernanceManager:
             ontology_manager: Optional[OntologyManager] = None,
             llm_manager: Optional[LLMOntologyManager] = None,
             smart_memory: Optional[Any] = None,
+            scope_provider: Optional[Any] = None,
     ) -> None:
         self.logger = logging.getLogger(__name__)
-        self.ontology_manager = ontology_manager or OntologyManager()
+        self.scope_provider = scope_provider
+        self.ontology_manager = ontology_manager or OntologyManager(scope_provider=scope_provider)
         self.llm_manager = llm_manager or LLMOntologyManager(self.ontology_manager)
         self.governor = OntologyGovernor(
             ontology_manager=self.ontology_manager,

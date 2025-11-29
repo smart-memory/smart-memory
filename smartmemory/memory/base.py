@@ -76,21 +76,23 @@ class GraphBackedMemory(MemoryBase):
     Consolidates the common pattern from all graph-backed memory stores.
     """
 
-    def __init__(self, memory_type: str = None, graph_class=None, config=None, *args, **kwargs):
+    def __init__(self, memory_type: str = None, graph_class=None, config=None, scope_provider=None, *args, **kwargs):
         super().__init__(memory_type=memory_type, config=config, *args, **kwargs)
+        
+        self.scope_provider = scope_provider
 
-        # Initialize graph backend
+        # Initialize graph backend with scope_provider for tenant isolation
         if graph_class:
             from smartmemory.models.memory_item import MemoryItem
-            self.graph = graph_class(item_cls=MemoryItem)
+            self.graph = graph_class(item_cls=MemoryItem, scope_provider=scope_provider)
         elif hasattr(self, '_graph_clazz') and self._graph_clazz:
             from smartmemory.models.memory_item import MemoryItem
-            self.graph = self._graph_clazz(item_cls=MemoryItem)
+            self.graph = self._graph_clazz(item_cls=MemoryItem, scope_provider=scope_provider)
         else:
             # Default to SmartGraph
             from smartmemory.graph.smartgraph import SmartGraph
             from smartmemory.models.memory_item import MemoryItem
-            self.graph = SmartGraph(item_cls=MemoryItem)
+            self.graph = SmartGraph(item_cls=MemoryItem, scope_provider=scope_provider)
 
     def _add_impl(self, item: MemoryItem, **kwargs) -> Optional[MemoryItem]:
         """Default graph-based add implementation."""

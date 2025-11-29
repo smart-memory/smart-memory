@@ -32,7 +32,7 @@ class ConversationContext:
     """
 
     conversation_id: Optional[str] = None
-    user_id: Optional[str] = None
+    participant_id: Optional[str] = None  # Who is participating in this conversation
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -47,7 +47,7 @@ class ConversationContext:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "conversation_id": self.conversation_id,
-            "user_id": self.user_id,
+            "participant_id": self.participant_id,
             "created_at": self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at,
             "last_updated_at": self.last_updated_at.isoformat() if isinstance(self.last_updated_at, datetime) else self.last_updated_at,
             "topics": list(self.topics or []),
@@ -64,7 +64,7 @@ class ConversationContext:
             return cls()
         ctx = cls(
             conversation_id=data.get("conversation_id"),
-            user_id=data.get("user_id"),
+            participant_id=data.get("participant_id"),
             topics=list(data.get("topics") or []),
             entities=list(data.get("entities") or []),
             sentiment=data.get("sentiment"),

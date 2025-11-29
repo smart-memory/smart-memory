@@ -32,7 +32,7 @@ class TestRealPipelineIntegration:
         item = MemoryItem(
             content="I feel really happy about learning Python today!",
             memory_type="episodic",
-            user_id="pipeline_test_user"
+            
         )
         
         # 2. Add to graph (bypassing normal pipeline to isolate enrichment test)
@@ -85,7 +85,7 @@ class TestRealPipelineIntegration:
         item = MemoryItem(
             content="Important working memory to be consolidated",
             memory_type="working",
-            user_id="evolution_user",
+            
             metadata={"importance": "high"}
         )
         item_id = self.memory.add(item)

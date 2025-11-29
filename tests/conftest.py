@@ -124,25 +124,25 @@ def sample_memory_items():
         MemoryItem(
             content="Python is a programming language",
             memory_type="semantic",
-            user_id="user1",
+            
             metadata={"source": "test", "confidence": 0.9}
         ),
         MemoryItem(
             content="I learned Python yesterday",
             memory_type="episodic",
-            user_id="user1",
+            
             metadata={"timestamp": datetime.now(timezone.utc).isoformat()}
         ),
         MemoryItem(
             content="How to write a function in Python",
             memory_type="procedural",
-            user_id="user1",
+            
             metadata={"steps": ["def", "parameters", "return"]}
         ),
         MemoryItem(
             content="Currently working on memory tests",
             memory_type="working",
-            user_id="user1",
+            
             metadata={"priority": "high"}
         )
     ]
@@ -184,7 +184,7 @@ def conversation_context():
     """Sample conversation context."""
     return ConversationContext(
         conversation_id="test_conv_1",
-        user_id="user1",
+        
         metadata={"topic": "testing", "session_start": datetime.now(timezone.utc).isoformat()}
     )
 
@@ -299,14 +299,12 @@ class TestDataFactory:
     def create_memory_item(
         content: str = "Test content",
         memory_type: str = "semantic",
-        user_id: str = "test_user",
         **kwargs
     ) -> MemoryItem:
         """Create a test memory item."""
         return MemoryItem(
             content=content,
             memory_type=memory_type,
-            user_id=user_id,
             **kwargs
         )
     

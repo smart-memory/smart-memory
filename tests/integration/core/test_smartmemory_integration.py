@@ -33,7 +33,7 @@ class TestSmartMemoryRealBackendIntegration:
         test_item = MemoryItem(
             content="Integration test: Python is a programming language",
             memory_type="semantic",
-            user_id="integration_user",
+            
             metadata={"test": "integration", "timestamp": datetime.now(timezone.utc).isoformat()}
         )
         
@@ -52,7 +52,7 @@ class TestSmartMemoryRealBackendIntegration:
         # Retry logic for eventual consistency if needed
         retrieved_items = []
         for i in range(3):
-            retrieved_items = memory.search("Python programming", user_id="integration_user")
+            retrieved_items = memory.search("Python programming", )
             if retrieved_items:
                 break
             time.sleep(0.5)
@@ -73,19 +73,19 @@ class TestSmartMemoryRealBackendIntegration:
             MemoryItem(
                 content="Machine learning is a subset of artificial intelligence",
                 memory_type="semantic",
-                user_id="integration_user",
+                
                 metadata={"topic": "AI"}
             ),
             MemoryItem(
                 content="Deep learning uses neural networks with multiple layers",
                 memory_type="semantic", 
-                user_id="integration_user",
+                
                 metadata={"topic": "AI"}
             ),
             MemoryItem(
                 content="Cooking pasta requires boiling water and salt",
                 memory_type="procedural",
-                user_id="integration_user",
+                
                 metadata={"topic": "cooking"}
             )
         ]
@@ -95,7 +95,7 @@ class TestSmartMemoryRealBackendIntegration:
             memory.add(item)
         
         # Test similarity search
-        ai_results = memory.search("artificial intelligence neural networks", user_id="integration_user")
+        ai_results = memory.search("artificial intelligence neural networks", )
         assert len(ai_results) >= 2  # Should find both AI-related items
         
         # Verify AI topics are ranked higher than cooking
@@ -111,7 +111,7 @@ class TestSmartMemoryRealBackendIntegration:
         test_item = MemoryItem(
             content="Cache integration test content",
             memory_type="working",
-            user_id="cache_test_user",
+            
             metadata={"cache_test": True}
         )
         
@@ -119,10 +119,10 @@ class TestSmartMemoryRealBackendIntegration:
         memory.add(test_item)
         
         # Search operation - should use cache if available
-        results1 = memory.search("cache integration", user_id="cache_test_user")
+        results1 = memory.search("cache integration", )
         
         # Second identical search - should be faster due to cache
-        results2 = memory.search("cache integration", user_id="cache_test_user")
+        results2 = memory.search("cache integration", )
         
         # Verify results are consistent
         # Extract IDs for comparison to avoid object identity issues
@@ -143,7 +143,7 @@ class TestCrossComponentIntegration:
         test_item = MemoryItem(
             content="Integration test content for sync",
             memory_type="semantic",
-            user_id="test_user",
+            
             metadata={"test": True}
         )
         
@@ -171,7 +171,7 @@ class TestCrossComponentIntegration:
         test_item = MemoryItem(
             content="Pipeline integration test content",
             memory_type="episodic",
-            user_id="test_user"
+            
         )
         
         # Run ingestion
@@ -219,12 +219,12 @@ class TestCrossComponentIntegration:
         memory_item = MemoryItem(
             content="Conversation memory integration test",
             memory_type="working",
-            user_id=user_id,
+            
             metadata={"conversation_id": conversation_id}
         )
         
         memory.add(memory_item)
-        search_results = memory.search("Conversation", user_id=user_id)
+        search_results = memory.search("Conversation")
         
         # Debug print
         print(f"DEBUG: Conversation search results: {search_results}")
@@ -266,7 +266,7 @@ class TestPerformanceIntegration:
                 test_item = MemoryItem(
                     content=f"Concurrent test {operation_id}",
                     memory_type="working",
-                    user_id="concurrent_user"
+                    
                 )
                 result = memory.add(test_item)
                 results.append(result)
