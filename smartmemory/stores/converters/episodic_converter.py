@@ -41,7 +41,7 @@ class EpisodicConverter(MemoryItemConverter):
             'item_id': item.item_id,
             'content': item.content,
             'type': getattr(item, 'type', 'episodic'),
-            'user_id': getattr(item, 'user_id', None),
+            
             'group_id': getattr(item, 'group_id', None),
             'transaction_time': getattr(item, 'transaction_time', None),
             'valid_start_time': getattr(item, 'valid_start_time', None),
@@ -122,7 +122,7 @@ class EpisodicConverter(MemoryItemConverter):
             'item_id': data['item_id'],
             'content': data.get('content', ''),
             'type': data.get('type', 'episodic'),
-            'user_id': data.get('user_id'),
+            
             'group_id': data.get('group_id'),
             'transaction_time': self._parse_datetime(data.get('transaction_time')),
             'valid_start_time': self._parse_datetime(data.get('valid_start_time')),

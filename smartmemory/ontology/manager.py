@@ -22,7 +22,8 @@ from smartmemory.utils import get_config
 class OntologyManager:
     """Main interface for ontology management operations."""
 
-    def __init__(self, storage: OntologyStorage = None):
+    def __init__(self, storage: OntologyStorage = None, scope_provider=None):
+        self.scope_provider = scope_provider
         self.storage = storage or FileSystemOntologyStorage()
         self._active_ontology: Optional[Ontology] = None
 

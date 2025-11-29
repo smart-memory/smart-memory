@@ -42,7 +42,7 @@ class TestEvolverCombinations:
             'working_memory': MemoryItem(
                 content="Currently working on implementing backpropagation algorithm. Need to compute gradients.",
                 memory_type="working",
-                user_id="evolver_test_user",
+                
                 metadata={
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "priority": "high",
@@ -52,7 +52,7 @@ class TestEvolverCombinations:
             'episodic_memory': MemoryItem(
                 content="Yesterday I learned how gradient descent works in neural networks. The learning rate affects convergence.",
                 memory_type="episodic", 
-                user_id="evolver_test_user",
+                
                 metadata={
                     "timestamp": (datetime.now(timezone.utc)).isoformat(),
                     "context": "learning_session",
@@ -62,7 +62,7 @@ class TestEvolverCombinations:
             'semantic_memory': MemoryItem(
                 content="Gradient descent is an optimization algorithm that finds local minima by moving in the direction of steepest descent.",
                 memory_type="semantic",
-                user_id="evolver_test_user",
+                
                 metadata={
                     "concept": "gradient_descent",
                     "domain": "machine_learning",
@@ -72,7 +72,7 @@ class TestEvolverCombinations:
             'procedural_memory': MemoryItem(
                 content="To implement gradient descent: 1) Initialize weights randomly 2) Compute forward pass 3) Calculate loss 4) Backpropagate gradients 5) Update weights",
                 memory_type="procedural",
-                user_id="evolver_test_user",
+                
                 metadata={
                     "skill": "gradient_descent_implementation",
                     "steps": 5,
@@ -82,7 +82,7 @@ class TestEvolverCombinations:
             'old_episodic': MemoryItem(
                 content="Long ago I tried to understand calculus but found it confusing.",
                 memory_type="episodic",
-                user_id="evolver_test_user", 
+                 
                 metadata={
                     "timestamp": "2020-01-01T00:00:00Z",  # Old timestamp
                     "emotional_valence": "negative",
@@ -299,7 +299,7 @@ class TestEvolverCombinations:
         # Test search on memories
         search_results = evolver_memory.search(
             "gradient descent neural networks",
-            user_id="evolver_test_user",
+            
             top_k=10
         )
         
@@ -310,7 +310,7 @@ class TestEvolverCombinations:
         # Test user isolation still works after evolution
         other_user_results = evolver_memory.search(
             "gradient descent neural networks",
-            user_id="different_user",
+            
             top_k=10
         )
         assert len(other_user_results) == 0
@@ -328,9 +328,9 @@ class TestEvolverCombinations:
         
         # Test with malformed items
         malformed_items = [
-            MemoryItem(content="", memory_type="working", user_id="test"),  # Empty content
-            MemoryItem(content=None, memory_type="episodic", user_id="test"),  # None content
-            MemoryItem(content="Test", memory_type="invalid", user_id="test"),  # Invalid type
+            MemoryItem(content="", memory_type="working", ),  # Empty content
+            MemoryItem(content=None, memory_type="episodic", ),  # None content
+            MemoryItem(content="Test", memory_type="invalid", ),  # Invalid type
         ]
         
         for evolver in evolvers:

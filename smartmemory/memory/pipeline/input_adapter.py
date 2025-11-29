@@ -123,6 +123,16 @@ class InputAdapter(PipelineComponent):
 
             # Convert input to MemoryItem
             memory_item = adapter_fn(input_data)
+            
+            # Merge config metadata into item metadata (preserves scope from ScopedPipeline)
+            if config.metadata:
+                if not memory_item.metadata:
+                    memory_item.metadata = {}
+                memory_item.metadata.update(config.metadata)
+            
+            # Apply memory_type from config if specified
+            if config.memory_type:
+                memory_item.memory_type = config.memory_type
 
             # Normalize metadata
             memory_item = self._normalize_metadata(memory_item)

@@ -91,9 +91,9 @@ class ZettelMemory(GraphBackedMemory, CRUDMixin, ArchivingMixin, ValidationMixin
 
     _memory_type = "zettel"
 
-    def __init__(self, config: Optional[MemoryConfig] = None, auto_link: bool = True):
-        super().__init__(config)
-        self.graph = ZettelMemoryGraph()
+    def __init__(self, config: Optional[MemoryConfig] = None, auto_link: bool = True, scope_provider=None):
+        super().__init__(config=config, scope_provider=scope_provider)
+        self.graph = ZettelMemoryGraph(scope_provider=scope_provider)
 
         # Initialize Zettelkasten extensions
         self.backlinks = ZettelBacklinkSystem(self)

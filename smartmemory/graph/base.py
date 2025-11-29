@@ -16,11 +16,12 @@ class BaseMemoryGraph(ABC):
     Includes shared edge property serialization to eliminate code duplication.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scope_provider=None, **kwargs):
         super().__init__()
+        self.scope_provider = scope_provider
         # Initialize with MemoryItem class for consistency
         from smartmemory.models.memory_item import MemoryItem
-        self.graph = SmartGraph(item_cls=MemoryItem)
+        self.graph = SmartGraph(item_cls=MemoryItem, scope_provider=scope_provider)
 
     def _serialize_edge_properties(self, properties: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """

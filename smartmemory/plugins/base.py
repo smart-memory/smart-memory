@@ -264,7 +264,7 @@ class ExtractorPlugin(PluginBase):
         ...             plugin_type="extractor"
         ...         )
         ...     
-        ...     def extract(self, text, user_id=None):
+        ...     def extract(self, text):
         ...         # Extract entities and relations
         ...         entities = [{"name": "John", "type": "person"}]
         ...         relations = [("John", "works_at", "Google")]
@@ -272,13 +272,12 @@ class ExtractorPlugin(PluginBase):
     """
     
     @abstractmethod
-    def extract(self, text: str, user_id: Optional[str] = None) -> dict:
+    def extract(self, text: str) -> dict:
         """
         Extract entities and relationships from text.
         
         Args:
             text: The text to extract from
-            user_id: Optional user ID for context
         
         Returns:
             dict: Dictionary with 'entities' and 'relations' keys

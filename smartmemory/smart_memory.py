@@ -165,7 +165,6 @@ class SmartMemory(MemoryBase):
             extractor_name=None,
             enricher_names=None,
             conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
-            user_id: Optional[str] = None,
             sync: Optional[bool] = None,
             auto_challenge: Optional[bool] = None,
             **kwargs) -> Union[str, Dict[str, Any]]:
@@ -182,7 +181,6 @@ class SmartMemory(MemoryBase):
             extractor_name: Specific extractor to use
             enricher_names: Specific enrichers to use
             conversation_context: Conversation context for conversational memory
-            user_id: User ID for user isolation (sets normalized_item.user_id)
             sync: If True, run full pipeline synchronously; if False, persist and queue for background processing.
                   If None, defaults to sync=True (local mode).
             auto_challenge: If True, automatically challenge factual claims before ingesting.
@@ -205,8 +203,6 @@ class SmartMemory(MemoryBase):
         # Async path: quick persist + queue for background processing
         if not sync:
             normalized_item = self._crud.normalize_item(item)
-            if user_id is not None:
-                normalized_item.user_id = user_id
             add_result = self._crud.add(normalized_item)
             if isinstance(add_result, dict):
                 item_id = add_result.get('memory_node_id')
@@ -222,10 +218,6 @@ class SmartMemory(MemoryBase):
             return {'item_id': item_id, 'queued': queued}
         # Normalize item using CRUD component (eliminates mixed abstraction)
         normalized_item = self._crud.normalize_item(item)
-        
-        # Set user_id if provided (backward compatible)
-        if user_id is not None:
-            normalized_item.user_id = user_id
 
         # Annotate with conversation metadata if provided (non-invasive)
         try:
@@ -306,7 +298,6 @@ class SmartMemory(MemoryBase):
                     item_id=original_id,
                     content=normalized_item.content,
                     metadata=normalized_item.metadata,
-                    changed_by=user_id,
                     change_reason="updated via add()"
                 )
                 # Return a unique ID for the version node, consistent with the expectation that
@@ -381,7 +372,6 @@ class SmartMemory(MemoryBase):
                         item_id=item_id,
                         content=normalized_item.content,
                         metadata=normalized_item.metadata,
-                        changed_by=user_id,
                         change_reason="initial creation"
                     )
             except Exception as e:
