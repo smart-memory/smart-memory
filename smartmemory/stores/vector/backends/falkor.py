@@ -121,6 +121,10 @@ class FalkorVectorBackend(VectorBackend):
         scalars.pop('item_id', None)
         scalars.pop('id', None)  # Also remove 'id' to avoid conflicts
         
+        # Convert numpy array to list if needed (FalkorDB vecf32 requires list)
+        if hasattr(embedding, 'tolist'):
+            embedding = embedding.tolist()
+        
         params: Dict = {"item_id": item_id, "embedding": embedding}
         # Ensure vector literal creation via vecf32($embedding)
         set_parts = ["n.embedding = vecf32($embedding)"]

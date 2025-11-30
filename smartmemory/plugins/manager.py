@@ -134,21 +134,27 @@ class PluginManager:
         
         # Load built-in extractors (all class-based now)
         try:
-            from smartmemory.plugins.extractors.spacy import SpacyExtractor
-            # GLiNER removed - entity-only extraction is incomplete (no relationships)
-            from smartmemory.plugins.extractors.rebel import RebelExtractor
             from smartmemory.plugins.extractors.llm import LLMExtractor
-            from smartmemory.plugins.extractors.relik import RelikExtractor
             from smartmemory.plugins.extractors.conversation_aware_llm import ConversationAwareLLMExtractor
             
-            # All extractors are now class-based - register them directly
+            # Primary extractors
             class_based_extractors = [
-                SpacyExtractor,
-                RebelExtractor,
                 LLMExtractor,
-                RelikExtractor,
                 ConversationAwareLLMExtractor,
             ]
+            
+            # Deprecated extractors (kept for backwards compatibility)
+            try:
+                from smartmemory.plugins.extractors.spacy import SpacyExtractor
+                class_based_extractors.append(SpacyExtractor)
+            except ImportError:
+                pass
+            
+            try:
+                from smartmemory.plugins.extractors.relik import RelikExtractor
+                class_based_extractors.append(RelikExtractor)
+            except ImportError:
+                pass
             
             # Try to load GLiNER2 extractor (optional dependency)
             try:

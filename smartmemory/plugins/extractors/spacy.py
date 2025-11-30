@@ -1,14 +1,25 @@
-from typing import Optional
+"""
+DEPRECATED: spaCy-based entity extractor.
+
+This extractor is deprecated in favor of:
+- HybridGlinerRebelExtractor (GLiNER2 + ReLiK) for local extraction
+- CascadingExtractor for local + LLM enhancement
+- EnsembleExtractor for best quality
+
+GLiNER2 provides better entity extraction than spaCy NER.
+"""
+
+import warnings
 from smartmemory.utils import get_config
 from smartmemory.plugins.base import ExtractorPlugin, PluginMetadata
 
 
 class SpacyExtractor(ExtractorPlugin):
     """
-    spaCy-based entity and relationship extractor.
+    DEPRECATED: spaCy-based entity and relationship extractor.
     
-    Extracts entities and subject-verb-object (SVO) relationships using dependency parsing.
-    Gracefully falls back to regex-based extraction if spaCy is unavailable.
+    Use HybridGlinerRebelExtractor, CascadingExtractor, or EnsembleExtractor instead.
+    GLiNER2 provides better entity extraction than spaCy NER.
     """
     
     # Class-level cache for spaCy model
@@ -21,15 +32,21 @@ class SpacyExtractor(ExtractorPlugin):
             name="spacy",
             version="1.0.0",
             author="SmartMemory Team",
-            description="Entity and relation extraction using spaCy NLP",
+            description="[DEPRECATED] Use HybridGlinerRebelExtractor instead",
             plugin_type="extractor",
             dependencies=["spacy>=3.0.0"],
             min_smartmemory_version="0.1.0",
-            tags=["ner", "relation-extraction", "nlp"]
+            tags=["ner", "relation-extraction", "nlp", "deprecated"]
         )
     
     def __init__(self):
         """Initialize the spaCy extractor."""
+        warnings.warn(
+            "SpacyExtractor is deprecated. Use HybridGlinerRebelExtractor, "
+            "CascadingExtractor, or EnsembleExtractor instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._load_nlp()
     
     def _load_nlp(self):

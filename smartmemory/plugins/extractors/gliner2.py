@@ -181,19 +181,29 @@ class GLiNER2Extractor(ExtractorPlugin):
         """
         Extract relations between entities.
         
-        GLiNER2 can extract structured data - we use this to find relationships.
+        GLiNER2 works best with ontology-defined schemas. Without ontology,
+        we only use co-occurrence based relations.
         """
         relations = []
         
-        # For now, use simple co-occurrence based relations
-        # GLiNER2's extract_json could be used for more sophisticated relation extraction
-        # but that requires defining relation schemas
+        # Build entity name to entity mapping
+        entity_names = {e.metadata.get('name', e.content): e for e in entities}
+        entity_names_lower = {name.lower(): e for name, e in entity_names.items()}
         
-        # Simple heuristic: entities mentioned in same sentence are related
+        # NOTE: GLiNER2's extract_json works well ONLY with specific ontology schemas.
+        # Generic relation extraction is unreliable. When ontology is provided,
+        # the caller should pass relation schemas. For now, skip structured extraction
+        # and use co-occurrence only - it's honest about what it can do.
+        
+        # Fallback: add co-occurrence relations for entity pairs not yet connected
         import re
         sentences = re.split(r'[.!?]+', text)
         
-        entity_names = {e.metadata.get('name', e.content): e for e in entities}
+        # Track which pairs already have relations
+        connected_pairs = set()
+        for rel in relations:
+            pair = tuple(sorted([rel['source_id'], rel['target_id']]))
+            connected_pairs.add(pair)
         
         for sentence in sentences:
             sentence_lower = sentence.lower()
@@ -203,15 +213,18 @@ class GLiNER2Extractor(ExtractorPlugin):
                 if name.lower() in sentence_lower:
                     entities_in_sentence.append(entity)
             
-            # Create RELATED edges between entities in same sentence
+            # Create co-occurrence edges only for unconnected pairs
             for i, e1 in enumerate(entities_in_sentence):
                 for e2 in entities_in_sentence[i+1:]:
-                    relations.append({
-                        'source_id': e1.item_id,
-                        'target_id': e2.item_id,
-                        'relation_type': 'RELATED',
-                        'source': 'gliner2_cooccurrence'
-                    })
+                    pair = tuple(sorted([e1.item_id, e2.item_id]))
+                    if pair not in connected_pairs:
+                        connected_pairs.add(pair)
+                        relations.append({
+                            'source_id': e1.item_id,
+                            'target_id': e2.item_id,
+                            'relation_type': 'occurs_with',
+                            'source': 'gliner2_cooccurrence'
+                        })
         
         return relations
 
