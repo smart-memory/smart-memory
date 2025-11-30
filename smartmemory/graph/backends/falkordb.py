@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from falkordb import FalkorDB
@@ -9,6 +10,28 @@ from smartmemory.interfaces import ScopeProvider
 from smartmemory.scope_provider import DefaultScopeProvider
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_label(label: str) -> str:
+    """
+    Sanitize a string for use as a Neo4j/FalkorDB node label.
+    
+    Labels must:
+    - Start with a letter
+    - Contain only letters, numbers, and underscores
+    - Not contain hyphens, spaces, or special characters
+    """
+    if not label:
+        return "Entity"
+    # Replace hyphens and spaces with underscores
+    sanitized = re.sub(r'[-\s]+', '_', label)
+    # Remove any other non-alphanumeric characters (except underscores)
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '', sanitized)
+    # Ensure it starts with a letter
+    if sanitized and not sanitized[0].isalpha():
+        sanitized = 'E_' + sanitized
+    # Default if empty
+    return sanitized if sanitized else "Entity"
 
 
 class FalkorDBBackend(SmartGraphBackend):
@@ -806,7 +829,7 @@ class FalkorDBBackend(SmartGraphBackend):
         # This is acceptable for now - failures are rare and can be cleaned up.
 
         # Prepare memory node
-        memory_label = memory_type.capitalize()
+        memory_label = sanitize_label(memory_type.capitalize())
         memory_props = flatten_dict(memory_properties)
 
         # Apply scope provider logic
@@ -887,7 +910,7 @@ class FalkorDBBackend(SmartGraphBackend):
                     entity_id = f"{item_id}_entity_{i}"
                     entity_ids.append(entity_id)
                     entity_id_map[i] = entity_id
-                    entity_label = normalize_entity_type(entity_type).capitalize()
+                    entity_label = sanitize_label(normalize_entity_type(entity_type).capitalize())
                     
                     resolved_entities.append({
                         'index': i,

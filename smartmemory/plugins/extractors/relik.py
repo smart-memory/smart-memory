@@ -1,13 +1,25 @@
-from typing import Optional
+"""
+DEPRECATED: Standalone ReLiK extractor.
+
+This extractor is deprecated in favor of:
+- HybridGlinerRebelExtractor (GLiNER2 + ReLiK) for local extraction
+- CascadingExtractor for local + LLM enhancement
+- EnsembleExtractor for best quality
+
+ReLiK is now integrated into the hybrid extractor for better results.
+"""
+
+import warnings
 from smartmemory.plugins.base import ExtractorPlugin, PluginMetadata
 from smartmemory.configuration import MemoryConfig
 
 
 class RelikExtractor(ExtractorPlugin):
     """
-    Relik-based relation extractor.
+    DEPRECATED: Standalone ReLiK extractor.
     
-    Uses the Relik library to extract entity-relation-entity triples.
+    Use HybridGlinerRebelExtractor, CascadingExtractor, or EnsembleExtractor instead.
+    ReLiK is integrated into those extractors for better entity + relation extraction.
     """
     
     @classmethod
@@ -17,15 +29,21 @@ class RelikExtractor(ExtractorPlugin):
             name="relik",
             version="1.0.0",
             author="SmartMemory Team",
-            description="Entity and relation extraction using Relik",
+            description="[DEPRECATED] Use HybridGlinerRebelExtractor instead",
             plugin_type="extractor",
             dependencies=["relik>=0.1.0"],
             min_smartmemory_version="0.1.0",
-            tags=["ner", "relation-extraction", "relik"]
+            tags=["ner", "relation-extraction", "relik", "deprecated"]
         )
     
     def __init__(self):
         """Initialize the Relik extractor."""
+        warnings.warn(
+            "RelikExtractor is deprecated. Use HybridGlinerRebelExtractor, "
+            "CascadingExtractor, or EnsembleExtractor instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.model = None
         self.model_name = None
     
