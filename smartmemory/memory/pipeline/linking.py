@@ -40,7 +40,8 @@ class LinkingEngine(PipelineComponent[LinkingConfig]):
 
             item = context.get('item')
             if not item:
-                logger.warning("No item found in context for vector/graph saving")
+                # This is normal when linking runs after storage has already saved the item
+                logger.debug("No item in context for vector/graph saving (already handled by storage)")
                 context['vector_saved'] = False
                 context['graph_saved'] = False
                 return

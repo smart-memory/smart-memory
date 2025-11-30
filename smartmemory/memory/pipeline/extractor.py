@@ -90,22 +90,25 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
 
     def _get_fallback_order(self, primary: str = None) -> List[str]:
         """Get fallback order for extractors, excluding primary"""
+        # Default fallback order: LLM first, then local
+        default_fallback = ['llm']
+        
         # Read from config but be resilient to ConfigDict fail-fast semantics
         try:
             cfg = get_config('extractor')  # ConfigDict
             try:
                 fallback_order = cfg['fallback_order']  # type: ignore[index]
             except KeyError:
-                fallback_order = ['llm', 'spacy', 'gliner', 'relik']
+                fallback_order = default_fallback
         except Exception:
-            fallback_order = ['llm', 'spacy', 'gliner', 'relik']
+            fallback_order = default_fallback
 
         if primary and isinstance(fallback_order, list):
             try:
                 return [x for x in fallback_order if x != primary]
             except Exception:
                 return []
-        return fallback_order if isinstance(fallback_order, list) else ['llm', 'spacy', 'gliner', 'relik']
+        return fallback_order if isinstance(fallback_order, list) else default_fallback
 
     def validate_config(self, config: ExtractionConfig) -> bool:
         """Validate ExtractorPipeline configuration using typed config"""

@@ -27,8 +27,13 @@ class StorageEngine(PipelineComponent[StorageConfig]):
         self.memory = memory_instance
 
     def _process_extracted_relations(self, context: Dict[str, Any], item_id: str, relations: List) -> int:
-        """Process extracted relations to create relationships in the graph"""
+        """Process extracted relations to create relationships in the graph.
+        
+        Maps extraction entity IDs to storage entity IDs using context['entity_ids'].
+        The entity_ids dict maps both entity names and extraction IDs to storage IDs.
+        """
         edges_created = 0
+        entity_ids = context.get('entity_ids', {})  # Maps entity name/extraction ID -> storage ID
 
         try:
             for relation in relations:
@@ -44,21 +49,29 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                 else:
                     continue
 
-                if not all([source_id, target_id, relation_type]):
+                if not relation_type:
+                    continue
+
+                # Map extraction IDs to storage IDs
+                # entity_ids contains both name->storageID and extractionID->storageID mappings
+                resolved_source = entity_ids.get(source_id, source_id)
+                resolved_target = entity_ids.get(target_id, target_id)
+
+                if not all([resolved_source, resolved_target]):
+                    logger.debug(f"Skipping relation: missing source or target after resolution")
                     continue
 
                 # Create relationship in graph
                 try:
-                    # Use SmartGraph's add_edge method
                     self.memory._graph.add_edge(
-                        source_id=str(source_id),
-                        target_id=str(target_id),
+                        source_id=str(resolved_source),
+                        target_id=str(resolved_target),
                         edge_type=str(relation_type),
                         properties={**properties, "source": "extraction"}
                     )
                     edges_created += 1
                 except Exception as e:
-                    logger.warning(f"Failed to create edge {source_id} -> {relation_type} -> {target_id}: {e}")
+                    logger.warning(f"Failed to create edge {resolved_source} -> {relation_type} -> {resolved_target}: {e}")
                     continue
 
             context['edges_created'] = edges_created
@@ -203,27 +216,40 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                         item_id = add_result.get('memory_node_id')
                         created_entity_ids = add_result.get('entity_node_ids', []) or []
 
-                        # Map entity names to their created IDs
+                        # Map entity names AND extraction IDs to their storage IDs
                         for i, entity in enumerate(entities):
                             if not isinstance(entity, MemoryItem):
                                 continue
-                            if not getattr(entity, 'metadata', None) or 'name' not in entity.metadata:
-                                continue
-
-                            entity_name = entity.metadata['name']
+                            
                             real_id = created_entity_ids[i] if i < len(created_entity_ids) else f"{item_id}_entity_{i}"
-                            entity_ids[entity_name] = real_id
+                            
+                            # Map by name
+                            if getattr(entity, 'metadata', None) and 'name' in entity.metadata:
+                                entity_name = entity.metadata['name']
+                                entity_ids[entity_name] = real_id
+                            
+                            # Also map by extraction entity ID
+                            extraction_id = getattr(entity, 'item_id', None)
+                            if extraction_id:
+                                entity_ids[extraction_id] = real_id
                     else:
                         # Legacy return format (string item_id)
                         item_id = add_result
                         for i, entity in enumerate(entities):
                             if not isinstance(entity, MemoryItem):
                                 continue
-                            if not getattr(entity, 'metadata', None) or 'name' not in entity.metadata:
-                                continue
 
-                            entity_name = entity.metadata['name']
-                            entity_ids[entity_name] = f"{item_id}_entity_{i}"
+                            real_id = f"{item_id}_entity_{i}"
+                            
+                            # Map by name
+                            if getattr(entity, 'metadata', None) and 'name' in entity.metadata:
+                                entity_name = entity.metadata['name']
+                                entity_ids[entity_name] = real_id
+                            
+                            # Also map by extraction entity ID
+                            extraction_id = getattr(entity, 'item_id', None)
+                            if extraction_id:
+                                entity_ids[extraction_id] = real_id
 
                     # Update memory item with generated ID
                     memory_item.item_id = item_id

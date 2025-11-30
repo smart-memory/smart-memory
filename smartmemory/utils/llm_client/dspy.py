@@ -169,27 +169,12 @@ def call_dspy(
     try:
         lm = dspy.LM(provider_model, **lm_kwargs)  # type: ignore[attr-defined]
 
-        # Use thread-local storage to prevent DSPy threading issues
-        # Only configure DSPy if this thread hasn't been configured yet
-        if not hasattr(_thread_local, 'dspy_configured'):
-            dspy.settings.configure(lm=lm)  # type: ignore[attr-defined]
-            _thread_local.dspy_configured = True
-            _thread_local.current_lm = lm
-        else:
-            # If already configured, check if we need to update the LM
-            current_lm = getattr(_thread_local, 'current_lm', None)
-            if current_lm is None or _lm_config_changed(current_lm, lm):
-                # Reset DSPy configuration for this thread
-                dspy.settings.configure(lm=lm)  # type: ignore[attr-defined]
-                _thread_local.current_lm = lm
-
-        # Use the LM interface directly to complete the prompt
-        # Some versions expose .complete(prompt) -> object with .text/.completion
-        # Prefer complete(), else call the LM directly if callable
-        if hasattr(lm, "complete"):
-            result = lm.complete(joined)  # type: ignore[attr-defined]
-        else:
+        # Use DSPy's context manager to handle thread-safe configuration
+        # This avoids the "can only be changed by the thread that initially configured it" error
+        with dspy.context(lm=lm):  # type: ignore[attr-defined]
+            # DSPy 3.x: Call LM directly with prompt, returns list of strings
             result = lm(joined)  # type: ignore[misc]
+            logger.debug(f"DSPy raw result type: {type(result)}, value: {str(result)[:200]}")
         
         # Track token usage from DSPy history
         _track_dspy_usage(lm, model)
