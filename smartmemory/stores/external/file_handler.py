@@ -1,78 +1,182 @@
 import os
-from typing import Any, Dict, List
+import shutil
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.stores.base import BaseHandler
 
 
-class FileHandler(BaseHandler):
+class FileHandler(BaseHandler[MemoryItem]):
     """
-    Handler for file resources (local file paths).
+    Handler for local filesystem resources (file://path/to/file).
     All methods accept and return canonical MemoryItem objects or dicts with at least 'content' and 'item_id'.
-    Supports reading, writing, updating, searching, and deleting files.
+    Supports get, add (write), search (list), and delete.
     """
 
-    def get(self, item: 'MemoryItem', **kwargs) -> 'MemoryItem':
+    def __init__(self, base_path: Optional[str] = None):
         """
-        Retrieve file content as a MemoryItem/dict. Accepts file path, MemoryItem, or dict.
+        Initialize FileHandler.
+        
+        Args:
+            base_path: Optional base directory to restrict operations to (jail).
+                       If None, allows absolute paths (use with caution).
         """
-        if not isinstance(item, MemoryItem):
-            raise TypeError('FileHandler only accepts MemoryItem objects')
-        path = item.item_id or item.metadata.get('path')
-        item_id = item.item_id
-        with open(path, 'r', encoding=kwargs.get('encoding', 'utf-8')) as f:
-            content = f.read()
-        return {'content': content, 'item_id': item_id, 'metadata': {'path': path}}
+        self.base_path = Path(base_path).resolve() if base_path else None
 
-    def add(self, item: 'MemoryItem', **kwargs) -> str:
-        """
-        Add a file. Accepts MemoryItem or dict with 'content' and 'item_id' (or 'path').
-        Returns the file path (item_id).
-        """
-        if not isinstance(item, MemoryItem):
-            raise TypeError('FileHandler only accepts MemoryItem objects')
-        path = item.item_id or item.metadata.get('path')
-        content = item.content
-        with open(path, 'w', encoding=kwargs.get('encoding', 'utf-8')) as f:
-            f.write(content)
+    def _parse_file_uri(self, uri: str) -> Path:
+        """Parse file:// URI to Path object."""
+        if uri.startswith('file://'):
+            path_str = uri[7:]
+            path = Path(path_str)
+        else:
+            path = Path(uri)
+            
+        # If path is relative and we have a base_path, resolve against it
+        if not path.is_absolute() and self.base_path:
+            path = self.base_path / path
+            
+        path = path.resolve()
+        
+        if self.base_path:
+            # Security check: ensure path is within base_path
+            try:
+                path.relative_to(self.base_path)
+            except ValueError:
+                raise ValueError(f"Access denied: Path {path} is outside base directory {self.base_path}")
+                
         return path
 
-    def update(self, item: 'MemoryItem', **kwargs) -> str:
+    def get(self, item: Union[str, MemoryItem], **kwargs) -> Dict[str, Any]:
         """
-        Update a file. Accepts MemoryItem or dict with 'content' and 'item_id' (or 'path').
-        Returns the file path (item_id).
+        Retrieve file content from filesystem.
+        
+        Args:
+            item: MemoryItem or URI string
+            **kwargs: Additional args (encoding, etc.)
+            
+        Returns:
+            Dict with content, item_id, metadata
+        """
+        if isinstance(item, str):
+            uri = item
+            item_id = item
+        elif isinstance(item, MemoryItem):
+            uri = item.metadata.get('uri') or item.item_id
+            item_id = item.item_id
+        else:
+            uri = item.get('metadata', {}).get('uri') or item.get('item_id') or item.get('uri')
+            item_id = item.get('item_id', uri)
+
+        if not uri:
+            raise ValueError("No URI provided for file retrieval")
+
+        path = self._parse_file_uri(uri)
+        
+        try:
+            if not path.exists():
+                return None
+            
+            content = path.read_text(encoding=kwargs.get('encoding', 'utf-8'))
+            return {
+                'content': content,
+                'item_id': item_id,
+                'metadata': {
+                    'uri': f"file://{path}",
+                    'path': str(path),
+                    'size': path.stat().st_size,
+                    'is_file': True
+                }
+            }
+        except Exception as e:
+            raise RuntimeError(f"File get failed: {e}")
+
+    def add(self, item: MemoryItem, **kwargs) -> str:
+        """
+        Write content to filesystem.
+        
+        Args:
+            item: MemoryItem to write
+            **kwargs: encoding, overwrite (bool)
+            
+        Returns:
+            URI string
         """
         if not isinstance(item, MemoryItem):
-            raise TypeError('FileHandler only accepts MemoryItem objects')
-        return self.add(item, **kwargs)
+            raise TypeError('FileHandler only accepts MemoryItem objects for add()')
+            
+        uri = item.metadata.get('uri') or item.item_id
+        if not uri:
+             # If no URI, maybe construct one from item_id if we have a base_path
+             if self.base_path:
+                 uri = f"file://{self.base_path}/{item.item_id}"
+             else:
+                 raise ValueError("No URI provided and no base_path configured")
+                 
+        path = self._parse_file_uri(uri)
+        content = item.content
+        
+        # Ensure parent directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        mode = 'w' if kwargs.get('overwrite', True) else 'x'
+        
+        try:
+            path.write_text(content, encoding=kwargs.get('encoding', 'utf-8'))
+            return f"file://{path}"
+        except FileExistsError:
+            raise FileExistsError(f"File {path} already exists and overwrite=False")
+        except Exception as e:
+            raise RuntimeError(f"File write failed: {e}")
 
-    def search(self, query: str, item: 'MemoryItem', **kwargs) -> List[Dict[str, Any]]:
+    def update(self, item: MemoryItem, **kwargs) -> str:
+        """Alias for add with overwrite=True."""
+        return self.add(item, overwrite=True, **kwargs)
+
+    def search(self, query: str, **kwargs) -> List[str]:
         """
-        Search for lines containing the query in the file. Returns list of dicts with 'line' and 'content'.
+        List files matching glob pattern.
+        
+        Args:
+            query: Glob pattern (e.g. "*.txt")
+            **kwargs: 'path' (optional search root within base_path)
+            
+        Returns:
+            List of file:// URIs
         """
-        if isinstance(item, str):
-            path = item
-        elif MemoryItem is not None and isinstance(item, MemoryItem):
-            path = item.item_id or item.metadata.get('path')
-        else:
-            path = item.get('item_id') or item.get('path')
+        search_root = self.base_path
+        if kwargs.get('path'):
+            search_root = self._parse_file_uri(kwargs.get('path'))
+            
+        if not search_root:
+             # Fallback to current dir if no base_path? Unsafe.
+             raise ValueError("Cannot search without a base directory context")
+             
         results = []
-        with open(path, 'r', encoding=kwargs.get('encoding', 'utf-8')) as f:
-            for i, line in enumerate(f):
-                if query in line:
-                    results.append({'line': i + 1, 'content': line.strip()})
+        for path in search_root.rglob(query):
+            if path.is_file():
+                results.append(f"file://{path}")
         return results
 
-    def delete(self, item: 'MemoryItem', **kwargs) -> bool:
+    def delete(self, item: Union[str, MemoryItem], **kwargs) -> bool:
         """
-        Delete a file. Accepts file path, MemoryItem, or dict.
-        Returns True on success.
+        Delete file from filesystem.
         """
         if isinstance(item, str):
-            path = item
-        elif MemoryItem is not None and isinstance(item, MemoryItem):
-            path = item.item_id or item.metadata.get('path')
+            uri = item
+        elif isinstance(item, MemoryItem):
+            uri = item.metadata.get('uri') or item.item_id
         else:
-            path = item.get('item_id') or item.get('path')
-        os.remove(path)
-        return True
+            uri = item.get('metadata', {}).get('uri') or item.get('item_id')
+
+        if not uri:
+            return False
+
+        path = self._parse_file_uri(uri)
+        try:
+            if path.exists():
+                path.unlink()
+                return True
+            return False
+        except Exception as e:
+            raise RuntimeError(f"File delete failed: {e}")

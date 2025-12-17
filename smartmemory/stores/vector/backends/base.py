@@ -18,6 +18,11 @@ class VectorBackend(ABC):
         ...
 
     @abstractmethod
+    def search_by_text(self, *, query_text: str, top_k: int) -> List[Dict]:
+        """Search using full-text index (BM25 or equivalent)."""
+        ...
+
+    @abstractmethod
     def clear(self) -> None:
         ...
 

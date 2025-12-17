@@ -28,14 +28,35 @@ class JSONFileBackend(PersistenceBackend):
         try:
             with open(file_path, 'r') as f:
                 data = json.load(f)
-                return [model_class.from_dict(item) for item in data]  # All models are AgenticBaseModel
+                results = []
+                for item in data:
+                    if hasattr(model_class, 'model_validate'): # Pydantic v2
+                        results.append(model_class.model_validate(item))
+                    elif hasattr(model_class, 'parse_obj'): # Pydantic v1
+                        results.append(model_class.parse_obj(item))
+                    elif hasattr(model_class, 'from_dict'): # Custom/Legacy
+                        results.append(model_class.from_dict(item))
+                    else:
+                         # Fallback for dataclasses or simple init
+                         results.append(model_class(**item))
+                return results
         except (json.JSONDecodeError, IOError):
             return []
 
     def _save_models(self, model_class: Type[T], models: List[T]) -> None:
-        """Save AgenticBaseModel dataclasses to JSON file."""
+        """Save models to JSON file."""
         file_path = self._get_file_path(model_class)
-        data = [model.to_dict() for model in models]  # All models are AgenticBaseModel
+        data = []
+        for model in models:
+            if hasattr(model, 'model_dump'): # Pydantic v2
+                data.append(model.model_dump())
+            elif hasattr(model, 'dict'): # Pydantic v1
+                data.append(model.dict())
+            elif hasattr(model, 'to_dict'): # Custom/Legacy
+                data.append(model.to_dict())
+            else:
+                data.append(model.__dict__)
+
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=2, default=str)
 
