@@ -248,9 +248,23 @@ class TemporalQueries:
             
             return temporal_results
             
+            
         except Exception as e:
             logger.error(f"Error in temporal search: {e}")
             return []
+
+    def search_during_range(self, query: str, start_time: str, end_time: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Alias for search_temporal to match API router expectations.
+        
+        Args:
+            query: Search query
+            start_time: Start of range
+            end_time: End of range
+            limit: Max results
+        """
+        results = self.search_temporal(query, start_time, end_time)
+        return results[:limit]
     
     def get_changes(
         self,

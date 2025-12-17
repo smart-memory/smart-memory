@@ -30,7 +30,9 @@ from typing import List, Optional, Type, TypeVar
 T = TypeVar('T', bound='PersistentModel')
 
 
-class PersistenceBackend(ABC):
+from typing import Generic
+
+class PersistenceBackend(ABC, Generic[T]):
     """Abstract persistence backend interface for Pydantic models."""
 
     @abstractmethod

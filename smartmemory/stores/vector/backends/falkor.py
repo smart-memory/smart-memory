@@ -81,6 +81,13 @@ class FalkorVectorBackend(VectorBackend):
         except Exception:
             # Let add/search fail later if server truly lacks support
             pass
+            
+        # Create full-text index for keyword search
+        ft_ddl = f"CREATE FULLTEXT INDEX FOR (n:{self.label}) ON EACH [n.content, n.name, n.id]"
+        try:
+            self.graph.query(ft_ddl)
+        except Exception:
+            pass
 
     # ---------- Helpers ----------
     @staticmethod
@@ -162,6 +169,42 @@ class FalkorVectorBackend(VectorBackend):
             except Exception:
                 continue
         return out
+
+    def search_by_text(self, *, query_text: str, top_k: int) -> List[Dict]:
+        """Full-text search using FalkorDB's fulltext index."""
+        # Sanitize query text (simple escape)
+        safe_query = query_text.replace("'", "\\'")
+        
+        # Use CALL db.idx.fulltext.queryNodes
+        q = (
+            "CALL db.idx.fulltext.queryNodes($label, $q) "
+            "YIELD node, score "
+            "RETURN node.id AS id, node AS node, score "
+            "ORDER BY score DESC "
+            "LIMIT $k"
+        )
+        params = {"label": self.label, "q": safe_query, "k": int(top_k) * 2}
+        
+        try:
+            res = self.graph.query(q, params)
+            out: List[Dict] = []
+            for row in getattr(res, "result_set", res) or []:
+                try:
+                    cid = row[0]
+                    node_obj = row[1]
+                    score = row[2]
+                    if hasattr(node_obj, "properties"):
+                        meta = dict(node_obj.properties)
+                    else:
+                        meta = {k: v for k, v in vars(node_obj).items() if not k.startswith("_") and k != "properties"}
+                    meta.pop("embedding", None)
+                    out.append({"id": cid, "metadata": meta, "score": score})
+                except Exception:
+                    continue
+            return out
+        except Exception as e:
+            print(f"Warning: Full-text search failed: {e}")
+            return []
 
     # ---------- Maintenance ----------
     def clear(self) -> None:

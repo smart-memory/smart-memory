@@ -10,6 +10,20 @@ from smartmemory.models.status import StatusLoggerMixin
 from smartmemory.utils import flatten_dict, unflatten_dict
 
 
+# --- Memory Types ---
+# Valid memory types for the system
+MEMORY_TYPES = {
+    'semantic',      # Facts, knowledge, concepts
+    'episodic',      # Events, experiences, interactions
+    'procedural',    # Skills, how-to, procedures
+    'working',       # Short-term, active context
+    'zettel',        # Zettelkasten notes
+    'reasoning',     # Chain-of-thought traces (System 2)
+    'opinion',       # Beliefs with confidence scores (Phase 3)
+    'observation',   # Synthesized entity summaries (Phase 3)
+}
+
+
 # --- MemoryItem ---
 @dataclass(init=False)
 class MemoryItem(MemoryBaseModel, StatusLoggerMixin):

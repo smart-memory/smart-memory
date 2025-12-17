@@ -547,7 +547,7 @@ class SmartMemory(MemoryBase):
         """Delegate resolve_external to ExternalResolver submodule."""
         return self._external_resolver.resolve_external(node)
 
-    def search(self, query: str, top_k: int = 5, memory_type: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None):
+    def search(self, query: str, top_k: int = 5, memory_type: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None, **kwargs):
         """
         Search using canonical search component with automatic scope filtering.
         
@@ -567,7 +567,7 @@ class SmartMemory(MemoryBase):
             if persist_enabled:
                 # Use canonical search for working memory stored in graph
                 # ScopeProvider handles tenant/user filtering automatically
-                results = self._search.search(query, top_k=top_k, memory_type='working')
+                results = self._search.search(query, top_k=top_k, memory_type='working', **kwargs)
                 
                 # Optional: filter by conversation_id when provided
                 conv_id = None
@@ -629,7 +629,7 @@ class SmartMemory(MemoryBase):
         # Use canonical search component directly
         # ScopeProvider handles all tenant/workspace/user filtering automatically
         t0 = perf_counter()
-        results = self._search.search(query, top_k=top_k, memory_type=memory_type)
+        results = self._search.search(query, top_k=top_k, memory_type=memory_type, **kwargs)
         
         # Emit memory_retrieve event for observability
         SmartMemory._MEM_EMIT("memory_retrieve", "search", {

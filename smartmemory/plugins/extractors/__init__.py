@@ -1,7 +1,7 @@
 from .llm import LLMExtractor
 from .gliner2 import GLiNER2Extractor
-from .ensemble import EnsembleExtractor
-from .cascading import CascadingExtractor
+from .hybrid import HybridExtractor
+from .reasoning import ReasoningExtractor
 
 # Deprecated - kept for backwards compatibility
 from .relik import RelikExtractor
@@ -9,10 +9,10 @@ from .spacy import SpacyExtractor
 
 __all__ = [
     # Primary extractors
-    'EnsembleExtractor',      # Best quality: parallel local + LLM
-    'CascadingExtractor',     # Cost-efficient: local first, LLM if needed
+    'HybridExtractor',        # Best quality: parallel local + LLM
     'LLMExtractor',           # Pure LLM
     'GLiNER2Extractor',       # Fast local entities + co-occurrence
+    'ReasoningExtractor',     # System 2: Chain-of-thought traces
     
     # Deprecated
     'RelikExtractor', 

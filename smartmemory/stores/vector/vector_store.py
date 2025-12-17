@@ -239,15 +239,55 @@ class VectorStore:
                 return False
         return False
 
-    def search(self, query_embedding, top_k=5, is_global=False):
+    def search(self, query_embedding, top_k=5, is_global=False, query_text=None, rrf_k=60):
         """
         Search the vector store with automatic scope filtering.
+        Supports hybrid retrieval if query_text is provided.
         
-        If is_global is True, return all results. Otherwise, filter by ScopeProvider.
-        Filtering is handled automatically by ScopeProvider.
+        Args:
+            query_embedding: query vector
+            top_k: number of results to return
+            is_global: if True, return all results. Otherwise, filter by ScopeProvider.
+            query_text: optional text query for hybrid search (BM25)
+            rrf_k: constant for Reciprocal Rank Fusion (default 60)
         """
         t0 = perf_counter()
-        backend_results = self._backend.search(query_embedding=query_embedding, top_k=top_k * 2)
+        
+        # 1. Vector Search
+        vector_results = self._backend.search(query_embedding=query_embedding, top_k=top_k * 2)
+        
+        backend_results = vector_results
+        
+        # 2. Hybrid Search (if query_text provided)
+        if query_text and hasattr(self._backend, 'search_by_text'):
+            text_results = self._backend.search_by_text(query_text=query_text, top_k=top_k * 2)
+            
+            # Perform Reciprocal Rank Fusion (RRF)
+            # score = 1 / (k + rank)
+            rrf_scores = {}
+            doc_map = {}  # Keep track of full doc objects
+            
+            for rank, res in enumerate(vector_results):
+                doc_id = res['id']
+                rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank + 1))
+                doc_map[doc_id] = res
+                
+            for rank, res in enumerate(text_results):
+                doc_id = res['id']
+                rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank + 1))
+                if doc_id not in doc_map:
+                    doc_map[doc_id] = res
+            
+            # Sort by RRF score
+            sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+            
+            # Reconstruct backend_results
+            backend_results = []
+            for doc_id in sorted_ids:
+                doc = doc_map[doc_id]
+                doc['score'] = rrf_scores[doc_id] # Replace score with RRF score
+                backend_results.append(doc)
+                
         hits = []
         count = 0
         

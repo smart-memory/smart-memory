@@ -20,7 +20,7 @@ class Search:
         self.graph = graph
         self.similarity_framework = EnhancedSimilarityFramework()
 
-    def search(self, query: str, top_k: int = 5, memory_type: Optional[str] = None) -> List[MemoryItem]:
+    def search(self, query: str, top_k: int = 5, memory_type: Optional[str] = None, **kwargs) -> List[MemoryItem]:
         """
         Search for memory items using enhanced similarity framework.
         
@@ -28,6 +28,7 @@ class Search:
             query: Search query string
             top_k: Maximum number of results to return
             memory_type: Optional filter by memory type
+            **kwargs: Additional search options (e.g. enable_hybrid=True)
             
         Returns:
             List of MemoryItems ranked by similarity
@@ -54,7 +55,7 @@ class Search:
         try:
             if hasattr(self.graph, 'search') and callable(getattr(self.graph, 'search', None)) and query.strip():
                 # Use SmartGraph's search method which handles text queries efficiently
-                results = self.graph.search(query, top_k=top_k * 2)  # Get more for filtering
+                results = self.graph.search(query, top_k=top_k * 2, **kwargs)  # Get more for filtering
 
                 # Filter by memory type if specified
                 if memory_type and results:

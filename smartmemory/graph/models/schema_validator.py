@@ -151,6 +151,24 @@ class GraphSchemaValidator:
             }
         ))
 
+        # REASONING TRACE NODE SCHEMA (System 2 Memory)
+        self.register_node_schema(NodeSchema(
+            node_type="reasoning",
+            required_fields={"item_id", "content"},
+            optional_fields={"trace_id", "steps", "task_context", "evaluation", "session_id", "has_explicit_markup", "artifact_ids"},
+            field_types={
+                "item_id": str,
+                "content": str,
+                "trace_id": (str, type(None)),
+                "steps": (list, type(None)),
+                "task_context": (dict, type(None)),
+                "evaluation": (dict, type(None)),
+                "session_id": (str, type(None)),
+                "has_explicit_markup": (bool, type(None)),
+                "artifact_ids": (list, type(None))
+            }
+        ))
+
         # ZETTELKASTEN NODE SCHEMAS - CRITICAL MISSING SCHEMAS
 
         # Zettel (note) node schema
@@ -467,6 +485,28 @@ class GraphSchemaValidator:
             required_properties=set(),
             optional_properties={"relation_type", "strength", "confidence", "auto_created"},
             property_types={"relation_type": str, "strength": float, "confidence": float, "auto_created": bool}
+        ))
+
+        # REASONING TRACE EDGE SCHEMAS (System 2 Memory)
+
+        # Reasoning trace causes/produces an artifact
+        self.register_edge_schema(EdgeSchema(
+            edge_type="CAUSES",
+            source_node_types={"reasoning"},
+            target_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity"},
+            required_properties=set(),
+            optional_properties={"confidence", "timestamp", "trace_id"},
+            property_types={"confidence": float, "timestamp": str, "trace_id": str}
+        ))
+
+        # Inverse: artifact was caused by reasoning trace
+        self.register_edge_schema(EdgeSchema(
+            edge_type="CAUSED_BY",
+            source_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity"},
+            target_node_types={"reasoning"},
+            required_properties=set(),
+            optional_properties={"confidence", "timestamp", "trace_id"},
+            property_types={"confidence": float, "timestamp": str, "trace_id": str}
         ))
 
     def register_node_schema(self, schema: NodeSchema):

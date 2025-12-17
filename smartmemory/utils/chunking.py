@@ -22,7 +22,8 @@ def chunk_text(
     text: str,
     chunk_size: int = 5000,
     overlap: int = 200,
-    strategy: str = "sentence"
+    strategy: str = "sentence",
+    similarity_threshold: float = 0.85
 ) -> List[str]:
     """
     Split text into chunks for processing.
@@ -35,6 +36,10 @@ def chunk_text(
             - "character": Simple character-based splitting
             - "sentence": Split on sentence boundaries
             - "paragraph": Split on paragraph boundaries
+            - "recursive": Try paragraph → sentence → character in order
+            - "markdown": Respect markdown headers and code blocks
+            - "semantic": Use embeddings to find topic boundaries
+        similarity_threshold: For semantic chunking, threshold for topic change
             
     Returns:
         List of text chunks
@@ -51,6 +56,12 @@ def chunk_text(
         return _chunk_by_characters(text, chunk_size, overlap)
     elif strategy == "paragraph":
         return _chunk_by_paragraphs(text, chunk_size, overlap)
+    elif strategy == "recursive":
+        return _chunk_recursive(text, chunk_size, overlap)
+    elif strategy == "markdown":
+        return _chunk_by_markdown(text, chunk_size, overlap)
+    elif strategy == "semantic":
+        return _chunk_semantic(text, chunk_size, overlap, similarity_threshold)
     else:  # Default to sentence
         return _chunk_by_sentences(text, chunk_size, overlap)
 
@@ -179,6 +190,227 @@ def _chunk_by_paragraphs(text: str, chunk_size: int, overlap: int) -> List[str]:
     # Don't forget the last chunk
     if current_chunk:
         chunks.append('\n\n'.join(current_chunk))
+    
+    return chunks
+
+
+def _chunk_recursive(text: str, chunk_size: int, overlap: int) -> List[str]:
+    """
+    Recursive chunking: try paragraph → sentence → character in order.
+    
+    Attempts to preserve larger semantic units first, falling back to
+    smaller units when content exceeds chunk_size.
+    """
+    # First try paragraphs
+    paragraphs = re.split(r'\n\s*\n', text)
+    paragraphs = [p.strip() for p in paragraphs if p.strip()]
+    
+    if len(paragraphs) == 1 and len(paragraphs[0]) > chunk_size:
+        # Single paragraph too large, try sentences
+        return _chunk_by_sentences(text, chunk_size, overlap)
+    
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for para in paragraphs:
+        para_length = len(para)
+        
+        if para_length > chunk_size:
+            # Paragraph too large - flush current and recurse
+            if current_chunk:
+                chunks.append('\n\n'.join(current_chunk))
+                current_chunk = []
+                current_length = 0
+            
+            # Recursively chunk the large paragraph by sentences
+            sub_chunks = _chunk_by_sentences(para, chunk_size, overlap)
+            chunks.extend(sub_chunks)
+        elif current_length + para_length + 2 > chunk_size:
+            # Would exceed chunk size - start new chunk
+            if current_chunk:
+                chunks.append('\n\n'.join(current_chunk))
+            current_chunk = [para]
+            current_length = para_length
+        else:
+            current_chunk.append(para)
+            current_length += para_length + 2
+    
+    if current_chunk:
+        chunks.append('\n\n'.join(current_chunk))
+    
+    return chunks
+
+
+def _chunk_by_markdown(text: str, chunk_size: int, overlap: int) -> List[str]:
+    """
+    Markdown-aware chunking that respects headers, code blocks, and lists.
+    
+    Preserves markdown structure by:
+    - Never splitting inside code blocks
+    - Preferring splits at header boundaries
+    - Keeping list items together when possible
+    """
+    # Pattern to identify markdown sections
+    header_pattern = r'(^#{1,6}\s+.*$)'
+    code_block_pattern = r'(```[\s\S]*?```|`[^`]+`)'
+    
+    # Protect code blocks by replacing with placeholders
+    code_blocks = []
+    def save_code_block(match):
+        code_blocks.append(match.group(0))
+        return f"__CODE_BLOCK_{len(code_blocks) - 1}__"
+    
+    protected_text = re.sub(code_block_pattern, save_code_block, text, flags=re.MULTILINE)
+    
+    # Split by headers
+    sections = re.split(r'(^#{1,6}\s+.*$)', protected_text, flags=re.MULTILINE)
+    
+    chunks = []
+    current_chunk = ""
+    current_header = ""
+    
+    for section in sections:
+        if not section.strip():
+            continue
+            
+        # Check if this is a header
+        if re.match(r'^#{1,6}\s+', section):
+            # If current chunk is getting large, flush it
+            if len(current_chunk) + len(section) > chunk_size and current_chunk:
+                # Restore code blocks in current chunk
+                for i, block in enumerate(code_blocks):
+                    current_chunk = current_chunk.replace(f"__CODE_BLOCK_{i}__", block)
+                chunks.append(current_chunk.strip())
+                current_chunk = section
+            else:
+                current_chunk += section
+            current_header = section
+        else:
+            # Regular content
+            if len(current_chunk) + len(section) > chunk_size:
+                if current_chunk:
+                    # Restore code blocks
+                    for i, block in enumerate(code_blocks):
+                        current_chunk = current_chunk.replace(f"__CODE_BLOCK_{i}__", block)
+                    chunks.append(current_chunk.strip())
+                
+                # Start new chunk with overlap (include current header)
+                if current_header:
+                    current_chunk = current_header + "\n" + section
+                else:
+                    current_chunk = section
+            else:
+                current_chunk += "\n" + section
+    
+    # Don't forget the last chunk
+    if current_chunk:
+        for i, block in enumerate(code_blocks):
+            current_chunk = current_chunk.replace(f"__CODE_BLOCK_{i}__", block)
+        chunks.append(current_chunk.strip())
+    
+    # If no markdown structure found, fall back to paragraph chunking
+    if len(chunks) <= 1 and text.strip():
+        return _chunk_by_paragraphs(text, chunk_size, overlap)
+    
+    return [c for c in chunks if c.strip()]
+
+
+def _chunk_semantic(
+    text: str,
+    chunk_size: int,
+    overlap: int,
+    similarity_threshold: float = 0.85
+) -> List[str]:
+    """
+    Semantic chunking using embeddings to detect topic boundaries.
+    
+    Splits text where consecutive sentences have low semantic similarity,
+    indicating a topic change. Falls back to sentence chunking if
+    embeddings are unavailable.
+    
+    Args:
+        text: Input text
+        chunk_size: Maximum chunk size
+        overlap: Overlap between chunks (unused for semantic, kept for API consistency)
+        similarity_threshold: Similarity below which we detect a boundary (0-1)
+    """
+    try:
+        from smartmemory.plugins.embedding import create_embeddings
+        import numpy as np
+    except ImportError:
+        logger.warning("Embeddings unavailable for semantic chunking, falling back to sentence")
+        return _chunk_by_sentences(text, chunk_size, overlap)
+    
+    # Split into sentences first
+    sentence_pattern = r'(?<=[.!?])\s+'
+    sentences = re.split(sentence_pattern, text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    if len(sentences) <= 2:
+        return _chunk_by_sentences(text, chunk_size, overlap)
+    
+    # Generate embeddings for each sentence
+    try:
+        embeddings = []
+        for sentence in sentences:
+            if len(sentence) > 10:  # Skip very short sentences
+                emb = create_embeddings(sentence)
+                if emb is not None:
+                    embeddings.append((sentence, np.array(emb)))
+                else:
+                    embeddings.append((sentence, None))
+            else:
+                embeddings.append((sentence, None))
+    except Exception as e:
+        logger.warning(f"Failed to generate embeddings: {e}, falling back to sentence chunking")
+        return _chunk_by_sentences(text, chunk_size, overlap)
+    
+    # Find semantic boundaries by comparing consecutive sentences
+    def cosine_similarity(a, b):
+        if a is None or b is None:
+            return 1.0  # Assume similar if embeddings unavailable
+        dot = np.dot(a, b)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        if norm_a == 0 or norm_b == 0:
+            return 1.0
+        return dot / (norm_a * norm_b)
+    
+    # Build chunks based on semantic boundaries
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for i, (sentence, embedding) in enumerate(embeddings):
+        sentence_length = len(sentence)
+        
+        # Check if we should create a boundary
+        should_split = False
+        
+        if i > 0 and embedding is not None:
+            prev_sentence, prev_embedding = embeddings[i - 1]
+            if prev_embedding is not None:
+                similarity = cosine_similarity(prev_embedding, embedding)
+                if similarity < similarity_threshold:
+                    should_split = True
+                    logger.debug(f"Semantic boundary detected: similarity={similarity:.3f}")
+        
+        # Force split if chunk is getting too large
+        if current_length + sentence_length + 1 > chunk_size:
+            should_split = True
+        
+        if should_split and current_chunk:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = []
+            current_length = 0
+        
+        current_chunk.append(sentence)
+        current_length += sentence_length + 1
+    
+    # Don't forget the last chunk
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
     
     return chunks
 

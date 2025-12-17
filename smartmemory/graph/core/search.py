@@ -159,8 +159,8 @@ class SmartGraphSearch:
             if hasattr(query_embedding, 'tolist'):
                 query_embedding = query_embedding.tolist()
 
-            # Search vector store for similar embeddings
-            vector_results = vector_store.search(query_embedding, top_k=top_k * 2)  # Get more for filtering
+            # Search vector store for similar embeddings with hybrid retrieval support
+            vector_results = vector_store.search(query_embedding, top_k=top_k * 2, query_text=query_str)  # Get more for filtering
 
             if not vector_results:
                 logger.debug(f"No vector results found for query: {query_str}, triggering fallback")
