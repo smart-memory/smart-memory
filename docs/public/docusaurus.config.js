@@ -11,7 +11,7 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-    url: 'https://docs.smartmemory.ai',
+  url: 'https://docs.smartmemory.ai',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/smart-memory/',
@@ -104,10 +104,16 @@ const config = {
                 value: '<button class="button button--secondary button--sm" onclick="document.documentElement.setAttribute(\'data-theme\', \'light\')">☀️ Light</button>',
               },
               {
-                type: 'html', 
+                type: 'html',
                 value: '<button class="button button--secondary button--sm" onclick="document.documentElement.setAttribute(\'data-theme\', \'dark\')">🌙 Dark</button>',
               },
             ],
+          },
+          {
+            href: 'https://github.com/regression-io/smart-memory',
+            position: 'right',
+            className: 'header-github-link',
+            'aria-label': 'GitHub repository',
           },
         ],
       },
@@ -135,7 +141,7 @@ const config = {
         additionalLanguages: ['python', 'json', 'bash'],
       },
       colorMode: {
-defaultMode: 'light',
+        defaultMode: 'light',
         disableSwitch: false,
         respectPrefersColorScheme: false,
       },

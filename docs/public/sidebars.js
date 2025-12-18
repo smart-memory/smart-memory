@@ -35,6 +35,9 @@ const sidebars = {
         'concepts/hybrid-storage',
         'concepts/ingestion-flow',
         'concepts/similarity-framework',
+        'concepts/hybrid-retrieval',
+        'concepts/reasoning-traces',
+        'concepts/opinions-observations',
         {
           type: 'category',
           label: 'Evolution Algorithms',
