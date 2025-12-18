@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0] - 2025-11-24
+## [0.2.1] - 2025-11-24
 
 ### 🎯 Major: API Clarification - `ingest()` vs `add()`
 
@@ -59,13 +59,13 @@ item_id = memory.add(item)
 
 #### Migration Guide
 
-**Before (v0.2.0)**:
+**Before (v0.2.1)**:
 ```python
 memory.add(item)  # Ran full pipeline (confusing!)
 memory._add_basic(item)  # Simple storage (private method)
 ```
 
-**After (v0.2.0)**:
+**After (v0.2.1)**:
 ```python
 memory.ingest(item)  # Full pipeline (clear intent)
 memory.add(item)     # Simple storage (public, clear intent)
@@ -80,7 +80,7 @@ memory.add(item)     # Simple storage (public, clear intent)
 
 ---
 
-## [0.2.0] - 2025-11-23
+## [0.2.1] - 2025-11-23
 
 ### 🎯 Major: Complete Scoping Architecture Refactor
 
@@ -126,7 +126,7 @@ memory.search("query", user_id="user123")
 memory.run_clustering(tenant_id="tenant456", workspace_id="ws789")
 ```
 
-**After (v0.2.0)**:
+**After (v0.2.1)**:
 ```python
 # OSS: No parameters needed
 memory = SmartMemory()
