@@ -454,7 +454,8 @@ CONFIG_SCHEMA = {
     "background_processing": {"type": "boolean", "default": True}
 }
 ```
-{{ ... }}
+
+### Environment-Specific Configurations
 - **Development**: Local backends, debug logging
 - **Testing**: In-memory storage, mock services
 - **Staging**: Production-like setup with test data

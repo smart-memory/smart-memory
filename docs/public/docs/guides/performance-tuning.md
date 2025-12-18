@@ -192,7 +192,7 @@ results = {q: memory.search(q, top_k=10, memory_type="semantic") for q in querie
 ### Bulk Operations
 
 #### Batch Ingestion
-{{ ... }}
+
 ```python
 # Efficient batch processing
 items = [
