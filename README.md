@@ -31,6 +31,9 @@ SmartMemory implements a multi-layered memory architecture with the following co
 - **Episodic Memory**: Personal experiences and learning history
 - **Procedural Memory**: Skills, strategies, and learned patterns
 - **Zettelkasten Memory**: Bidirectional note-taking system with AI-powered knowledge discovery
+- **Reasoning Memory**: Chain-of-thought traces capturing "why" decisions were made (System 2)
+- **Opinion Memory**: Beliefs with confidence scores, reinforced or contradicted over time
+- **Observation Memory**: Synthesized entity summaries from scattered facts
 
 ### Storage Backend
 

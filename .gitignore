@@ -177,3 +177,4 @@ test_data/
 *.md
 !docs/public/*.md
 !DESIGN_STANDARDS.md
+!CHANGELOG.md
