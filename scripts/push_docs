@@ -2,7 +2,7 @@
 set -e
 
 # Absolute path to project root
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SMARTMEMORY_DOCS_DIR="$PROJECT_ROOT/docs/public"
 SMARTMEMORY_BUILD_DIR="$SMARTMEMORY_DOCS_DIR/build"
 MAYA_DOCS_DIR="$PROJECT_ROOT/../maya/docs/public"
@@ -233,26 +233,26 @@ prepare_deployment() {
 sync_to_s3() {
     log_info "Syncing Maya documentation to S3 at https://docs.smartmemory.ai/maya..."
 
-    # Sync Maya docs to S3 with cache control
-    log_info "Syncing Maya docs to s3://docs.smartmemory.ai/maya (visit https://docs.smartmemory.ai/maya)..."
-    aws s3 sync "$DEPLOY_DIR/maya" s3://docs.smartmemory.ai/maya --delete --profile reg \
-        --cache-control "public, max-age=3600" --metadata-directive REPLACE
-    
-    # Set longer cache for static assets
-    log_info "Setting long cache for Maya static assets at https://docs.smartmemory.ai/maya..."
-    aws s3 sync "$DEPLOY_DIR/maya" s3://docs.smartmemory.ai/maya \
-        --exclude "*" \
-        --include "*.css" \
-        --include "*.js" \
-        --include "*.png" \
-        --include "*.jpg" \
-        --include "*.jpeg" \
-        --include "*.gif" \
-        --include "*.svg" \
-        --include "*.ico" \
-        --cache-control "public, max-age=31536000" \
-        --metadata-directive REPLACE \
-        --profile reg
+    # Sync Maya docs to S3 - commented out as Maya build is disabled
+    # log_info "Syncing Maya docs to s3://docs.smartmemory.ai/maya (visit https://docs.smartmemory.ai/maya)..."
+    # aws s3 sync "$DEPLOY_DIR/maya" s3://docs.smartmemory.ai/maya --delete --profile reg \
+    #     --cache-control "public, max-age=3600" --metadata-directive REPLACE
+    # 
+    # # Set longer cache for static assets
+    # log_info "Setting long cache for Maya static assets at https://docs.smartmemory.ai/maya..."
+    # aws s3 sync "$DEPLOY_DIR/maya" s3://docs.smartmemory.ai/maya \
+    #     --exclude "*" \
+    #     --include "*.css" \
+    #     --include "*.js" \
+    #     --include "*.png" \
+    #     --include "*.jpg" \
+    #     --include "*.jpeg" \
+    #     --include "*.gif" \
+    #     --include "*.svg" \
+    #     --include "*.ico" \
+    #     --cache-control "public, max-age=31536000" \
+    #     --metadata-directive REPLACE \
+    #     --profile reg
 
     # Sync SmartMemory docs to S3
     log_info "Syncing SmartMemory docs to s3://docs.smartmemory.ai/smart-memory for Maya at https://docs.smartmemory.ai/maya..."
@@ -352,15 +352,15 @@ main() {
     if [ "$deploy_only" = false ]; then
         local build_success=true
 
-        # Build Maya docs
-        if ! build_maya_docs; then
-            build_success=false
-        fi
+        # Build Maya docs - commented out due to MDX issues in studio-mvp-plan.md
+        # if ! build_maya_docs; then
+        #     build_success=false
+        # fi
 
-        # Build React site (landing page)
-        if ! build_react_site; then
-            build_success=false
-        fi
+        # Build React site (landing page) - commented out as root-page doesn't exist
+        # if ! build_react_site; then
+        #     build_success=false
+        # fi
 
         if [ "$architecture_only" = false ]; then
             if ! build_smartmemory_docs; then
