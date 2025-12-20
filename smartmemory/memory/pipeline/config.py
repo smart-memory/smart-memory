@@ -170,21 +170,20 @@ class PipelineConfigBundle(MemoryBaseModel):
 
     def __post_init__(self):
         # Initialize default configs if None
-        # Pass user context to sub-configs (may be None, which is fine)
         if self.input_adapter is None:
-            self.input_adapter = InputAdapterConfig(user=self.user)
+            self.input_adapter = InputAdapterConfig()
         if self.classification is None:
-            self.classification = ClassificationConfig(user=self.user)
+            self.classification = ClassificationConfig()
         if self.extraction is None:
-            self.extraction = ExtractionConfig(user=self.user)
+            self.extraction = ExtractionConfig()
         if self.storage is None:
-            self.storage = StorageConfig(user=self.user)
+            self.storage = StorageConfig()
         if self.linking is None:
-            self.linking = LinkingConfig(user=self.user)
+            self.linking = LinkingConfig()
         if self.enrichment is None:
-            self.enrichment = EnrichmentConfig(user=self.user)
+            self.enrichment = EnrichmentConfig()
         if self.grounding is None:
-            self.grounding = GroundingConfig(user=self.user)
+            self.grounding = GroundingConfig()
 
     def get_config_for_stage(self, stage: str) -> Optional[MemoryBaseModel]:
         """Get configuration for a specific pipeline stage."""
