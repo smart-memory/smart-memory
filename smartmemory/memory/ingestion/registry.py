@@ -38,18 +38,11 @@ class IngestionRegistry:
         
         # Import classes (lightweight, no model loading)
         try:
-            from smartmemory.plugins.extractors import SpacyExtractor, LLMExtractor, RebelExtractor, RelikExtractor
-            from smartmemory.extraction.extractor import OntologyExtractor
+            from smartmemory.plugins.extractors import LLMExtractor
             
-            # Register extractor classes
-            self.register_extractor_class('spacy', SpacyExtractor)
             self.register_extractor_class('llm', LLMExtractor)
-            self.register_extractor_class('gpt4o_triple', LLMExtractor)  # Alias
-            self.register_extractor_class('rebel', RebelExtractor)
-            self.register_extractor_class('relik', RelikExtractor)
-            self.register_extractor_class('ontology', OntologyExtractor)
         except ImportError as e:
-            logger.warning(f"Failed to import some extractors: {e}")
+            logger.warning(f"Failed to import LLM extractor: {e}")
 
     def register_adapter(self, name: str, adapter_fn: Callable):
         """Register a new input adapter by name."""
