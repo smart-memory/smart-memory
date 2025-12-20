@@ -132,22 +132,50 @@ print(f"Total memories: {summary['total_items']}")
 ### Multi-Tenant Usage (Service Layer)
 
 For production multi-tenant applications, use the [smart-memory-service](https://github.com/smart-memory/smart-memory-service) which provides:
-- Automatic tenant isolation via `ScopeProvider`
-- JWT authentication
+- Automatic tenant isolation via `MemoryScopeProvider`
+- JWT authentication with `ServiceUser` model
 - Team and workspace management
 - RESTful API with FastAPI
+- Three isolation levels: TENANT, WORKSPACE (default), USER
 
 ```python
 # Service layer automatically handles scoping
-from service_common.security import create_secure_smart_memory
+from service_common.security import SecureSmartMemory, MemoryScopeProvider
+from service_common.auth.models import ServiceUser
 
-# Scope provider is injected automatically based on authenticated user
-memory = create_secure_smart_memory(user, request_scope=scope)
+# Create scope provider from authenticated user
+scope_provider = MemoryScopeProvider(
+    user=authenticated_user,  # ServiceUser with tenant_id, user_id
+    request_scope=request_scope,  # RequestScope with workspace_id, team_id
+    isolation_level=IsolationLevel.WORKSPACE
+)
+
+# Create secure memory instance
+memory = SecureSmartMemory(
+    tenant_context=TenantContext.from_user(authenticated_user),
+    user=authenticated_user,
+    scope_provider=scope_provider
+)
 
 # All operations automatically tenant-scoped
-memory.ingest(content)  # Full pipeline, stamped with tenant_id
-memory.add(item)        # Simple storage, stamped with tenant_id
-memory.search("query")  # Filtered by tenant
+memory.ingest(content)  # Full pipeline, stamped with tenant_id, workspace_id, user_id
+memory.add(item)        # Simple storage, stamped with security metadata
+memory.search("query")  # Filtered by workspace_id (or user_id if USER isolation)
+```
+
+**FastAPI Integration:**
+```python
+from fastapi import Depends
+from service_common.security import get_secure_smart_memory
+
+@router.post("/memories")
+async def add_memory(
+    content: str,
+    memory: SecureSmartMemory = Depends(get_secure_smart_memory)
+):
+    # Automatically scoped to authenticated user's tenant/workspace
+    item_id = memory.ingest(content)
+    return {"item_id": item_id}
 ```
 
 ### Using Different Memory Types
@@ -439,7 +467,12 @@ class SmartMemory:
 - `ingest()` - Full agentic pipeline: extract → store → link → enrich → evolve. Use for user-facing ingestion.
 - `add()` - Simple storage: normalize → store → embed. Use for internal operations or when pipeline is not needed.
 
-**Note**: All methods automatically use `ScopeProvider` for filtering. No `user_id`, `tenant_id`, or `workspace_id` parameters needed - scoping is handled transparently.
+**Scoping:**
+- OSS mode: No scoping needed, all data accessible
+- Service mode: All methods automatically use `ScopeProvider` for filtering
+- No `user_id`, `tenant_id`, or `workspace_id` parameters on methods
+- Security metadata automatically injected on writes, filtered on reads
+- See `docs/SECURITY_AND_AUTH.md` for complete details
 
 ### MemoryItem Class
 
@@ -460,7 +493,11 @@ class MemoryItem:
     metadata: dict = field(default_factory=dict)
 ```
 
-**Note**: `user_id`, `workspace_id`, `tenant_id`, and `team_id` are automatically injected by `ScopeProvider` when using the service layer. For OSS usage, these fields are optional.
+**Security Metadata:**
+- `user_id`, `workspace_id`, `tenant_id`, `team_id` are automatically injected by `MemoryScopeProvider` in service layer
+- For OSS usage, these fields are not needed
+- Never pass these as parameters - use `ScopeProvider` instead
+- See `docs/SECURITY_AND_AUTH.md` for multi-tenancy details
 
 ## Dependencies
 
@@ -535,7 +572,8 @@ External plugins use the `standard` security profile by default. See `docs/PLUGI
 - **📚 Documentation**: https://docs.smartmemory.ai
 - **🐙 GitHub Repository**: https://github.com/smart-memory/smart-memory
 - **🐛 Issue Tracker**: https://github.com/smart-memory/smart-memory/issues
-- **🔒 Security Policy**: See `docs/PLUGIN_SECURITY.md`
+- **🔒 Security & Auth**: See `docs/SECURITY_AND_AUTH.md`
+- **🔐 Plugin Security**: See `docs/PLUGIN_SECURITY.md`
 - **🚀 Production Service**: https://github.com/smart-memory/smart-memory-service
 
 ---
@@ -573,11 +611,18 @@ The following features are currently under active development:
 
 ## ✅ Recently Completed
 
-### Multi-Tenancy & Scoping (v0.2.2)
-- ✅ **Complete ScopeProvider architecture**: All filtering through single source of truth
-- ✅ **Optional scoping**: OSS works without configuration, service layer enforces isolation
-- ✅ **Zero hardcoded parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods
-- ✅ **Tenant isolation**: Full multi-tenancy support in smart-memory-service
-- ✅ **Team collaboration**: Team and workspace management
+### Multi-Tenancy & Security (v0.2.2)
+- ✅ **MemoryScopeProvider**: Single source of truth for all security decisions
+- ✅ **SecureSmartMemory**: Tenant-aware wrapper with automatic metadata injection
+- ✅ **ServiceUser Model**: Rich user model with tenant_id, team memberships, roles
+- ✅ **Three Isolation Levels**: TENANT, WORKSPACE (default), USER
+- ✅ **Auth-Agnostic Core**: Core library works without any auth configuration
+- ✅ **Automatic Filtering**: All reads filtered by workspace/tenant/user
+- ✅ **Metadata Injection**: All writes stamped with security context
+- ✅ **Ownership Validation**: Updates/deletes check ownership via scope provider
+- ✅ **FastAPI Integration**: Dependency injection for automatic scoping
+- ✅ **Zero Manual Parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods
+
+**See `docs/SECURITY_AND_AUTH.md` for complete security documentation.**
 
 Check the [GitHub repository](https://github.com/smart-memory/smart-memory) for the latest updates.
