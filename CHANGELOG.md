@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Security & Authentication Documentation
+- **New documentation**: `docs/SECURITY_AND_AUTH.md` - Comprehensive guide to SmartMemory's security architecture
+- **Updated**: `README.md` - Added security/auth examples and references
+- **Updated**: `docs/ARCHITECTURE.md` - Enhanced multi-tenancy section with isolation levels
+
 #### System 2 Memory: Reasoning Traces
 - **New memory type**: `reasoning` - Captures chain-of-thought reasoning traces
 - **New extractor**: `ReasoningExtractor` - Extracts reasoning from Thought:/Action:/Observation: markers or via LLM detection
