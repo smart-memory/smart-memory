@@ -212,7 +212,7 @@ class GlobalClustering:
         Strategy: Prefer the one with the longest name (most descriptive),
         or highest confidence if available.
         """
-        from smartmemory import MemoryItem
+        from smartmemory.models.memory_item import MemoryItem
 
         # Fetch full nodes to check properties
         candidates = []
