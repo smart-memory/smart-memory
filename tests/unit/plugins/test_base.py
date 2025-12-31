@@ -181,15 +181,15 @@ class TestVersionCompatibility:
     
     def test_compatible_version(self):
         """Test compatible version."""
-        assert check_version_compatibility("0.2.2", "0.1.0") is True
+        assert check_version_compatibility("0.2.3", "0.1.0") is True
     
     def test_incompatible_min_version(self):
         """Test incompatible minimum version."""
-        assert check_version_compatibility("0.1.0", "0.2.2") is False
+        assert check_version_compatibility("0.1.0", "0.2.3") is False
     
     def test_compatible_with_max_version(self):
         """Test compatible with max version."""
-        assert check_version_compatibility("0.2.2", "0.1.0", "0.3.0") is True
+        assert check_version_compatibility("0.2.3", "0.1.0", "0.3.0") is True
     
     def test_incompatible_max_version(self):
         """Test incompatible maximum version."""

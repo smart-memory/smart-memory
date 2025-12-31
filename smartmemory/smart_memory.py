@@ -1,8 +1,9 @@
 import logging
 from time import perf_counter
-from typing import Optional, List, Union, Any, Dict
+from typing import Optional, Union, Any, Dict, List
 
 from smartmemory.conversation.context import ConversationContext
+from smartmemory.memory.pipeline.config import PipelineConfigBundle
 from smartmemory.observability.instrumentation import make_emitter
 from smartmemory.graph.smartgraph import SmartGraph
 from smartmemory.integration.archive.archive_provider import get_archive_provider
@@ -165,6 +166,7 @@ class SmartMemory(MemoryBase):
             extractor_name=None,
             enricher_names=None,
             conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
+            pipeline_config: Optional[PipelineConfigBundle] = None,
             sync: Optional[bool] = None,
             auto_challenge: Optional[bool] = None,
             **kwargs) -> Union[str, Dict[str, Any]]:
@@ -338,6 +340,7 @@ class SmartMemory(MemoryBase):
             converter_name=converter_name,
             extractor_name=extractor_name,
             enricher_names=pipeline,
+            pipeline_config=pipeline_config,
         )
 
         # Delegate evolution to EvolutionOrchestrator (fail fast)
