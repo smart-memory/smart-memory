@@ -393,19 +393,27 @@ Respond in JSON format:
 
 Only respond with the JSON, no other text."""
 
-            response = call_llm(prompt, max_tokens=500)
+            parsed_result, response = call_llm(
+                user_content=prompt,
+                max_output_tokens=500,
+                response_format={"type": "json_object"}
+            )
             
             # Parse response
             import json
             import re
             
-            # Extract JSON from response
-            json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
-            if not json_match:
-                logger.warning("Could not parse LLM response as JSON")
-                return None
-            
-            result = json.loads(json_match.group())
+            # Use parsed_result if available, otherwise extract JSON from response
+            if parsed_result:
+                result = parsed_result
+            else:
+                # Extract JSON from response
+                json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+                if not json_match:
+                    logger.warning("Could not parse LLM response as JSON")
+                    return None
+                
+                result = json.loads(json_match.group())
             
             if not result.get("contradicts", False):
                 return None
@@ -983,15 +991,22 @@ Respond in JSON format:
 If you cannot determine which is correct with at least 70% confidence, respond with "unknown".
 Only respond with the JSON, no other text."""
 
-            response = call_llm(prompt, max_tokens=500)
+            parsed_result, response = call_llm(
+                user_content=prompt,
+                max_output_tokens=500,
+                response_format={"type": "json_object"}
+            )
             
             # Parse response
             import json
-            json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
-            if not json_match:
-                return None
-            
-            result = json.loads(json_match.group())
+            if parsed_result:
+                result = parsed_result
+            else:
+                json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+                if not json_match:
+                    return None
+                
+                result = json.loads(json_match.group())
             
             correct = result.get("correct_statement", "unknown")
             confidence = float(result.get("confidence", 0.0))

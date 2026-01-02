@@ -1,5 +1,5 @@
 """Persistence layer exports."""
-# from .entity_handler import EntityHandler
+from .entity_handler import EntityHandler
 from .ontology_handlers import (
     OntologyHandlers,
     OntologyRegistryHandler,

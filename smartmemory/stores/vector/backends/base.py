@@ -57,4 +57,5 @@ def create_backend(name: str, collection_name: str, persist_directory: Optional[
             f"Unknown vector backend: '{name}'. Available backends: {available}."
         )
     cls = _BACKENDS[key]
+    # noinspection PyArgumentList
     return cls(collection_name, persist_directory)

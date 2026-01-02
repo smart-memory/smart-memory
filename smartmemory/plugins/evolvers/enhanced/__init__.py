@@ -7,12 +7,15 @@ human memory consolidation processes.
 """
 
 import importlib
-from smartmemory.plugins.evolvers.enhanced.exponential_decay import ExponentialDecayEvolver
-from smartmemory.plugins.evolvers.enhanced.interference_based_consolidation import InterferenceBasedConsolidationEvolver
-from smartmemory.plugins.evolvers.enhanced.retrieval_based_strengthening import RetrievalBasedStrengtheningEvolver
 from typing import Any, Dict, Optional, Type
 
 from smartmemory.plugins.evolvers.enhanced.working_to_episodic import EnhancedWorkingToEpisodicEvolver
+
+# Note: These evolvers are registered in the registry but modules don't exist yet
+# They can be imported dynamically when needed via the registry system
+# from smartmemory.plugins.evolvers.enhanced.exponential_decay import ExponentialDecayEvolver
+# from smartmemory.plugins.evolvers.enhanced.interference_based_consolidation import InterferenceBasedConsolidationEvolver
+# from smartmemory.plugins.evolvers.enhanced.retrieval_based_strengthening import RetrievalBasedStrengtheningEvolver
 
 # Enhanced evolver list including new algorithms
 ENHANCED_EVOLVERS = [

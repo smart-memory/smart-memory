@@ -118,6 +118,7 @@ class WorkingMemory(MemoryBase):
             
             # Update the item in storage if available
             if hasattr(self, 'update') and callable(self.update):
+                # noinspection PyArgumentList
                 self.update(item)
         
         # Clear the in-memory buffer

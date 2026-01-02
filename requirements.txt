@@ -12,3 +12,5 @@ scikit-learn
 slack_sdk
 boto3
 dspy
+rank_bm25
+sentence-transformers

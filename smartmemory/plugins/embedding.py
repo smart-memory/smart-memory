@@ -112,9 +112,17 @@ class EmbeddingService:
             # Lazy load model and tokenizer (cache for reuse)
             if self._hf_tokenizer is None or self._hf_model_instance is None:
                 logger.info(f"Loading HuggingFace model: {self.hf_model}")
-                self._hf_tokenizer = AutoTokenizer.from_pretrained(self.hf_model)
-                self._hf_model_instance = AutoModel.from_pretrained(self.hf_model)
-                self._hf_model_instance.eval()  # Set to evaluation mode
+                try:
+                    self._hf_tokenizer = AutoTokenizer.from_pretrained(self.hf_model)
+                    self._hf_model_instance = AutoModel.from_pretrained(self.hf_model)
+                    self._hf_model_instance.eval()  # Set to evaluation mode
+                except Exception as load_error:
+                    logger.error(f"Failed to load HuggingFace model: {load_error}")
+                    raise RuntimeError(f"Failed to load HuggingFace model '{self.hf_model}': {load_error}")
+            
+            # Verify tokenizer and model are loaded before using
+            if self._hf_tokenizer is None or self._hf_model_instance is None:
+                raise RuntimeError("HuggingFace tokenizer or model is None after loading attempt")
             
             # Tokenize and generate embeddings
             inputs = self._hf_tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)

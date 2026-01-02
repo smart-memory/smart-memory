@@ -449,6 +449,7 @@ class SmartMemory(MemoryBase):
             t0 = perf_counter()
             result = self._crud.add(item, **kwargs)
             # Emit memory_store event for observability
+            # noinspection PyArgumentList
             SmartMemory._MEM_EMIT("memory_store", "add", {
                 "item_id": result,
                 "memory_type": memory_type,
@@ -472,6 +473,7 @@ class SmartMemory(MemoryBase):
         t0 = perf_counter()
         result = self._crud.get(item_id)
         # Emit memory_retrieve event for observability
+        # noinspection PyArgumentList
         SmartMemory._MEM_EMIT("memory_retrieve", "get", {
             "item_id": item_id,
             "found": result is not None,
@@ -539,6 +541,7 @@ class SmartMemory(MemoryBase):
         t0 = perf_counter()
         result = self._crud.delete(item_id)
         # Emit memory_delete event for observability
+        # noinspection PyArgumentList
         SmartMemory._MEM_EMIT("memory_delete", "delete", {
             "item_id": item_id,
             "success": result,
@@ -635,6 +638,7 @@ class SmartMemory(MemoryBase):
         results = self._search.search(query, top_k=top_k, memory_type=memory_type, **kwargs)
         
         # Emit memory_retrieve event for observability
+        # noinspection PyArgumentList
         SmartMemory._MEM_EMIT("memory_retrieve", "search", {
             "query_length": len(query) if query else 0,
             "top_k": top_k,

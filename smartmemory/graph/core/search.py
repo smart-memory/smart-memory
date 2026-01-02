@@ -77,6 +77,7 @@ class SmartGraphSearch:
 
         for i, fallback_method in enumerate(fallback_attempts):
             try:
+                # noinspection PyArgumentList
                 results = fallback_method(query_str, top_k, **kwargs)
                 # Check if we got actual results, not just an empty list
                 if results is not None and len(results) > 0:

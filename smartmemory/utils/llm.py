@@ -35,7 +35,7 @@ def _model_supports_temperature(model_name: str) -> bool:
 
 def call_llm(
         *,
-        model: str,
+        model: Optional[str] = None,
         # Provide either messages OR (system_prompt + user_content)
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
@@ -60,6 +60,19 @@ def call_llm(
     - parsed_result: dict parsed from JSON when JSON was requested and parse succeeded
     - raw_response_text: raw content from the model (always returned when JSON parse not used or fails)
     """
+    # Resolve model: explicit -> config -> default
+    resolved_model = model
+    if not resolved_model:
+        try:
+            section = get_config(config_section or "extractor")
+            llm_cfg = section.get("llm") if hasattr(section, "get") else None
+            if isinstance(llm_cfg, dict):
+                resolved_model = llm_cfg.get("model_name") or llm_cfg.get("model")
+        except Exception as e:
+            logger.debug(f"Failed reading config for model: {e}")
+    if not resolved_model:
+        resolved_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    
     # Resolve API key: explicit -> config -> env
     resolved_api_key = api_key
     if not resolved_api_key:
@@ -120,10 +133,10 @@ def call_llm(
         # Use DSPy transport exclusively
         # For reasoning models (o1/o3/o4/gpt-5.x), temperature is handled by call_dspy
         # which sets the required temperature=1.0 automatically
-        temp_arg = temperature if (temperature is not None and _model_supports_temperature(model)) else None
+        temp_arg = temperature if (temperature is not None and _model_supports_temperature(resolved_model)) else None
 
         resp = call_dspy(
-            model=model,
+            model=resolved_model,
             messages=fb_messages,
             max_output_tokens=(max_output_tokens or 2000),
             api_key=resolved_api_key,

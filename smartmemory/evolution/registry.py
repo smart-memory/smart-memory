@@ -122,28 +122,28 @@ def register_builtin_evolvers() -> None:
         tags=("zettel", "prune", "maintenance", "builtin"),
     )
 
-    # Agent-optimized suite
+    # Agent-optimized suite (from service_common)
     R.register(
         "maximal_connectivity",
-        "smartmemory.evolution.agent_optimized.MaximalConnectivityEvolver",
+        "service_common.plugins.evolvers.optimized.maximal_connectivity.MaximalConnectivityEvolver",
         description="Create maximum useful connections between items",
         tags=("agent", "connectivity", "links", "experimental"),
     )
     R.register(
         "rapid_enrichment",
-        "smartmemory.evolution.agent_optimized.RapidEnrichmentEvolver",
+        "service_common.plugins.evolvers.optimized.rapid_enrichment.RapidEnrichmentEvolver",
         description="Immediately enrich items with comprehensive context",
         tags=("agent", "enrichment", "experimental"),
     )
     R.register(
         "strategic_pruning",
-        "smartmemory.evolution.agent_optimized.StrategicPruningEvolver",
+        "service_common.plugins.evolvers.optimized.strategic_pruning.StrategicPruningEvolver",
         description="Strategically prune redundant/outdated/low-value items",
         tags=("agent", "pruning", "experimental"),
     )
     R.register(
         "hierarchical_organization",
-        "smartmemory.evolution.agent_optimized.HierarchicalOrganizationEvolver",
+        "service_common.plugins.evolvers.optimized.hierarchical_organization.HierarchicalOrganizationEvolver",
         description="Create hierarchical topic/entity/temporal organization",
         tags=("agent", "hierarchy", "experimental"),
     )

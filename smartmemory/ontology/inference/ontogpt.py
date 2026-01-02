@@ -20,7 +20,7 @@ import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from smartmemory.ontology.models import Ontology
+from smartmemory.ontology.models import Ontology, EntityTypeDefinition, RelationshipTypeDefinition
 
 
 class OntoGPTInferenceEngine:
@@ -466,7 +466,6 @@ class OntoGPTInferenceEngine:
             examples: List[str],
             confidence: float,
     ) -> Any:
-        from .manager import EntityTypeDefinition  # local import to avoid cycles
 
         return EntityTypeDefinition(
             name=name,
@@ -489,7 +488,6 @@ class OntoGPTInferenceEngine:
             target_types: set,
             confidence: float,
     ) -> Any:
-        from .manager import RelationshipTypeDefinition  # local import to avoid cycles
 
         return RelationshipTypeDefinition(
             name=name,

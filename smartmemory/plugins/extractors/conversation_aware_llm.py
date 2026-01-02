@@ -191,7 +191,7 @@ Return a JSON object with an 'entities' array."""
         
         # Call LLM
         try:
-            response = call_llm(
+            parsed, response = call_llm(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -199,11 +199,11 @@ Return a JSON object with an 'entities' array."""
                 model=self.cfg.model_name,
                 api_key=api_key,
                 temperature=self.cfg.temperature,
-                max_tokens=self.cfg.max_tokens,
+                max_output_tokens=self.cfg.max_tokens,
                 response_format={"type": "json_object"}
             )
             
-            parsed = response.get('parsed')
+            parsed_result = parsed
             if parsed and isinstance(parsed, dict):
                 raw_entities = parsed.get('entities', [])
                 return self._normalize_entities(raw_entities)
@@ -258,7 +258,7 @@ Extract relationships between these entities. Return a JSON object with a 'relat
 Each relation should have 'subject', 'predicate', and 'object'."""
         
         try:
-            response = call_llm(
+            parsed, response = call_llm(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -266,11 +266,10 @@ Each relation should have 'subject', 'predicate', and 'object'."""
                 model=self.cfg.model_name,
                 api_key=api_key,
                 temperature=self.cfg.temperature,
-                max_tokens=self.cfg.max_tokens,
+                max_output_tokens=self.cfg.max_tokens,
                 response_format={"type": "json_object"}
             )
             
-            parsed = response.get('parsed')
             if parsed and isinstance(parsed, dict):
                 raw_relations = parsed.get('relations', [])
                 return self._normalize_relations(raw_relations)
@@ -435,7 +434,7 @@ Return a JSON object with a 'speaker_relations' array.
 Each relation should have 'subject' (speaker role), 'predicate' (relationship type), and 'object' (entity name)."""
         
         try:
-            response = call_llm(
+            parsed, response = call_llm(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -443,11 +442,10 @@ Each relation should have 'subject' (speaker role), 'predicate' (relationship ty
                 model=self.cfg.model_name,
                 api_key=api_key,
                 temperature=self.cfg.temperature,
-                max_tokens=self.cfg.max_tokens,
+                max_output_tokens=self.cfg.max_tokens,
                 response_format={"type": "json_object"}
             )
             
-            parsed = response.get('parsed')
             if parsed and isinstance(parsed, dict):
                 return parsed.get('speaker_relations', [])
             

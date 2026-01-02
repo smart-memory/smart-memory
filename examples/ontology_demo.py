@@ -14,11 +14,12 @@ compared to generic entity extraction approaches.
 import os
 import sys
 
+from smartmemory.plugins.extractors import LLMExtractor
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from smartmemory.smart_memory import SmartMemory
 from smartmemory.models.memory_item import MemoryItem
-from smartmemory.extraction.extractor import LLMExtractor
 
 
 def demonstrate_old_vs_new():

@@ -169,12 +169,16 @@ class GraphBackedMemory(MemoryBase):
                 ]
             else:
                 # Fallback: try search_nodes if available
-                nodes = self.graph.search_nodes(
-                    query=query,
-                    limit=top_k,
-                    memory_type=self._memory_type,
-                    **kwargs
-                )
+                # Build query dict with filters
+                query_dict = {}
+                if self._memory_type:
+                    query_dict["memory_type"] = self._memory_type
+                
+                # search_nodes expects a dict query, not separate parameters
+                nodes = self.graph.search_nodes(query_dict)
+                
+                # Limit results to top_k
+                limited_nodes = nodes[:top_k] if nodes else []
 
                 return [
                     MemoryItem(
@@ -182,7 +186,7 @@ class GraphBackedMemory(MemoryBase):
                         content=node.get("content", ""),
                         metadata=node
                     )
-                    for node in nodes
+                    for node in limited_nodes
                 ]
         except Exception as e:
             raise RuntimeError(f"Failed to search graph: {e}")

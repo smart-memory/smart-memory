@@ -184,8 +184,7 @@ def conversation_context():
     """Sample conversation context."""
     return ConversationContext(
         conversation_id="test_conv_1",
-        
-        metadata={"topic": "testing", "session_start": datetime.now(timezone.utc).isoformat()}
+        extra={"topic": "testing", "session_start": datetime.now(timezone.utc).isoformat()}
     )
 
 

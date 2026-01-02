@@ -4,7 +4,7 @@ from typing import Optional, Any, List
 from smartmemory.graph.base import BaseMemoryGraph
 from smartmemory.graph.types.interfaces import MemoryGraphInterface
 from smartmemory.models.memory_item import MemoryItem
-from smartmemory.stores.converters import SemanticConverter
+from smartmemory.stores.converters.semantic_converter import SemanticConverter
 from smartmemory.stores.mixins import (
     GraphErrorHandlingMixin, GraphLoggingMixin,
     GraphValidationMixin, GraphPerformanceMixin

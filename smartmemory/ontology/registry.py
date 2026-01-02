@@ -106,7 +106,7 @@ class OntologyRegistry:
                     concepts=[], relations=[], taxonomy=[],
                     audit=Audit(version="v1.0.0")
                 )
-                self._save_snapshot("default", "v1.0.0", empty_ontology, "system", "Initial default registry")
+                self._save_snapshot("default", "v1.0.0", empty_ontology, "Initial default registry")
                 logger.info("Created default ontology registry in FalkorDB")
 
         except Exception as e:
@@ -501,8 +501,8 @@ class OntologyRegistry:
             concepts=list(merged_concepts.values()),
             relations=list(merged_relations.values()),
             taxonomy=list(merged_taxonomy.values()),
-            version=base.version,
-            created_by=changeset.created_by or base.created_by
+            ir_version=base.version if hasattr(base, 'version') else base.ir_version,
+            registry_id=base.registry_id if hasattr(base, 'registry_id') else "default"
         )
 
     def _increment_version(self, version: str) -> str:

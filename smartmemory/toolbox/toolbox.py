@@ -2,6 +2,8 @@
 
 from typing import Callable, Set, List, Any, Optional
 
+from smartmemory.toolbox.finders import mcp_tools
+
 
 def discover_tools(
         metadata_only: bool = False,
@@ -24,7 +26,6 @@ def discover_tools(
     Returns:
         List of Tool objects or metadata dicts.
     """
-    from smartmemory.toolbox.finders import mcp_tools
     # Use MCP tools only as requested
     finders = [mcp_tools]
     seen = set()

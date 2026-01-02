@@ -611,7 +611,7 @@ The following features are currently under active development:
 
 ## ✅ Recently Completed
 
-### Multi-Tenancy & Security (v0.2.3)
+### Multi-Tenancy & Security (v0.2.4)
 - ✅ **MemoryScopeProvider**: Single source of truth for all security decisions
 - ✅ **SecureSmartMemory**: Tenant-aware wrapper with automatic metadata injection
 - ✅ **ServiceUser Model**: Rich user model with tenant_id, team memberships, roles

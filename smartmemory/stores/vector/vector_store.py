@@ -166,6 +166,7 @@ class VectorStore:
         t0 = perf_counter()
         self._backend.add(item_id=str(item_id), embedding=embedding, metadata=meta)
         # Best-effort emit with automatic context
+        # noinspection PyArgumentList
         VectorStore.VEC_EMIT(None, "add", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
 
     def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False):
@@ -200,6 +201,7 @@ class VectorStore:
         
         t0 = perf_counter()
         self._backend.upsert(item_id=str(item_id), embedding=embedding, metadata=meta)
+        # noinspection PyArgumentList
         VectorStore.VEC_EMIT(None, "upsert", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
 
     def get(self, item_id, include_metadata: bool = True):
@@ -232,6 +234,7 @@ class VectorStore:
         if callable(deleter):
             try:
                 deleter(item_id)
+                # noinspection PyArgumentList
                 VectorStore.VEC_EMIT(None, "delete", self._vec_data(item_id=item_id))
                 return True
             except Exception as e:
@@ -316,6 +319,7 @@ class VectorStore:
             count += 1
             if count >= top_k:
                 break
+        # noinspection PyArgumentList
         VectorStore.VEC_EMIT(None, "search", self._vec_data(top_k=top_k, returned=len(hits), t0=t0))
         return hits
 
@@ -328,6 +332,7 @@ class VectorStore:
             t0 = perf_counter()
             # Delegate to backend; not all backends return a count
             self._backend.clear()
+            # noinspection PyArgumentList
             VectorStore.VEC_EMIT(None, "clear", self._vec_data(deleted_count=None, t0=t0))
         except Exception as e:
             print(f"Warning: Vector store clear encountered error: {e}")

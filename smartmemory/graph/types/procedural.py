@@ -1,10 +1,10 @@
 import logging
 
 from smartmemory.graph.base import BaseMemoryGraph
-from smartmemory.graph.core import Triple
+from smartmemory.graph.core.memory_path import Triple
 from smartmemory.graph.types.interfaces import MemoryGraphInterface
 from smartmemory.models.memory_item import MemoryItem
-from smartmemory.stores.converters import ProceduralConverter
+from smartmemory.stores.converters.procedural_converter import ProceduralConverter
 from smartmemory.stores.mixins import (
     GraphErrorHandlingMixin, GraphLoggingMixin,
     GraphValidationMixin, GraphPerformanceMixin
