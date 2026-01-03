@@ -21,8 +21,66 @@ class EnvironmentHandler:
     """Unified environment variable handling and expansion"""
 
     @staticmethod
-    def load_dotenv():
-        """Load .env file if available (non-fatal if dotenv not installed)"""
+    def load_secrets():
+        """Load secrets from composable secrets system if available.
+        
+        Attempts to load from smart-memory-infra/secrets/ first, then falls back to .env file.
+        This happens automatically and silently - no user intervention required.
+        """
+        # Try composable secrets system first
+        try:
+            from pathlib import Path
+            
+            # Find secrets directory
+            secrets_candidates = [
+                Path.cwd().parent.parent / "smart-memory-infra" / "secrets",
+                Path.cwd().parent / "smart-memory-infra" / "secrets",
+                Path.home() / "reg/my/SmartMemory/smart-memory-infra/secrets",
+            ]
+            
+            secrets_dir = None
+            for candidate in secrets_candidates:
+                if candidate.exists() and (candidate / "shared.env").exists():
+                    secrets_dir = candidate
+                    break
+            
+            if secrets_dir:
+                # Load shared.env
+                env_vars = {}
+                shared_env = secrets_dir / "shared.env"
+                if shared_env.exists():
+                    with open(shared_env) as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#') and '=' in line:
+                                key, _, value = line.partition('=')
+                                env_vars[key.strip()] = value.strip()
+                
+                # Load environment-specific overrides
+                environment = os.environ.get('ENVIRONMENT', 'development')
+                if environment == 'development':
+                    environment = 'local'
+                
+                env_file = secrets_dir / f"{environment}.env"
+                if env_file.exists():
+                    with open(env_file) as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#') and '=' in line:
+                                key, _, value = line.partition('=')
+                                env_vars[key.strip()] = value.strip()
+                
+                # Load into os.environ (don't override existing)
+                for key, value in env_vars.items():
+                    if key not in os.environ:
+                        os.environ[key] = value
+                
+                logger.debug(f"Loaded {len(env_vars)} secrets from {secrets_dir}")
+                return
+        except Exception as e:
+            logger.debug(f"Could not load composable secrets: {e}")
+        
+        # Fallback to .env file
         try:
             from dotenv import load_dotenv
             load_dotenv()  # Does not override existing env by default

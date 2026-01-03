@@ -45,8 +45,8 @@ class ConfigManager:
         Args:
             config_path: Path to configuration file (optional)
         """
-        # Load environment variables from .env file
-        EnvironmentHandler.load_dotenv()
+        # Load secrets automatically (composable secrets or .env)
+        EnvironmentHandler.load_secrets()
 
         # Resolve config path (param > env > default) and propagate to process env
         candidate_path = config_path or os.environ.get('SMARTMEMORY_CONFIG', 'config.json')
