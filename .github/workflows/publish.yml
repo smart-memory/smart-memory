@@ -118,3 +118,10 @@ jobs:
         echo "- 📦 [PyPI Package](https://pypi.org/project/smartmemory/$VERSION/)" >> $GITHUB_STEP_SUMMARY
         echo "- 📚 [Documentation](https://docs.smartmemory.ai)" >> $GITHUB_STEP_SUMMARY
         echo "- 🐙 [GitHub Repository](https://github.com/smart-memory/smart-memory)" >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify Discord
+      if: always()
+      uses: smart-memory/smart-memory-infra/.github/actions/discord-notify@main
+      with:
+        discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
+        status: ${{ job.status }}
