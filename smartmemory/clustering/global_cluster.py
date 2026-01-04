@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Set, Optional, Tuple
 
-from smartmemory import MemoryItem
+from smartmemory.models.memory_item import MemoryItem
 from smartmemory.memory.pipeline.stages.clustering import logger
 from smartmemory.stores.vector.vector_store import VectorStore
 
