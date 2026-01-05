@@ -120,7 +120,7 @@ jobs:
         echo "- 🐙 [GitHub Repository](https://github.com/smart-memory/smart-memory)" >> $GITHUB_STEP_SUMMARY
 
     - name: Notify Discord
-      if: always()
+      if: ${{ always() && secrets.DISCORD_WEBHOOK != '' }}
       uses: smart-memory/smart-memory-infra/.github/actions/discord-notify@main
       with:
         discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
