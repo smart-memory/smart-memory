@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EnricherPlugin, PluginMetadata
-from smartmemory.tools.wikipedia import wikipedia_article
+from smartmemory.integration.wikipedia_client import WikipediaClient
 
 
 @dataclass
@@ -20,8 +20,8 @@ class WikipediaEnricherRequest(StageRequest):
 
 class WikipediaEnricher(EnricherPlugin):
     """
-    Enricher that adds Wikipedia summaries and metadata for recognized entities using the wikipedia_article tool function.
-    This ensures consistent, LLM/agent-compatible enrichment and DRY logic.
+    Enricher that adds Wikipedia summaries and metadata for recognized entities.
+    Uses WikipediaClient to fetch article data for each entity.
     """
 
     @classmethod
@@ -45,6 +45,7 @@ class WikipediaEnricher(EnricherPlugin):
         if not isinstance(self.config, WikipediaEnricherConfig):
             raise TypeError("WikipediaEnricher requires a typed config (WikipediaEnricherConfig)")
         self.language = self.config.language
+        self._client = WikipediaClient(language=self.language)
 
     def enrich(self, item, node_ids=None):
         entities = node_ids.get('semantic_entities', []) if isinstance(node_ids, dict) else []
@@ -55,13 +56,12 @@ class WikipediaEnricher(EnricherPlugin):
                 'summary': getattr(item, 'content', str(item)).split('.')[0] + '.',
                 'provenance_candidates': [],
             }
-        wiki_articles = wikipedia_article(entities, language=self.language)
+
         wiki_data = {}
         provenance_candidates = []
-        for entity, article in wiki_articles.items():
-            # Check if article exists (either 'exists' is True or article has content)
-            exists = article.get('exists', True) if article.get('exists') is not None else bool(article.get('summary'))
-            if exists:
+        for entity in entities:
+            article = self._client.get_article(entity)
+            if article.get('exists', False):
                 wikipedia_node_id = f"wikipedia:{entity.replace(' ', '_').lower()}"
                 node_properties = {
                     'entity': entity,

@@ -178,3 +178,7 @@ test_data/
 !docs/public/*.md
 !DESIGN_STANDARDS.md
 !CHANGELOG.md
+
+.claude/
+!.claude/rules/*.md
+!.claude/commands/*.md

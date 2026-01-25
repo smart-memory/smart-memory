@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "./"
+      ]
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ]
+    },
+    "smartmemory": {
+      "args": [
+        "--directory",
+        "/Users/ruze/reg/my/SmartMemory/smart-memory-infra/packages/sm-hetzner",
+        "run",
+        "sm-hetzner",
+        "mcp"
+      ],
+      "command": "uv",
+      "env": {
+        "HETZNER_PROJECT": "smartmemory"
+      }
+    }
+  }
+}
