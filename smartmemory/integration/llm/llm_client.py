@@ -14,14 +14,24 @@ from smartmemory.configuration import MemoryConfig
 from .providers import OpenAIProvider, AnthropicProvider, AzureOpenAIProvider, BaseLLMProvider
 from .response_parser import ResponseParser, StructuredResponse
 
-# Import Claude CLI from new package
-from smartmemory.claude_cli import Claude as ClaudeCLI
+# Import Claude CLI from external package (optional)
+try:
+    from claude_cli import Claude as ClaudeCLI
+    CLAUDE_CLI_AVAILABLE = True
+except ImportError:
+    ClaudeCLI = None  # type: ignore
+    CLAUDE_CLI_AVAILABLE = False
 
 
 class ClaudeCLIProviderAdapter(BaseLLMProvider):
     """Adapter to use claude_cli package with LLMClient interface."""
 
     def __init__(self, config=None, **kwargs):
+        if not CLAUDE_CLI_AVAILABLE:
+            raise ImportError(
+                "claude-cli package not installed. Install with: "
+                "pip install git+ssh://git@github.com/regression-io/claude-cli.git"
+            )
         self.config = config
         self.provider = "claude-cli"
         self.api_key = None

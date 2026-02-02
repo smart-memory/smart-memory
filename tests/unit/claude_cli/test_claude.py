@@ -1,25 +1,26 @@
 """Tests for Claude CLI interface."""
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
 
-from smartmemory.claude_cli import (
+# Skip all tests if claude-cli not installed
+pytest.importorskip("claude_cli")
+
+from claude_cli import (
     Claude,
-    Response,
-    StructuredResponse,
     CLIError,
     CLINotFoundError,
     CLITimeoutError,
+    Response,
 )
 
 
 class TestClaude:
     """Test main Claude class."""
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_simple_call(self, mock_run):
         """Test simple __call__ interface."""
         mock_run.side_effect = [
@@ -32,7 +33,7 @@ class TestClaude:
 
         assert answer == "4"
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_simple_call_with_model(self, mock_run):
         """Test simple call with model override."""
         mock_run.side_effect = [
@@ -48,7 +49,7 @@ class TestClaude:
         model_idx = call_args.index("--model")
         assert call_args[model_idx + 1] == "opus"
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_chat(self, mock_run):
         """Test chat interface."""
         mock_run.side_effect = [
@@ -68,7 +69,7 @@ class TestClaude:
         assert response.usage.prompt_tokens == 10
         assert response.usage.completion_tokens == 5
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_chat_with_system(self, mock_run):
         """Test chat with system prompt."""
         mock_run.side_effect = [
@@ -85,7 +86,7 @@ class TestClaude:
         call_args = mock_run.call_args[0][0]
         assert "--append-system-prompt" in call_args
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_structured(self, mock_run):
         """Test structured output."""
         class Person(BaseModel):
@@ -107,7 +108,7 @@ class TestClaude:
         assert person.name == "John"
         assert person.age == 30
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_structured_with_markdown_fence(self, mock_run):
         """Test structured output strips markdown fences."""
         class Data(BaseModel):
@@ -127,7 +128,7 @@ class TestClaude:
 
         assert data.value == 42
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_structured_safe_success(self, mock_run):
         """Test structured_safe returns StructuredResponse on success."""
         class Item(BaseModel):
@@ -144,7 +145,7 @@ class TestClaude:
         assert result.success is True
         assert result.data.name == "test"
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_structured_safe_failure(self, mock_run):
         """Test structured_safe returns error instead of raising."""
         class Item(BaseModel):
@@ -161,7 +162,7 @@ class TestClaude:
         assert result.success is False
         assert result.error is not None
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_is_available_true(self, mock_run):
         """Test is_available returns True when CLI works."""
         mock_run.return_value = MagicMock(returncode=0, stdout="v1.0", stderr="")
@@ -169,7 +170,7 @@ class TestClaude:
         claude = Claude()
         assert claude.is_available is True
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_is_available_false(self, mock_run):
         """Test is_available returns False when CLI not found."""
         mock_run.side_effect = FileNotFoundError()
@@ -181,7 +182,7 @@ class TestClaude:
 class TestModelAliases:
     """Test model alias resolution."""
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_fast_alias(self, mock_run):
         """Test 'fast' resolves to haiku."""
         mock_run.side_effect = [
@@ -196,7 +197,7 @@ class TestModelAliases:
         model_idx = call_args.index("--model")
         assert call_args[model_idx + 1] == "haiku"
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_best_alias(self, mock_run):
         """Test 'best' resolves to opus."""
         mock_run.side_effect = [
@@ -215,7 +216,7 @@ class TestModelAliases:
 class TestErrors:
     """Test error handling."""
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_cli_not_found(self, mock_run):
         """Test CLINotFoundError when CLI not installed."""
         mock_run.side_effect = FileNotFoundError()
@@ -224,7 +225,7 @@ class TestErrors:
         with pytest.raises(CLINotFoundError):
             claude("test")
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_cli_timeout(self, mock_run):
         """Test CLITimeoutError on timeout."""
         import subprocess
@@ -237,7 +238,7 @@ class TestErrors:
         with pytest.raises(CLITimeoutError):
             claude("test")
 
-    @patch("smartmemory.claude_cli.provider.subprocess.run")
+    @patch("claude_cli.provider.subprocess.run")
     def test_cli_error(self, mock_run):
         """Test CLIError on non-zero exit."""
         mock_run.side_effect = [
@@ -260,7 +261,7 @@ class TestResponseModel:
 
     def test_usage_total(self):
         """Test Usage total_tokens property."""
-        from smartmemory.claude_cli import Usage
+        from claude_cli import Usage
 
         usage = Usage(prompt_tokens=10, completion_tokens=20)
         assert usage.total_tokens == 30

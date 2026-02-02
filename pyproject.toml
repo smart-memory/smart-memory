@@ -58,6 +58,7 @@ rebel = ["transformers>=4.0.0"]
 relik = ["relik>=0.1.0"]
 
 # Optional dependencies for integrations
+claude-cli = ["claude-cli @ git+ssh://git@github.com/regression-io/claude-cli.git"]
 slack = ["slack-sdk>=3.0.0"]
 aws = ["boto3>=1.26.0"]
 wikipedia = ["wikipedia-api>=0.6.0"]

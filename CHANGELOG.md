@@ -11,12 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Claude CLI Package (`smartmemory.claude_cli`)
-- **New package**: Reusable Claude CLI interface for embedding in projects
+#### Claude CLI Integration
+- **External package**: `claude-cli` extracted to `regression-io/claude-cli` (private)
+- **Optional dependency**: `pip install smartmemory[claude-cli]`
 - **No API key required**: Uses Claude subscription authentication via subprocess
 - **Simple API**: `claude = Claude(); answer = claude("prompt")`
 - **Structured output**: `claude.structured(prompt, schema=MyModel)` with Pydantic
-- **Models**: haiku (default), sonnet, opus with semantic aliases (fast, balanced, best)
+- **Framework adapters**: LangChain and DSPy adapters included
 - **Integration**: Available via `LLMClient(provider='claude-cli')`
 - **Note**: Experimental, for internal testing
 
