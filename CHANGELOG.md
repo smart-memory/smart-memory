@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Experimental: Claude CLI Provider
+- **New provider**: `ClaudeCLIProvider` - Uses Claude Code/CLI subprocess for LLM operations
+- **No API key required**: Leverages user's existing Claude subscription authentication
+- **Model support**: opus, sonnet, haiku with alias normalization
+- **Location**: `smartmemory/integration/llm/claude_cli_provider.py`
+- **Note**: Experimental, intended for internal testing only
+
 #### Security & Authentication Documentation
 - **New documentation**: `docs/SECURITY_AND_AUTH.md` - Comprehensive guide to SmartMemory's security architecture
 - **Updated**: `README.md` - Added security/auth examples and references
