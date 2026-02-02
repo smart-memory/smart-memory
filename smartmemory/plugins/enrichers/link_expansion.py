@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 # URL pattern - matches http/https URLs
 URL_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')
 
@@ -115,6 +117,38 @@ class LinkExpansionEnricher(EnricherPlugin):
 
         # 3. Dedupe and limit
         return list(urls)[: self.config.max_urls_per_item]
+
+    def _fetch_url(self, url: str) -> dict:
+        """Fetch URL and return result dict with status.
+
+        Args:
+            url: The URL to fetch.
+
+        Returns:
+            dict: Result with status, html/error, final_url, content_type.
+        """
+        try:
+            response = httpx.get(
+                url,
+                timeout=self.config.timeout_seconds,
+                headers={"User-Agent": self.config.user_agent},
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+
+            html = response.text[: self.config.max_content_length]
+            return {
+                "status": "success",
+                "html": html,
+                "final_url": str(response.url),
+                "content_type": response.headers.get("content-type", ""),
+            }
+        except Exception as e:
+            return {
+                "status": "failed",
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs.

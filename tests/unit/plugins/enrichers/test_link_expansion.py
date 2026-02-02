@@ -184,3 +184,114 @@ class TestURLExtraction:
         urls = enricher._extract_urls("No links here.", None)
 
         assert urls == []
+
+
+class TestURLFetching:
+    """Tests for URL fetching functionality."""
+
+    def test_fetch_url_success(self):
+        """Test successful URL fetch."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html><head><title>Test</title></head></html>"
+            mock_response.url = "https://example.com"
+            mock_response.headers = {"content-type": "text/html"}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher._fetch_url("https://example.com")
+
+        assert result["status"] == "success"
+        assert result["html"] == "<html><head><title>Test</title></head></html>"
+        assert result["final_url"] == "https://example.com"
+
+    def test_fetch_url_timeout(self):
+        """Test URL fetch timeout handling."""
+        from unittest.mock import patch
+
+        import httpx
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_httpx.get.side_effect = httpx.TimeoutException("Timeout")
+
+            result = enricher._fetch_url("https://example.com")
+
+        assert result["status"] == "failed"
+        assert "Timeout" in result["error"]
+        assert result["error_type"] == "TimeoutException"
+
+    def test_fetch_url_http_error(self):
+        """Test URL fetch HTTP error handling."""
+        from unittest.mock import Mock, patch
+
+        import httpx
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "404 Not Found", request=Mock(), response=Mock()
+            )
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher._fetch_url("https://example.com/missing")
+
+        assert result["status"] == "failed"
+        assert "404" in result["error"]
+
+    def test_fetch_url_truncates_large_content(self):
+        """Test that large content is truncated."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import (
+            LinkExpansionEnricher,
+            LinkExpansionEnricherConfig,
+        )
+
+        config = LinkExpansionEnricherConfig(max_content_length=100)
+        enricher = LinkExpansionEnricher(config=config)
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "x" * 1000  # Large content
+            mock_response.url = "https://example.com"
+            mock_response.headers = {"content-type": "text/html"}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher._fetch_url("https://example.com")
+
+        assert len(result["html"]) == 100
+
+    def test_fetch_url_follows_redirects(self):
+        """Test that redirects are followed and final URL captured."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html></html>"
+            mock_response.url = "https://www.example.com/final"  # Redirected URL
+            mock_response.headers = {"content-type": "text/html"}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher._fetch_url("https://example.com")
+
+        assert result["final_url"] == "https://www.example.com/final"
