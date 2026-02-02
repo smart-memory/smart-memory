@@ -233,6 +233,7 @@ class TestStructuredCompletion:
         assert result is not None
         assert result["parsed_data"]["name"] == "test"
         assert result["parsed_data"]["count"] == 42
+        assert "models" in result
 
     @patch("subprocess.run")
     def test_structured_completion_parse_failure(self, mock_run):

@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any, Type
 
 from smartmemory.configuration import MemoryConfig
 from .providers import OpenAIProvider, AnthropicProvider, AzureOpenAIProvider
+from .claude_cli_provider import ClaudeCLIProvider
 from .response_parser import ResponseParser, StructuredResponse
 
 logger = logging.getLogger(__name__)
@@ -70,12 +71,18 @@ class LLMClient:
         provider_classes = {
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
-            "azure_openai": AzureOpenAIProvider
+            "azure_openai": AzureOpenAIProvider,
+            "claude-cli": ClaudeCLIProvider,
+            "claude_cli": ClaudeCLIProvider,  # Allow underscore variant
         }
 
         provider_class = provider_classes.get(self.provider_name)
         if not provider_class:
             raise ValueError(f"Unsupported provider: {self.provider_name}")
+
+        # Claude CLI provider doesn't use api_key
+        if self.provider_name in ("claude-cli", "claude_cli"):
+            return provider_class(config=self.config, **kwargs)
 
         return provider_class(
             config=self.config,
@@ -241,7 +248,9 @@ class LLMClient:
         defaults = {
             'openai': 'gpt-4',
             'anthropic': 'claude-3-sonnet-20240229',
-            'azure_openai': 'gpt-4'
+            'azure_openai': 'gpt-4',
+            'claude-cli': 'haiku',
+            'claude_cli': 'haiku',
         }
 
         return defaults.get(self.provider_name, 'gpt-4')

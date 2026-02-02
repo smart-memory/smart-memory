@@ -273,7 +273,7 @@ class ClaudeCLIProvider(BaseLLMProvider):
 
         return {
             "content": content,
-            "model": f"claude-cli:{self._normalize_model(model)}",
+            "models": f"claude-cli:{self._normalize_model(model)}",  # Match existing provider convention
             "usage": {
                 "prompt_tokens": usage.get("input_tokens", 0),
                 "completion_tokens": usage.get("output_tokens", 0),
@@ -329,7 +329,7 @@ class ClaudeCLIProvider(BaseLLMProvider):
                 return {
                     "parsed_data": parsed,
                     "raw_content": content,
-                    "model": response.get("model", "claude-cli"),
+                    "models": response.get("models", "claude-cli"),
                 }
         except json.JSONDecodeError:
             pass
