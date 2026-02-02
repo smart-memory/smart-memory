@@ -10,8 +10,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+
+try:
+    from bs4 import BeautifulSoup
+
+    HAS_BS4 = True
+except ImportError:
+    HAS_BS4 = False
 
 # URL pattern - matches http/https URLs
 URL_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')
@@ -149,6 +157,81 @@ class LinkExpansionEnricher(EnricherPlugin):
                 "error": str(e),
                 "error_type": type(e).__name__,
             }
+
+    def _get_meta(self, soup, name: str) -> str | None:
+        """Get meta tag content by property or name.
+
+        Args:
+            soup: BeautifulSoup parsed HTML.
+            name: Meta property or name to look for.
+
+        Returns:
+            Content string or None if not found.
+        """
+        tag = soup.find("meta", attrs={"property": name}) or soup.find(
+            "meta", attrs={"name": name}
+        )
+        return tag.get("content") if tag else None
+
+    def _get_canonical(self, soup) -> str | None:
+        """Get canonical URL from link tag.
+
+        Args:
+            soup: BeautifulSoup parsed HTML.
+
+        Returns:
+            Canonical URL or None if not found.
+        """
+        link = soup.find("link", rel="canonical")
+        return link.get("href") if link else None
+
+    def _extract_metadata(self, html: str, url: str) -> dict:
+        """Extract metadata from HTML using heuristics.
+
+        Args:
+            html: HTML content string.
+            url: Original URL for fallback values.
+
+        Returns:
+            dict: Extracted metadata.
+        """
+        if not HAS_BS4:
+            return {
+                "title": url,
+                "description": None,
+                "og_image": None,
+                "og_type": None,
+                "author": None,
+                "published_date": None,
+                "domain": urlparse(url).netloc,
+                "canonical_url": url,
+            }
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Title: og:title > twitter:title > <title>
+        title = (
+            self._get_meta(soup, "og:title")
+            or self._get_meta(soup, "twitter:title")
+            or (soup.title.string if soup.title else None)
+            or url
+        )
+
+        # Description: og:description > meta description
+        description = self._get_meta(soup, "og:description") or self._get_meta(
+            soup, "description"
+        )
+
+        return {
+            "title": title[:500] if title else url,
+            "description": description[:1000] if description else None,
+            "og_image": self._get_meta(soup, "og:image"),
+            "og_type": self._get_meta(soup, "og:type"),
+            "author": self._get_meta(soup, "author"),
+            "published_date": self._get_meta(soup, "article:published_time"),
+            "domain": urlparse(url).netloc,
+            "canonical_url": self._get_canonical(soup) or url,
+        }
 
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs.

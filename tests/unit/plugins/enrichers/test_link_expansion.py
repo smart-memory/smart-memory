@@ -295,3 +295,128 @@ class TestURLFetching:
             result = enricher._fetch_url("https://example.com")
 
         assert result["final_url"] == "https://www.example.com/final"
+
+
+class TestMetadataExtraction:
+    """Tests for heuristic metadata extraction from HTML."""
+
+    def test_extract_title_from_og_tag(self):
+        """Test extracting title from Open Graph tag."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '''
+        <html>
+        <head>
+            <meta property="og:title" content="OG Title">
+            <title>HTML Title</title>
+        </head>
+        </html>
+        '''
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert metadata["title"] == "OG Title"
+
+    def test_extract_title_fallback_to_html_title(self):
+        """Test fallback to HTML title when no OG tag."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = "<html><head><title>HTML Title</title></head></html>"
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert metadata["title"] == "HTML Title"
+
+    def test_extract_description_from_og_tag(self):
+        """Test extracting description from Open Graph tag."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '''
+        <html>
+        <head>
+            <meta property="og:description" content="OG Description">
+            <meta name="description" content="Meta Description">
+        </head>
+        </html>
+        '''
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert metadata["description"] == "OG Description"
+
+    def test_extract_domain(self):
+        """Test extracting domain from URL."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = "<html><head><title>Test</title></head></html>"
+
+        metadata = enricher._extract_metadata(html, "https://www.example.com/page")
+
+        assert metadata["domain"] == "www.example.com"
+
+    def test_extract_og_image(self):
+        """Test extracting Open Graph image."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '''
+        <html>
+        <head>
+            <meta property="og:image" content="https://example.com/image.jpg">
+        </head>
+        </html>
+        '''
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert metadata["og_image"] == "https://example.com/image.jpg"
+
+    def test_extract_author(self):
+        """Test extracting author from meta tag."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '''
+        <html>
+        <head>
+            <meta name="author" content="John Doe">
+        </head>
+        </html>
+        '''
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert metadata["author"] == "John Doe"
+
+    def test_extract_canonical_url(self):
+        """Test extracting canonical URL."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '''
+        <html>
+        <head>
+            <link rel="canonical" href="https://example.com/canonical">
+        </head>
+        </html>
+        '''
+
+        metadata = enricher._extract_metadata(html, "https://example.com/page?ref=123")
+
+        assert metadata["canonical_url"] == "https://example.com/canonical"
+
+    def test_extract_metadata_truncates_long_values(self):
+        """Test that long metadata values are truncated."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        long_title = "T" * 1000
+        html = f"<html><head><title>{long_title}</title></head></html>"
+
+        metadata = enricher._extract_metadata(html, "https://example.com")
+
+        assert len(metadata["title"]) == 500  # Truncated to 500
