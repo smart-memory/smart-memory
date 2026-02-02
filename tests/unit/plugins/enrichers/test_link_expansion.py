@@ -1,8 +1,5 @@
 """Unit tests for LinkExpansionEnricher plugin."""
 
-import pytest
-from dataclasses import FrozenInstanceError
-
 
 class TestLinkExpansionEnricherConfig:
     """Tests for LinkExpansionEnricherConfig dataclass."""
@@ -34,3 +31,56 @@ class TestLinkExpansionEnricherConfig:
         assert config.model_name == "gpt-4o"
         assert config.timeout_seconds == 30
         assert config.max_urls_per_item == 10
+
+
+class TestLinkExpansionEnricherMetadata:
+    """Tests for LinkExpansionEnricher plugin metadata."""
+
+    def test_metadata_returns_plugin_metadata(self):
+        """Test that metadata() returns PluginMetadata."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+        from smartmemory.plugins.base import PluginMetadata
+
+        metadata = LinkExpansionEnricher.metadata()
+
+        assert isinstance(metadata, PluginMetadata)
+        assert metadata.name == "link_expansion_enricher"
+        assert metadata.plugin_type == "enricher"
+        assert metadata.requires_network is True
+
+    def test_enricher_inherits_from_enricher_plugin(self):
+        """Test that LinkExpansionEnricher inherits from EnricherPlugin."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+        from smartmemory.plugins.base import EnricherPlugin
+
+        assert issubclass(LinkExpansionEnricher, EnricherPlugin)
+
+    def test_enricher_init_with_default_config(self):
+        """Test creating enricher with default config."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        assert enricher.config.enable_llm is False
+        assert enricher.config.timeout_seconds == 10
+
+    def test_enricher_init_with_custom_config(self):
+        """Test creating enricher with custom config."""
+        from smartmemory.plugins.enrichers.link_expansion import (
+            LinkExpansionEnricher,
+            LinkExpansionEnricherConfig,
+        )
+
+        config = LinkExpansionEnricherConfig(enable_llm=True, timeout_seconds=30)
+        enricher = LinkExpansionEnricher(config=config)
+
+        assert enricher.config.enable_llm is True
+        assert enricher.config.timeout_seconds == 30
+
+    def test_enricher_init_rejects_wrong_config_type(self):
+        """Test that wrong config type raises TypeError."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+        import pytest
+
+        with pytest.raises(TypeError, match="requires typed config"):
+            LinkExpansionEnricher(config={"enable_llm": True})
