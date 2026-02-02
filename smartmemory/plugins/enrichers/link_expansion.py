@@ -7,8 +7,12 @@ to Entity child nodes.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
+
+# URL pattern - matches http/https URLs
+URL_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EnricherPlugin, PluginMetadata
@@ -85,6 +89,32 @@ class LinkExpansionEnricher(EnricherPlugin):
             raise TypeError(
                 "LinkExpansionEnricher requires typed config (LinkExpansionEnricherConfig)"
             )
+
+    def _extract_urls(self, item, node_ids: dict[str, Any] | None) -> list[str]:
+        """Extract URLs from content, then merge with extraction stage output.
+
+        Args:
+            item: The memory item (string or object with content attribute).
+            node_ids: Optional dict that may contain 'urls' key.
+
+        Returns:
+            list: Deduplicated list of URLs, limited to max_urls_per_item.
+        """
+        # Get content from item
+        if hasattr(item, "content"):
+            content = item.content
+        else:
+            content = str(item)
+
+        # 1. Regex extraction
+        urls = set(URL_PATTERN.findall(content))
+
+        # 2. Merge with extraction stage (if present)
+        if isinstance(node_ids, dict):
+            urls.update(node_ids.get("urls", []))
+
+        # 3. Dedupe and limit
+        return list(urls)[: self.config.max_urls_per_item]
 
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs.

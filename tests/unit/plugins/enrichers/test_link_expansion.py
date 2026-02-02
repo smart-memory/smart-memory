@@ -84,3 +84,103 @@ class TestLinkExpansionEnricherMetadata:
 
         with pytest.raises(TypeError, match="requires typed config"):
             LinkExpansionEnricher(config={"enable_llm": True})
+
+
+class TestURLExtraction:
+    """Tests for URL extraction from content."""
+
+    def test_extract_single_url(self):
+        """Test extracting a single URL from content."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        content = "Check out https://example.com for more info."
+
+        urls = enricher._extract_urls(content, None)
+
+        assert urls == ["https://example.com"]
+
+    def test_extract_multiple_urls(self):
+        """Test extracting multiple URLs from content."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        content = "See https://example.com and http://test.org/page for details."
+
+        urls = enricher._extract_urls(content, None)
+
+        assert len(urls) == 2
+        assert "https://example.com" in urls
+        assert "http://test.org/page" in urls
+
+    def test_extract_urls_with_query_params(self):
+        """Test extracting URLs with query parameters."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        content = "Link: https://example.com/search?q=test&page=1"
+
+        urls = enricher._extract_urls(content, None)
+
+        assert urls == ["https://example.com/search?q=test&page=1"]
+
+    def test_extract_urls_deduplicates(self):
+        """Test that duplicate URLs are removed."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        content = "Visit https://example.com and https://example.com again."
+
+        urls = enricher._extract_urls(content, None)
+
+        assert urls == ["https://example.com"]
+
+    def test_extract_urls_respects_max_limit(self):
+        """Test that URL extraction respects max_urls_per_item."""
+        from smartmemory.plugins.enrichers.link_expansion import (
+            LinkExpansionEnricher,
+            LinkExpansionEnricherConfig,
+        )
+
+        config = LinkExpansionEnricherConfig(max_urls_per_item=2)
+        enricher = LinkExpansionEnricher(config=config)
+        content = "https://a.com https://b.com https://c.com https://d.com"
+
+        urls = enricher._extract_urls(content, None)
+
+        assert len(urls) == 2
+
+    def test_extract_urls_merges_with_node_ids(self):
+        """Test that URLs from node_ids are merged."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        content = "See https://example.com for info."
+        node_ids = {"urls": ["https://other.com"]}
+
+        urls = enricher._extract_urls(content, node_ids)
+
+        assert len(urls) == 2
+        assert "https://example.com" in urls
+        assert "https://other.com" in urls
+
+    def test_extract_urls_from_item_object(self):
+        """Test extracting URLs from an item with content attribute."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        class MockItem:
+            content = "Visit https://example.com today."
+
+        enricher = LinkExpansionEnricher()
+        urls = enricher._extract_urls(MockItem(), None)
+
+        assert urls == ["https://example.com"]
+
+    def test_extract_urls_empty_content(self):
+        """Test extracting URLs from empty content."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        urls = enricher._extract_urls("No links here.", None)
+
+        assert urls == []
