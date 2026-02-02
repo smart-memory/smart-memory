@@ -552,3 +552,126 @@ class TestEntityExtraction:
         entities = enricher._extract_entities_heuristic(html, {})
 
         assert entities == []
+
+
+class TestEnrichMethod:
+    """Tests for the main enrich() method."""
+
+    def test_enrich_with_no_urls(self):
+        """Test enriching content with no URLs."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        result = enricher.enrich("No links here.")
+
+        assert result["web_resources"] == []
+        assert result["provenance_candidates"] == []
+        assert result["tags"] == []
+
+    def test_enrich_with_single_url(self):
+        """Test enriching content with a single URL."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = '''
+            <html>
+            <head>
+                <title>Test Page</title>
+                <meta name="author" content="Test Author">
+            </head>
+            </html>
+            '''
+            mock_response.url = "https://example.com"
+            mock_response.headers = {"content-type": "text/html"}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher.enrich("Check out https://example.com for info.")
+
+        assert len(result["web_resources"]) == 1
+        resource = result["web_resources"][0]
+        assert resource["url"] == "https://example.com"
+        assert resource["status"] == "success"
+        assert resource["metadata"]["title"] == "Test Page"
+        assert len(result["provenance_candidates"]) == 1
+        assert "Test Author" in result["tags"]
+
+    def test_enrich_with_failed_fetch(self):
+        """Test enriching when URL fetch fails."""
+        from unittest.mock import patch
+
+        import httpx
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_httpx.get.side_effect = httpx.TimeoutException("Timeout")
+
+            result = enricher.enrich("Check https://example.com")
+
+        assert len(result["web_resources"]) == 1
+        resource = result["web_resources"][0]
+        assert resource["status"] == "failed"
+        assert "error" in resource
+        # Failed resources still get node_id for retry capability
+        assert "node_id" in resource
+
+    def test_enrich_creates_correct_node_id(self):
+        """Test that node IDs are created correctly."""
+        import hashlib
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html><title>Test</title></html>"
+            mock_response.url = "https://example.com"
+            mock_response.headers = {}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher.enrich("Visit https://example.com")
+
+        resource = result["web_resources"][0]
+        expected_hash = hashlib.md5("https://example.com".encode()).hexdigest()[:12]
+        assert resource["node_id"] == f"webresource:{expected_hash}"
+
+    def test_enrich_extracts_entities(self):
+        """Test that entities are extracted and returned as tags."""
+        import json
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        jsonld = {"@type": "Person", "name": "John Doe"}
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = f'''
+            <html>
+            <head>
+                <script type="application/ld+json">{json.dumps(jsonld)}</script>
+            </head>
+            </html>
+            '''
+            mock_response.url = "https://example.com"
+            mock_response.headers = {}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            result = enricher.enrich("See https://example.com")
+
+        assert "John Doe" in result["tags"]
+        resource = result["web_resources"][0]
+        assert len(resource["extracted_entities"]) >= 1

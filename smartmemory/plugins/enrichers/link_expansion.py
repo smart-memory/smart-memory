@@ -7,9 +7,11 @@ to Entity child nodes.
 """
 from __future__ import annotations
 
+import hashlib
 import json as json_module
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -329,18 +331,96 @@ class LinkExpansionEnricher(EnricherPlugin):
         return entities
 
     def enrich(self, item, node_ids=None) -> dict:
-        """Enrich a memory item by expanding URLs.
+        """Enrich a memory item by expanding URLs into graph structures.
 
         Args:
-            item: The memory item to enrich.
+            item: The memory item to enrich (string or object with content).
             node_ids: Optional dict of node IDs from extraction stage.
 
         Returns:
             dict: Enrichment results with web_resources, provenance_candidates, tags.
         """
-        # Placeholder - will be implemented in subsequent tasks
+        urls = self._extract_urls(item, node_ids)
+        if not urls:
+            return {
+                "web_resources": [],
+                "provenance_candidates": [],
+                "tags": [],
+            }
+
+        results = []
+        all_entities: list[dict] = []
+        provenance_candidates = []
+
+        for url in urls:
+            # Generate node ID
+            url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
+            node_id = f"webresource:{url_hash}"
+
+            # Fetch URL
+            fetch_result = self._fetch_url(url)
+
+            if fetch_result["status"] == "failed":
+                results.append({
+                    "url": url,
+                    "node_id": node_id,
+                    "status": "failed",
+                    "error": fetch_result.get("error"),
+                    "error_type": fetch_result.get("error_type"),
+                })
+                provenance_candidates.append(node_id)
+                continue
+
+            # Extract metadata (heuristic - always runs)
+            metadata = self._extract_metadata(fetch_result["html"], url)
+            metadata["fetched_at"] = datetime.now(timezone.utc).isoformat()
+
+            # Extract entities (heuristic - always runs)
+            entities = self._extract_entities_heuristic(fetch_result["html"], metadata)
+
+            # Build result
+            resource = {
+                "url": url,
+                "node_id": node_id,
+                "status": "success",
+                "metadata": metadata,
+                "extracted_entities": entities,
+                "summary": None,  # LLM only
+            }
+
+            results.append(resource)
+            all_entities.extend(entities)
+            provenance_candidates.append(node_id)
+
+            # Create graph nodes if graph available
+            if hasattr(self, "graph") and self.graph is not None:
+                # Create WebResource node
+                self.graph.add_node(
+                    item_id=node_id,
+                    properties={
+                        **metadata,
+                        "url": url,
+                        "type": "web_resource",
+                    },
+                )
+
+                # Create Entity nodes and MENTIONS edges
+                for entity in entities:
+                    entity_id = f"entity:{entity['name'].lower().replace(' ', '_')}"
+                    self.graph.add_node(
+                        item_id=entity_id,
+                        properties={
+                            **entity,
+                            "type": "extracted_entity",
+                        },
+                    )
+                    self.graph.add_edge(node_id, entity_id, "MENTIONS")
+
+        # Deduplicate entity names for tags
+        tags = list(set(e["name"] for e in all_entities))
+
         return {
-            "web_resources": [],
-            "provenance_candidates": [],
-            "tags": [],
+            "web_resources": results,
+            "provenance_candidates": provenance_candidates,
+            "tags": tags,
         }
