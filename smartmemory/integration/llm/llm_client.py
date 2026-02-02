@@ -11,9 +11,59 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Type
 
 from smartmemory.configuration import MemoryConfig
-from .providers import OpenAIProvider, AnthropicProvider, AzureOpenAIProvider
-from .claude_cli_provider import ClaudeCLIProvider
+from .providers import OpenAIProvider, AnthropicProvider, AzureOpenAIProvider, BaseLLMProvider
 from .response_parser import ResponseParser, StructuredResponse
+
+# Import Claude CLI from new package
+from smartmemory.claude_cli import Claude as ClaudeCLI
+
+
+class ClaudeCLIProviderAdapter(BaseLLMProvider):
+    """Adapter to use claude_cli package with LLMClient interface."""
+
+    def __init__(self, config=None, **kwargs):
+        self.config = config
+        self.provider = "claude-cli"
+        self.api_key = None
+        self.logger = logging.getLogger(f"{__name__}.ClaudeCLIProviderAdapter")
+        self._claude = ClaudeCLI(
+            model=kwargs.get("default_model", "haiku"),
+            timeout=kwargs.get("timeout_seconds", 120),
+            command=kwargs.get("command", "claude"),
+        )
+
+    def _initialize_client(self, **_kwargs):
+        pass
+
+    def _get_api_key(self):
+        return None
+
+    def chat_completion(self, messages: List[Dict[str, str]], **kwargs) -> Dict[str, Any]:
+        response = self._claude.chat(
+            messages,
+            model=kwargs.get("model"),
+            timeout=kwargs.get("timeout"),
+        )
+        return {
+            "content": response.content,
+            "models": response.model,
+            "usage": {
+                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+            },
+            "metadata": {
+                "finish_reason": response.stop_reason or "stop",
+                "response_id": response.session_id or "",
+            },
+        }
+
+    def structured_completion(self, messages, response_model, **kwargs):  # noqa: ARG002
+        del messages, response_model, kwargs  # Unused - falls back to JSON parsing
+        return None
+
+    def get_supported_features(self):
+        return ["chat_completion"]
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +122,8 @@ class LLMClient:
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
             "azure_openai": AzureOpenAIProvider,
-            "claude-cli": ClaudeCLIProvider,
-            "claude_cli": ClaudeCLIProvider,  # Allow underscore variant
+            "claude-cli": ClaudeCLIProviderAdapter,
+            "claude_cli": ClaudeCLIProviderAdapter,
         }
 
         provider_class = provider_classes.get(self.provider_name)
