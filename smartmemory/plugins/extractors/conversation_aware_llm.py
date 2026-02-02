@@ -67,68 +67,83 @@ class ConversationAwareLLMExtractor(LLMExtractor):
         }
     
     def extract(
-        self, 
-        text: str, 
+        self,
+        text: str,
         conversation_context: Optional[ConversationContext] = None
     ) -> dict:
         """
         Extract entities and relations with conversation awareness.
-        
+
         Args:
             text: Current message text
-            conversation_context: Conversation context with history and entities
-            
+            conversation_context: Conversation context with history, entities, and coreference chains
+
         Returns:
             dict with 'entities', 'relations', and optionally 'speaker_relations'
         """
-        # If no conversation context, fall back to base extraction
-        if not conversation_context:
+        # Check if we have any useful context (coreference chains count as useful context)
+        has_useful_context = (
+            conversation_context and (
+                conversation_context.turn_history or
+                conversation_context.entities or
+                conversation_context.coreference_chains
+            )
+        )
+
+        # If no useful context, fall back to base extraction
+        if not has_useful_context:
             return super().extract(text)
-        
-        # Build context text from conversation history
+
+        # Build context text from conversation history and coreference chains
         context_text = self._build_context_text(conversation_context)
-        
+
         # Extract entities with context
         entities = self._extract_entities_with_context(text, context_text)
-        
+
         # Resolve coreferences if enabled
-        if self.resolve_coreferences and conversation_context.entities:
-            entities = self._resolve_coreferences(entities, conversation_context)
-        
+        # Use fastcoref chains (high quality) or fall back to heuristics with entity history
+        if self.resolve_coreferences:
+            has_coref_data = (
+                conversation_context.coreference_chains or
+                conversation_context.entities
+            )
+            if has_coref_data:
+                entities = self._resolve_coreferences(entities, conversation_context)
+
         # Extract relations with context
         relations = []
         if entities:
             relations = self._extract_relations_with_context(text, entities, context_text)
-        
+
         result = {
             'entities': entities,
             'relations': relations
         }
-        
+
         # Extract speaker relations if enabled
         if self.extract_speaker_relations and conversation_context.turn_history:
             speaker_relations = self._extract_speaker_relations(
-                text, 
-                entities, 
+                text,
+                entities,
                 conversation_context
             )
             if speaker_relations:
                 result['speaker_relations'] = speaker_relations
-        
+
         return result
     
     def _build_context_text(self, conversation_context: ConversationContext) -> str:
         """
         Build context text from conversation history.
-        
+
         Args:
             conversation_context: Conversation context with history
-            
+
         Returns:
             Formatted context string
         """
         context_parts = []
-        
+
         # Add recent conversation history
         if conversation_context.turn_history:
             history_turns = conversation_context.turn_history[-self.max_history_turns:]
@@ -138,7 +153,17 @@ class ConversationAwareLLMExtractor(LLMExtractor):
                     role = turn.get('role', 'user').capitalize()
                     content = turn.get('content', '')
                     context_parts.append(f"[{role}]: {content}")
-        
+
+        # Add coreference chains from fastcoref preprocessing
+        if conversation_context.coreference_chains:
+            context_parts.append("\nCoreference resolutions (pronouns mapped to entities):")
+            for chain in conversation_context.coreference_chains:
+                head = chain.get('head', '')
+                mentions = chain.get('mentions', [])
+                other_mentions = [m for m in mentions if m != head]
+                if other_mentions:
+                    context_parts.append(f"- {head} (also referred to as: {', '.join(other_mentions)})")
+
         # Add known entities
         if conversation_context.entities:
             context_parts.append("\nKnown entities in conversation:")
@@ -146,46 +171,49 @@ class ConversationAwareLLMExtractor(LLMExtractor):
                 name = entity.get('name', '')
                 entity_type = entity.get('type', 'concept')
                 context_parts.append(f"- {name} ({entity_type})")
-        
+
         # Add topics if available
         if conversation_context.topics:
             context_parts.append(f"\nConversation topics: {', '.join(conversation_context.topics)}")
-        
+
         return "\n".join(context_parts)
     
     def _extract_entities_with_context(
-        self, 
-        text: str, 
+        self,
+        text: str,
         context_text: str
     ) -> List[Dict[str, Any]]:
         """
         Extract entities using conversation context.
-        
+
         Args:
             text: Current message text
             context_text: Formatted conversation context
-            
+
         Returns:
             List of extracted entities
         """
         api_key = self._get_api_key()
-        
+
         # Build context-aware prompt
         system_prompt = """You are extracting entities from a conversation.
 Use the conversation context to:
-1. Resolve pronouns and references to actual entities
+1. Use coreference resolutions provided (if any) to map pronouns to actual entities
 2. Maintain entity consistency across turns
 3. Identify new entities mentioned
 
+IMPORTANT: If coreference resolutions are provided, use the HEAD entity name instead of pronouns.
+For example, if "The company" maps to "Apple Inc.", extract "Apple Inc." not "The company".
+
 Return entities in JSON format with 'name', 'entity_type', and optional 'confidence'."""
-        
+
         user_prompt = f"""CONVERSATION CONTEXT:
 {context_text}
 
 CURRENT MESSAGE:
 {text}
 
-Extract all entities from the CURRENT MESSAGE. If pronouns or references appear (like "it", "that", "he", "she"), try to resolve them using the context.
+Extract all entities from the CURRENT MESSAGE. Use the coreference resolutions above to resolve pronouns and references to their actual entity names.
 
 Return a JSON object with an 'entities' array."""
         
@@ -285,32 +313,54 @@ Each relation should have 'subject', 'predicate', and 'object'."""
         conversation_context: ConversationContext
     ) -> List[Dict[str, Any]]:
         """
-        Resolve pronouns and references using conversation context.
-        
+        Resolve pronouns and references using coreference chains and context.
+
+        Uses fastcoref chains when available (higher quality), falls back to
+        heuristic resolution using conversation entity history.
+
         Args:
             entities: Extracted entities (may contain pronouns)
-            conversation_context: Conversation context with known entities
-            
+            conversation_context: Conversation context with known entities and coref chains
+
         Returns:
             Entities with coreferences resolved
         """
         resolved = []
-        
+
+        # Build lookup from fastcoref chains: mention -> head entity
+        coref_lookup = {}
+        if conversation_context.coreference_chains:
+            for chain in conversation_context.coreference_chains:
+                head = chain.get('head', '')
+                for mention in chain.get('mentions', []):
+                    if mention.lower() != head.lower():
+                        coref_lookup[mention.lower()] = head
+
         for entity in entities:
-            name = entity.get('name', '').lower().strip()
-            
-            # Check if it's a pronoun or reference
-            if name in self.pronouns or self._is_demonstrative_reference(name):
-                # Try to resolve from context
+            name = entity.get('name', '').strip()
+            name_lower = name.lower()
+
+            # First try fastcoref chain lookup (highest quality)
+            if name_lower in coref_lookup:
+                resolved_name = coref_lookup[name_lower]
+                resolved.append({
+                    'name': resolved_name,
+                    'entity_type': entity.get('entity_type', 'concept'),
+                    'confidence': 0.9,  # High confidence from fastcoref
+                    'resolved_from': name,
+                    'resolution_source': 'fastcoref'
+                })
+            # Then check if it's a pronoun or reference needing heuristic resolution
+            elif name_lower in self.pronouns or self._is_demonstrative_reference(name_lower):
                 resolved_entity = self._resolve_from_context(entity, conversation_context)
                 if resolved_entity:
+                    resolved_entity['resolution_source'] = 'heuristic'
                     resolved.append(resolved_entity)
                 else:
-                    # Keep original if can't resolve
                     resolved.append(entity)
             else:
                 resolved.append(entity)
-        
+
         return resolved
     
     def _is_demonstrative_reference(self, text: str) -> bool:

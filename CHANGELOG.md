@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enabled by default**: Runs automatically in `ingest()` pipeline before entity extraction
 - **Uses fastcoref**: High-quality neural coreference resolution
 - **Optional dependency**: `pip install smartmemory[coreference]`
+
+#### Conversation-Aware Extraction with Coreference
+- **Enhanced extractor**: `ConversationAwareLLMExtractor` now uses fastcoref chains for entity resolution
+- **Coreference chains in context**: `ConversationContext` now includes `coreference_chains` field
+- **Auto-selection**: Pipeline auto-selects `conversation_aware_llm` extractor when conversation context is present
+- **Resolution priority**: Uses fastcoref chains (high quality) before falling back to heuristic resolution
+- **LLM context enhancement**: Coreference mappings included in extraction prompts for better entity recognition
 - **Configuration**: `CoreferenceConfig` with resolver, device, enabled settings
 - **Location**: `smartmemory.memory.pipeline.stages.coreference`
 - **Metadata stored**: Original content and coreference chains preserved in item metadata

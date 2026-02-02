@@ -35,14 +35,20 @@ class IngestionRegistry:
     def _register_defaults(self):
         """Register default extractor classes for lazy loading."""
         # Register classes instead of instances - instantiated only when first requested
-        
+
         # Import classes (lightweight, no model loading)
         try:
             from smartmemory.plugins.extractors import LLMExtractor
-            
             self.register_extractor_class('llm', LLMExtractor)
         except ImportError as e:
             logger.warning(f"Failed to import LLM extractor: {e}")
+
+        # Register conversation-aware LLM extractor
+        try:
+            from smartmemory.plugins.extractors.conversation_aware_llm import ConversationAwareLLMExtractor
+            self.register_extractor_class('conversation_aware_llm', ConversationAwareLLMExtractor)
+        except ImportError as e:
+            logger.warning(f"Failed to import conversation-aware LLM extractor: {e}")
 
     def register_adapter(self, name: str, adapter_fn: Callable):
         """Register a new input adapter by name."""
@@ -127,6 +133,31 @@ class IngestionRegistry:
 
         # Keep only registered extractors (factories or instances)
         return [n for n in deduped if n in self.extractor_registry or n in self.extractor_instances]
+
+    def select_extractor_for_context(self, conversation_context: Optional[dict] = None) -> Optional[str]:
+        """
+        Select the appropriate extractor based on context.
+
+        If conversation_context is provided and has turn_history, selects 'conversation_aware_llm'.
+        Otherwise falls back to select_default_extractor().
+
+        Args:
+            conversation_context: Optional conversation context dict
+
+        Returns:
+            Extractor name to use
+        """
+        # Check if we have meaningful conversation context
+        if conversation_context:
+            turn_history = conversation_context.get('turn_history', [])
+            if turn_history and len(turn_history) > 0:
+                # Use conversation-aware extractor if registered
+                if self.is_extractor_registered('conversation_aware_llm'):
+                    logger.debug("Selecting conversation_aware_llm extractor due to conversation context")
+                    return 'conversation_aware_llm'
+
+        # Fall back to default selection
+        return self.select_default_extractor()
 
     def select_default_extractor(self) -> Optional[str]:
         """

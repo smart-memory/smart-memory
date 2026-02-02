@@ -36,15 +36,17 @@ class ExtractionPipeline:
         self.observer = observer
 
     def extract_semantics(self, item: MemoryItem, extractor_name: Optional[str] = None,
-                          extraction_config: Optional[ExtractionConfig] = None) -> Dict[str, Any]:
+                          extraction_config: Optional[ExtractionConfig] = None,
+                          conversation_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Extract entities and relations from the item using the specified extractor.
-        
+
         Args:
             item: MemoryItem to extract from
             extractor_name: Specific extractor to use (legacy parameter)
             extraction_config: Configuration for extraction behavior
-            
+            conversation_context: Optional conversation context for conversation-aware extraction
+
         Returns:
             Dict with 'entities' and 'relations' keys
         """
@@ -52,9 +54,10 @@ class ExtractionPipeline:
         config = extraction_config or ExtractionConfig()
 
         # Use config extractor_name if available, then parameter, then default
+        # Auto-select conversation_aware_llm if conversation context is provided
         final_extractor_name = config.extractor_name or extractor_name
         if not final_extractor_name:
-            final_extractor_name = self.registry.select_default_extractor()
+            final_extractor_name = self.registry.select_extractor_for_context(conversation_context)
 
         extractor = self.registry.get_extractor(final_extractor_name)
 
@@ -76,7 +79,7 @@ class ExtractionPipeline:
         if final_extractor_name == 'ontology' and config.ontology_extraction:
             return self._extract_with_ontology(item, extractor, fallback_order, config)
         else:
-            return self._extract_with_legacy(item, extractor, fallback_order, config)
+            return self._extract_with_legacy(item, extractor, fallback_order, config, conversation_context)
 
     def _extract_with_ontology(self, item: MemoryItem, extractor, fallback_order: List[str],
                                config: ExtractionConfig) -> Dict[str, Any]:
@@ -105,12 +108,29 @@ class ExtractionPipeline:
             return self._try_fallback_extractors(item, fallback_order, config)
 
     def _extract_with_legacy(self, item: MemoryItem, extractor, fallback_order: List[str],
-                             config: ExtractionConfig) -> Dict[str, Any]:
+                             config: ExtractionConfig,
+                             conversation_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Handle legacy extractor with fallback support."""
         try:
             # Call extract method with content
             content = item.content if hasattr(item, 'content') else str(item)
-            result = extractor.extract(content)
+
+            # Try to pass conversation_context if extractor supports it
+            if conversation_context and hasattr(extractor, 'extract'):
+                import inspect
+                sig = inspect.signature(extractor.extract)
+                if 'conversation_context' in sig.parameters:
+                    # Convert dict back to ConversationContext if needed
+                    from smartmemory.conversation.context import ConversationContext
+                    if isinstance(conversation_context, dict):
+                        ctx = ConversationContext.from_dict(conversation_context)
+                    else:
+                        ctx = conversation_context
+                    result = extractor.extract(content, conversation_context=ctx)
+                else:
+                    result = extractor.extract(content)
+            else:
+                result = extractor.extract(content)
         except Exception as e:
             logger.error(f"Extractor failed: {e}", exc_info=True)
             result = {}

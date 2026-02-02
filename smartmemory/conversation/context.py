@@ -42,6 +42,10 @@ class ConversationContext:
     turn_history: List[Dict[str, Any]] = field(default_factory=list)  # [{role, content, ts}]
     active_threads: List[str] = field(default_factory=list)
 
+    # Coreference chains from fastcoref preprocessing
+    # Format: [{"mentions": ["Apple", "The company", "it"], "head": "Apple"}, ...]
+    coreference_chains: List[Dict[str, Any]] = field(default_factory=list)
+
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -55,6 +59,7 @@ class ConversationContext:
             "sentiment": self.sentiment,
             "turn_history": list(self.turn_history or []),
             "active_threads": list(self.active_threads or []),
+            "coreference_chains": list(self.coreference_chains or []),
             "extra": dict(self.extra or {}),
         }
 
@@ -70,6 +75,7 @@ class ConversationContext:
             sentiment=data.get("sentiment"),
             turn_history=list(data.get("turn_history") or []),
             active_threads=list(data.get("active_threads") or []),
+            coreference_chains=list(data.get("coreference_chains") or []),
             extra=dict(data.get("extra") or {}),
         )
         return ctx

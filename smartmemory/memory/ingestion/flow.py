@@ -233,7 +233,21 @@ class MemoryIngestionFlow:
 
         try:
             # Pass conversation context to extraction pipeline if available
+            # Inject coreference chains into conversation context for enhanced extraction
             conversation_context = context.get('conversation') if context else None
+            coref_result = context.get('coreference_result', {})
+            coref_chains = coref_result.get('chains', [])
+
+            if coref_chains and conversation_context:
+                # Add coreference chains to existing conversation context
+                if isinstance(conversation_context, dict):
+                    conversation_context['coreference_chains'] = coref_chains
+                elif hasattr(conversation_context, 'coreference_chains'):
+                    conversation_context.coreference_chains = coref_chains
+            elif coref_chains and not conversation_context:
+                # Create minimal conversation context with just coreference chains
+                conversation_context = {'coreference_chains': coref_chains}
+
             extraction = self.extraction_pipeline.extract_semantics(
                 item, actual_extractor, config_bundle.extraction, conversation_context=conversation_context
             )
