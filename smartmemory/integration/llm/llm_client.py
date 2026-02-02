@@ -24,7 +24,17 @@ except ImportError:
 
 
 class ClaudeCLIProviderAdapter(BaseLLMProvider):
-    """Adapter to use claude_cli package with LLMClient interface."""
+    """Adapter to use claude_cli package with LLMClient interface.
+
+    Args:
+        model: Default model (haiku, sonnet, opus). Default: haiku
+        timeout: Request timeout in seconds. Default: 120
+        command: CLI command to use. Default: claude
+
+    Examples:
+        client = LLMClient(provider='claude-cli', model='opus')
+        client = LLMClient(provider='claude-cli', model='sonnet', timeout=300)
+    """
 
     def __init__(self, config=None, **kwargs):
         if not CLAUDE_CLI_AVAILABLE:
@@ -36,9 +46,14 @@ class ClaudeCLIProviderAdapter(BaseLLMProvider):
         self.provider = "claude-cli"
         self.api_key = None
         self.logger = logging.getLogger(f"{__name__}.ClaudeCLIProviderAdapter")
+
+        # Support both 'model' and 'default_model' for flexibility
+        model = kwargs.get("model") or kwargs.get("default_model", "haiku")
+        timeout = kwargs.get("timeout") or kwargs.get("timeout_seconds", 120)
+
         self._claude = ClaudeCLI(
-            model=kwargs.get("default_model", "haiku"),
-            timeout=kwargs.get("timeout_seconds", 120),
+            model=model,
+            timeout=timeout,
             command=kwargs.get("command", "claude"),
         )
 
@@ -110,16 +125,19 @@ class LLMClient:
                  **provider_kwargs):
         """
         Initialize unified LLM client.
-        
+
         Args:
-            provider: Provider name ("openai", "anthropic", "azure_openai")
+            provider: Provider name ("openai", "anthropic", "azure_openai", "claude-cli")
             config: Configuration object (defaults to global config)
             api_key: Override API key
-            **provider_kwargs: Provider-specific configuration
+            **provider_kwargs: Provider-specific configuration (model, timeout, etc.)
         """
         self.provider_name = provider
         self.config = config or MemoryConfig()
         self.response_parser = ResponseParser()
+
+        # Store model override if provided
+        self._model_override = provider_kwargs.get("model") or provider_kwargs.get("default_model")
 
         # Initialize provider using unified config directly
         self.provider = self._create_provider(api_key, **provider_kwargs)
@@ -291,20 +309,24 @@ class LLMClient:
         )
 
     def _get_default_model(self) -> str:
-        """Get default models for the provider from unified config."""
-        # Try extractor.llm.models first (most common location)
+        """Get default model for the provider."""
+        # First check if model was explicitly set at construction
+        if self._model_override:
+            return self._model_override
+
+        # Try extractor.llm.model from config
         extractor_config = getattr(self.config, 'extractor', {})
         if isinstance(extractor_config, dict):
             llm_config = extractor_config.get('llm', {})
-            if llm_config and llm_config.get('models'):
-                return llm_config['models']
+            if llm_config and llm_config.get('model'):
+                return llm_config['model']
 
-        # Try direct llm.models
+        # Try direct llm.model from config
         llm_config = getattr(self.config, 'llm', {})
-        if llm_config and llm_config.get('models'):
-            return llm_config['models']
+        if llm_config and llm_config.get('model'):
+            return llm_config['model']
 
-        # Provider defaults
+        # Provider defaults (fallback)
         defaults = {
             'openai': 'gpt-4',
             'anthropic': 'claude-3-sonnet-20240229',
