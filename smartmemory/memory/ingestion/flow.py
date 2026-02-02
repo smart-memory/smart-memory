@@ -23,8 +23,9 @@ from smartmemory.memory.ingestion.storage import StoragePipeline
 from smartmemory.memory.pipeline.config import (
     ClassificationConfig, LinkingConfig, StorageConfig,
     GroundingConfig, EnrichmentConfig, ExtractionConfig,
-    InputAdapterConfig, PipelineConfigBundle
+    InputAdapterConfig, PipelineConfigBundle, CoreferenceConfig
 )
+from smartmemory.memory.pipeline.stages.coreference import CoreferenceStage
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.observability.instrumentation import emit_after
 
@@ -182,6 +183,36 @@ class MemoryIngestionFlow:
         context['item'] = item
         context['classified_types'] = types
 
+        # Stage 1.5: Coreference resolution (before extraction)
+        # Resolves "The company" → "Apple Inc." to improve entity extraction
+        coref_config = config_bundle.coreference or CoreferenceConfig()
+        if coref_config.enabled and item.content:
+            try:
+                coref_stage = CoreferenceStage(min_text_length=coref_config.min_text_length)
+                coref_result = coref_stage.run(item.content, config=coref_config)
+
+                if not coref_result.skipped and coref_result.replacements_made > 0:
+                    # Store original content in metadata
+                    if not item.metadata:
+                        item.metadata = {}
+                    item.metadata['original_content'] = item.content
+                    item.metadata['coreference_chains'] = coref_result.chains
+                    item.metadata['coreference_replacements'] = coref_result.replacements_made
+
+                    # Use resolved content for extraction
+                    item.content = coref_result.resolved_text
+                    logger.info(f"Coreference: resolved {coref_result.replacements_made} references")
+
+                context['coreference_result'] = {
+                    'skipped': coref_result.skipped,
+                    'skip_reason': coref_result.skip_reason,
+                    'chains': coref_result.chains,
+                    'replacements_made': coref_result.replacements_made,
+                }
+            except Exception as e:
+                logger.warning(f"Coreference resolution failed: {e}")
+                context['coreference_result'] = {'skipped': True, 'skip_reason': str(e)}
+
         # Emit ingestion start event
         extraction_conf = config_bundle.extraction
         actual_extractor = extraction_conf.extractor_name if extraction_conf else extractor_name
@@ -201,7 +232,11 @@ class MemoryIngestionFlow:
         })
 
         try:
-            extraction = self.extraction_pipeline.extract_semantics(item, actual_extractor, config_bundle.extraction)
+            # Pass conversation context to extraction pipeline if available
+            conversation_context = context.get('conversation') if context else None
+            extraction = self.extraction_pipeline.extract_semantics(
+                item, actual_extractor, config_bundle.extraction, conversation_context=conversation_context
+            )
             # Standardize on 'entities' for internal flow (Path A); accept 'nodes' for back-compat
             entities = extraction.get('entities') or extraction.get('nodes') or []
             relations = extraction.get('relations', [])

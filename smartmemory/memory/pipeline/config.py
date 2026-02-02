@@ -72,6 +72,38 @@ class StorageConfig(MemoryBaseModel):
 
 
 @dataclass
+class CoreferenceConfig(MemoryBaseModel):
+    """Configuration for CoreferenceStage.
+
+    Coreference resolution resolves pronouns and vague references to explicit
+    entity names (e.g., "The company announced..." → "Apple announced...").
+    This improves entity extraction quality by making implicit references explicit.
+    """
+    enabled: bool = True
+    """Whether coreference resolution is enabled."""
+
+    resolver: str = "fastcoref"
+    """Resolver to use: 'fastcoref' (recommended) or 'spacy'."""
+
+    device: str = "auto"
+    """Device for model inference: 'auto', 'mps', 'cuda', or 'cpu'."""
+
+    min_text_length: int = 50
+    """Minimum text length to process (skip very short content)."""
+
+    def __post_init__(self):
+        # Validate resolver
+        valid_resolvers = {"fastcoref", "spacy"}
+        if self.resolver not in valid_resolvers:
+            raise ValueError(f"resolver must be one of {valid_resolvers}, got '{self.resolver}'")
+
+        # Validate device
+        valid_devices = {"auto", "mps", "cuda", "cpu"}
+        if self.device not in valid_devices:
+            raise ValueError(f"device must be one of {valid_devices}, got '{self.device}'")
+
+
+@dataclass
 class GroundingConfig(MemoryBaseModel):
     """Configuration for GroundingEngine stage."""
     grounding_strategy: str = "wikipedia"
@@ -162,6 +194,7 @@ class PipelineConfigBundle(MemoryBaseModel):
     """Bundle of all pipeline stage configurations."""
     input_adapter: Optional[InputAdapterConfig] = None
     classification: Optional[ClassificationConfig] = None
+    coreference: Optional[CoreferenceConfig] = None
     extraction: Optional[ExtractionConfig] = None
     storage: Optional[StorageConfig] = None
     linking: Optional[LinkingConfig] = None
@@ -174,6 +207,8 @@ class PipelineConfigBundle(MemoryBaseModel):
             self.input_adapter = InputAdapterConfig()
         if self.classification is None:
             self.classification = ClassificationConfig()
+        if self.coreference is None:
+            self.coreference = CoreferenceConfig()
         if self.extraction is None:
             self.extraction = ExtractionConfig()
         if self.storage is None:
@@ -191,6 +226,7 @@ class PipelineConfigBundle(MemoryBaseModel):
             'input': self.input_adapter,
             'input_adapter': self.input_adapter,
             'classification': self.classification,
+            'coreference': self.coreference,
             'extraction': self.extraction,
             'extractor': self.extraction,
             'storage': self.storage,

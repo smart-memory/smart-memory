@@ -42,10 +42,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ObservationSynthesisEvolver` - Creates entity summaries from facts
   - `OpinionReinforcementEvolver` - Updates confidence based on new evidence
 
+#### Coreference Resolution Stage (from feed integration)
+- **New pipeline stage**: `CoreferenceStage` - Resolves pronouns and vague references to explicit entity names
+- **Example**: "Apple announced... The company exceeded..." → "Apple announced... Apple exceeded..."
+- **Enabled by default**: Runs automatically in `ingest()` pipeline before entity extraction
+- **Uses fastcoref**: High-quality neural coreference resolution
+- **Optional dependency**: `pip install smartmemory[coreference]`
+- **Configuration**: `CoreferenceConfig` with resolver, device, enabled settings
+- **Location**: `smartmemory.memory.pipeline.stages.coreference`
+- **Metadata stored**: Original content and coreference chains preserved in item metadata
+- **Use case**: Improves entity extraction quality by making implicit references explicit
+
 #### New Exports
+- `smartmemory.memory.pipeline.stages`: Added `CoreferenceStage`, `CoreferenceResult`
+- `smartmemory.memory.pipeline.config`: Added `CoreferenceConfig`
 - `smartmemory.models`: Added `ReasoningStep`, `ReasoningTrace`, `ReasoningEvaluation`, `TaskContext`, `OpinionMetadata`, `ObservationMetadata`, `Disposition`
 - `smartmemory.plugins.extractors`: Added `ReasoningExtractor`
 - `smartmemory.plugins.evolvers`: Added `OpinionSynthesisEvolver`, `ObservationSynthesisEvolver`, `OpinionReinforcementEvolver`
+
+#### Dependencies
+- Added optional dependency group `coreference` with `fastcoref>=2.1.0`
 
 ---
 
