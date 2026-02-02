@@ -23,6 +23,9 @@
   "enrichers": {
     "temporal": {
       "prompt_template": "Given the following text, extract for each entity the valid_start, valid_end, and transaction_time (if available) in ISO format. Return a JSON object mapping each entity to its temporal info. If not available, leave the field null.\n\nText: <TEXT>\n\nEntities: <ENTITIES>\n\nOutput example: {\"Alice\": {\"valid_start\": \"2020-01-01\", \"valid_end\": null, \"transaction_time\": \"2022-04-27T12:00:00\"}, ...}"
+    },
+    "link_expansion": {
+      "prompt_template": "Analyze the following web page content and provide:\n1. A concise summary (2-3 sentences)\n2. Key entities mentioned (people, organizations, products, topics)\n3. Main topics covered\n\nPage Title: {{TITLE}}\n\nContent:\n{{CONTENT}}\n\nRespond in JSON format:\n{\n  \"summary\": \"...\",\n  \"entities\": [{\"name\": \"...\", \"type\": \"PERSON|ORG|PRODUCT|TOPIC\"}],\n  \"topics\": [\"...\"]\n}"
     }
   },
   "ontology": {

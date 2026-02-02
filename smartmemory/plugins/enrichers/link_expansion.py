@@ -5,10 +5,12 @@ Fetches URL content, extracts metadata (title, description, OG tags), and option
 uses LLM for summarization and entity extraction. Creates WebResource nodes linked
 to Entity child nodes.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json as json_module
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -18,17 +20,30 @@ from urllib.parse import urlparse
 import httpx
 
 try:
+    import openai
+
+    HAS_OPENAI = True
+except ImportError:
+    HAS_OPENAI = False
+
+try:
     from bs4 import BeautifulSoup
 
     HAS_BS4 = True
 except ImportError:
     HAS_BS4 = False
 
-# URL pattern - matches http/https URLs
-URL_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')
-
+from smartmemory.integration.llm.prompts.prompts_loader import (
+    apply_placeholders,
+    get_prompt_value,
+)
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EnricherPlugin, PluginMetadata
+
+logger = logging.getLogger(__name__)
+
+# URL pattern - matches http/https URLs
+URL_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+')  # noqa: E501
 
 
 @dataclass
@@ -99,9 +114,7 @@ class LinkExpansionEnricher(EnricherPlugin):
         """
         self.config = config or LinkExpansionEnricherConfig()
         if not isinstance(self.config, LinkExpansionEnricherConfig):
-            raise TypeError(
-                "LinkExpansionEnricher requires typed config (LinkExpansionEnricherConfig)"
-            )
+            raise TypeError("LinkExpansionEnricher requires typed config (LinkExpansionEnricherConfig)")
 
     def _extract_urls(self, item, node_ids: dict[str, Any] | None) -> list[str]:
         """Extract URLs from content, then merge with extraction stage output.
@@ -171,9 +184,7 @@ class LinkExpansionEnricher(EnricherPlugin):
         Returns:
             Content string or None if not found.
         """
-        tag = soup.find("meta", attrs={"property": name}) or soup.find(
-            "meta", attrs={"name": name}
-        )
+        tag = soup.find("meta", attrs={"property": name}) or soup.find("meta", attrs={"name": name})
         return tag.get("content") if tag else None
 
     def _get_canonical(self, soup) -> str | None:
@@ -221,9 +232,7 @@ class LinkExpansionEnricher(EnricherPlugin):
         )
 
         # Description: og:description > meta description
-        description = self._get_meta(soup, "og:description") or self._get_meta(
-            soup, "description"
-        )
+        description = self._get_meta(soup, "og:description") or self._get_meta(soup, "description")
 
         return {
             "title": title[:500] if title else url,
@@ -260,36 +269,44 @@ class LinkExpansionEnricher(EnricherPlugin):
 
         # Direct entity
         if ld_type in type_map and ld.get("name"):
-            entities.append({
-                "name": ld["name"],
-                "type": type_map[ld_type],
-                "source": "jsonld",
-            })
+            entities.append(
+                {
+                    "name": ld["name"],
+                    "type": type_map[ld_type],
+                    "source": "jsonld",
+                }
+            )
 
         # Nested author
         author = ld.get("author")
         if isinstance(author, dict) and author.get("name"):
             author_type = type_map.get(author.get("@type", ""), "PERSON")
-            entities.append({
-                "name": author["name"],
-                "type": author_type,
-                "source": "jsonld",
-            })
+            entities.append(
+                {
+                    "name": author["name"],
+                    "type": author_type,
+                    "source": "jsonld",
+                }
+            )
         elif isinstance(author, str):
-            entities.append({
-                "name": author,
-                "type": "PERSON",
-                "source": "jsonld",
-            })
+            entities.append(
+                {
+                    "name": author,
+                    "type": "PERSON",
+                    "source": "jsonld",
+                }
+            )
 
         # Nested publisher
         publisher = ld.get("publisher")
         if isinstance(publisher, dict) and publisher.get("name"):
-            entities.append({
-                "name": publisher["name"],
-                "type": "ORG",
-                "source": "jsonld",
-            })
+            entities.append(
+                {
+                    "name": publisher["name"],
+                    "type": "ORG",
+                    "source": "jsonld",
+                }
+            )
 
         return entities
 
@@ -330,6 +347,58 @@ class LinkExpansionEnricher(EnricherPlugin):
 
         return entities
 
+    def _analyze_with_llm(self, html: str, metadata: dict) -> dict:
+        """Analyze content with LLM for summary and entities.
+
+        Args:
+            html: HTML content (will extract text).
+            metadata: Previously extracted metadata.
+
+        Returns:
+            dict: LLM analysis results with summary, entities, topics.
+        """
+        if not HAS_OPENAI:
+            logger.warning("OpenAI not available for LLM analysis")
+            return {}
+
+        if not HAS_BS4:
+            return {}
+
+        # Extract text from HTML
+        soup = BeautifulSoup(html, "html.parser")
+        for script in soup(["script", "style"]):
+            script.decompose()
+        text = soup.get_text(separator=" ", strip=True)[:8000]
+
+        # Get prompt template
+        template = get_prompt_value(self.config.prompt_template_key)
+        if not template:
+            logger.warning(f"Prompt template not found: {self.config.prompt_template_key}")
+            return {}
+
+        prompt = apply_placeholders(
+            template,
+            {"CONTENT": text, "TITLE": metadata.get("title", "")},
+        )
+
+        try:
+            # Configure API key if provided
+            if self.config.openai_api_key:
+                openai.api_key = self.config.openai_api_key
+
+            response = openai.chat.completions.create(
+                model=self.config.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=1024,
+                response_format={"type": "json_object"},
+            )
+            result = json_module.loads(response.choices[0].message.content)
+            return result
+        except Exception as e:
+            logger.warning(f"LLM analysis failed: {e}")
+            return {}
+
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs into graph structures.
 
@@ -361,13 +430,15 @@ class LinkExpansionEnricher(EnricherPlugin):
             fetch_result = self._fetch_url(url)
 
             if fetch_result["status"] == "failed":
-                results.append({
-                    "url": url,
-                    "node_id": node_id,
-                    "status": "failed",
-                    "error": fetch_result.get("error"),
-                    "error_type": fetch_result.get("error_type"),
-                })
+                results.append(
+                    {
+                        "url": url,
+                        "node_id": node_id,
+                        "status": "failed",
+                        "error": fetch_result.get("error"),
+                        "error_type": fetch_result.get("error_type"),
+                    }
+                )
                 provenance_candidates.append(node_id)
                 continue
 
@@ -387,6 +458,22 @@ class LinkExpansionEnricher(EnricherPlugin):
                 "extracted_entities": entities,
                 "summary": None,  # LLM only
             }
+
+            # LLM analysis (optional)
+            if self.config.enable_llm:
+                llm_result = self._analyze_with_llm(fetch_result["html"], metadata)
+                if llm_result:
+                    resource["summary"] = llm_result.get("summary")
+                    # Add LLM entities
+                    for entity in llm_result.get("entities", []):
+                        if isinstance(entity, dict) and entity.get("name"):
+                            entities.append(
+                                {
+                                    "name": entity["name"],
+                                    "type": entity.get("type", "TOPIC"),
+                                    "source": "llm",
+                                }
+                            )
 
             results.append(resource)
             all_entities.extend(entities)

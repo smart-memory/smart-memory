@@ -675,3 +675,100 @@ class TestEnrichMethod:
         assert "John Doe" in result["tags"]
         resource = result["web_resources"][0]
         assert len(resource["extracted_entities"]) >= 1
+
+
+class TestLLMAnalysis:
+    """Tests for optional LLM analysis."""
+
+    def test_enrich_with_llm_enabled(self):
+        """Test enriching with LLM analysis enabled."""
+        import json
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import (
+            LinkExpansionEnricher,
+            LinkExpansionEnricherConfig,
+        )
+
+        config = LinkExpansionEnricherConfig(enable_llm=True)
+        enricher = LinkExpansionEnricher(config=config)
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html><body>Long article content here...</body></html>"
+            mock_response.url = "https://example.com"
+            mock_response.headers = {}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            with patch("smartmemory.plugins.enrichers.link_expansion.openai") as mock_openai:
+                mock_completion = Mock()
+                mock_completion.choices = [
+                    Mock(
+                        message=Mock(
+                            content=json.dumps({
+                                "summary": "This is a summary.",
+                                "entities": [{"name": "LLM Entity", "type": "TOPIC"}],
+                                "topics": ["AI", "Technology"],
+                            })
+                        )
+                    )
+                ]
+                mock_openai.chat.completions.create.return_value = mock_completion
+
+                result = enricher.enrich("Check https://example.com")
+
+        resource = result["web_resources"][0]
+        assert resource["summary"] == "This is a summary."
+        assert "LLM Entity" in result["tags"]
+
+    def test_enrich_llm_failure_falls_back(self):
+        """Test that LLM failure doesn't break enrichment."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import (
+            LinkExpansionEnricher,
+            LinkExpansionEnricherConfig,
+        )
+
+        config = LinkExpansionEnricherConfig(enable_llm=True)
+        enricher = LinkExpansionEnricher(config=config)
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html><title>Test</title></html>"
+            mock_response.url = "https://example.com"
+            mock_response.headers = {}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            with patch("smartmemory.plugins.enrichers.link_expansion.openai") as mock_openai:
+                mock_openai.chat.completions.create.side_effect = Exception("API Error")
+
+                result = enricher.enrich("Check https://example.com")
+
+        # Should still succeed with heuristic results
+        assert len(result["web_resources"]) == 1
+        assert result["web_resources"][0]["status"] == "success"
+
+    def test_llm_disabled_by_default(self):
+        """Test that LLM is not called when disabled."""
+        from unittest.mock import Mock, patch
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+
+        with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
+            mock_response = Mock()
+            mock_response.text = "<html><title>Test</title></html>"
+            mock_response.url = "https://example.com"
+            mock_response.headers = {}
+            mock_response.raise_for_status = Mock()
+            mock_httpx.get.return_value = mock_response
+
+            with patch("smartmemory.plugins.enrichers.link_expansion.openai") as mock_openai:
+                result = enricher.enrich("Check https://example.com")
+
+                # OpenAI should not be called
+                mock_openai.chat.completions.create.assert_not_called()
