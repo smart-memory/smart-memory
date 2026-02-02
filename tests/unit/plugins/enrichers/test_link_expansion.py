@@ -420,3 +420,135 @@ class TestMetadataExtraction:
         metadata = enricher._extract_metadata(html, "https://example.com")
 
         assert len(metadata["title"]) == 500  # Truncated to 500
+
+
+class TestEntityExtraction:
+    """Tests for heuristic entity extraction from HTML."""
+
+    def test_extract_author_as_person_entity(self):
+        """Test extracting author as PERSON entity."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = '<html><head><meta name="author" content="John Doe"></head></html>'
+        metadata = {"author": "John Doe"}
+
+        entities = enricher._extract_entities_heuristic(html, metadata)
+
+        assert len(entities) >= 1
+        author_entity = next((e for e in entities if e["name"] == "John Doe"), None)
+        assert author_entity is not None
+        assert author_entity["type"] == "PERSON"
+        assert author_entity["source"] == "meta"
+
+    def test_extract_entities_from_jsonld_person(self):
+        """Test extracting entities from JSON-LD Person."""
+        import json
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        jsonld = {
+            "@type": "Person",
+            "name": "Jane Smith",
+        }
+        html = f'''
+        <html>
+        <head>
+            <script type="application/ld+json">{json.dumps(jsonld)}</script>
+        </head>
+        </html>
+        '''
+
+        entities = enricher._extract_entities_heuristic(html, {})
+
+        assert len(entities) >= 1
+        person = next((e for e in entities if e["name"] == "Jane Smith"), None)
+        assert person is not None
+        assert person["type"] == "PERSON"
+        assert person["source"] == "jsonld"
+
+    def test_extract_entities_from_jsonld_organization(self):
+        """Test extracting entities from JSON-LD Organization."""
+        import json
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        jsonld = {
+            "@type": "Organization",
+            "name": "Acme Corp",
+        }
+        html = f'''
+        <html>
+        <head>
+            <script type="application/ld+json">{json.dumps(jsonld)}</script>
+        </head>
+        </html>
+        '''
+
+        entities = enricher._extract_entities_heuristic(html, {})
+
+        org = next((e for e in entities if e["name"] == "Acme Corp"), None)
+        assert org is not None
+        assert org["type"] == "ORG"
+        assert org["source"] == "jsonld"
+
+    def test_extract_entities_from_jsonld_article(self):
+        """Test extracting entities from JSON-LD Article with author."""
+        import json
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        jsonld = {
+            "@type": "Article",
+            "author": {"@type": "Person", "name": "Bob Writer"},
+        }
+        html = f'''
+        <html>
+        <head>
+            <script type="application/ld+json">{json.dumps(jsonld)}</script>
+        </head>
+        </html>
+        '''
+
+        entities = enricher._extract_entities_heuristic(html, {})
+
+        author = next((e for e in entities if e["name"] == "Bob Writer"), None)
+        assert author is not None
+        assert author["type"] == "PERSON"
+
+    def test_extract_entities_deduplicates(self):
+        """Test that duplicate entities are removed."""
+        import json
+
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        jsonld = {"@type": "Person", "name": "John Doe"}
+        html = f'''
+        <html>
+        <head>
+            <meta name="author" content="John Doe">
+            <script type="application/ld+json">{json.dumps(jsonld)}</script>
+        </head>
+        </html>
+        '''
+        metadata = {"author": "John Doe"}
+
+        entities = enricher._extract_entities_heuristic(html, metadata)
+
+        john_entities = [e for e in entities if e["name"] == "John Doe"]
+        assert len(john_entities) == 1  # Deduplicated
+
+    def test_extract_entities_empty_html(self):
+        """Test entity extraction from HTML with no structured data."""
+        from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
+
+        enricher = LinkExpansionEnricher()
+        html = "<html><body>Just text</body></html>"
+
+        entities = enricher._extract_entities_heuristic(html, {})
+
+        assert entities == []

@@ -7,6 +7,7 @@ to Entity child nodes.
 """
 from __future__ import annotations
 
+import json as json_module
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -232,6 +233,100 @@ class LinkExpansionEnricher(EnricherPlugin):
             "domain": urlparse(url).netloc,
             "canonical_url": self._get_canonical(soup) or url,
         }
+
+    def _parse_jsonld(self, ld: dict) -> list[dict]:
+        """Parse JSON-LD structured data to extract entities.
+
+        Args:
+            ld: JSON-LD object.
+
+        Returns:
+            list: Extracted entity dicts.
+        """
+        entities = []
+        ld_type = ld.get("@type", "")
+
+        # Map JSON-LD types to entity types
+        type_map = {
+            "Person": "PERSON",
+            "Organization": "ORG",
+            "Corporation": "ORG",
+            "Product": "PRODUCT",
+            "Place": "LOCATION",
+            "Event": "EVENT",
+        }
+
+        # Direct entity
+        if ld_type in type_map and ld.get("name"):
+            entities.append({
+                "name": ld["name"],
+                "type": type_map[ld_type],
+                "source": "jsonld",
+            })
+
+        # Nested author
+        author = ld.get("author")
+        if isinstance(author, dict) and author.get("name"):
+            author_type = type_map.get(author.get("@type", ""), "PERSON")
+            entities.append({
+                "name": author["name"],
+                "type": author_type,
+                "source": "jsonld",
+            })
+        elif isinstance(author, str):
+            entities.append({
+                "name": author,
+                "type": "PERSON",
+                "source": "jsonld",
+            })
+
+        # Nested publisher
+        publisher = ld.get("publisher")
+        if isinstance(publisher, dict) and publisher.get("name"):
+            entities.append({
+                "name": publisher["name"],
+                "type": "ORG",
+                "source": "jsonld",
+            })
+
+        return entities
+
+    def _extract_entities_heuristic(self, html: str, metadata: dict) -> list[dict]:
+        """Extract entities from structured data without LLM.
+
+        Args:
+            html: HTML content string.
+            metadata: Previously extracted metadata.
+
+        Returns:
+            list: Extracted entity dicts with name, type, source.
+        """
+        if not HAS_BS4:
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        entities = []
+        seen_names: set[str] = set()
+
+        # Author from metadata as PERSON
+        if metadata.get("author"):
+            name = metadata["author"]
+            if name not in seen_names:
+                entities.append({"name": name, "type": "PERSON", "source": "meta"})
+                seen_names.add(name)
+
+        # JSON-LD structured data (Schema.org)
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                ld = json_module.loads(script.string)
+                for entity in self._parse_jsonld(ld):
+                    if entity["name"] not in seen_names:
+                        entities.append(entity)
+                        seen_names.add(entity["name"])
+            except (json_module.JSONDecodeError, TypeError, AttributeError):
+                pass
+
+        return entities
 
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs.
