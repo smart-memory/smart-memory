@@ -772,3 +772,19 @@ class TestLLMAnalysis:
 
                 # OpenAI should not be called
                 mock_openai.chat.completions.create.assert_not_called()
+
+
+class TestPluginRegistration:
+    """Tests for plugin registration."""
+
+    def test_enricher_exported_from_module(self):
+        """Test that LinkExpansionEnricher is exported from enrichers module."""
+        from smartmemory.plugins.enrichers import LinkExpansionEnricher
+
+        assert LinkExpansionEnricher is not None
+
+    def test_enricher_in_all(self):
+        """Test that LinkExpansionEnricher is in __all__."""
+        from smartmemory.plugins import enrichers
+
+        assert "LinkExpansionEnricher" in enrichers.__all__
