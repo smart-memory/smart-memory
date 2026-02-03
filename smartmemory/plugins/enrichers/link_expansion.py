@@ -337,7 +337,10 @@ class LinkExpansionEnricher(EnricherPlugin):
         # JSON-LD structured data (Schema.org)
         for script in soup.find_all("script", type="application/ld+json"):
             try:
-                ld = json_module.loads(script.string)
+                script_content = script.string
+                if script_content is None:
+                    continue
+                ld = json_module.loads(script_content)
                 for entity in self._parse_jsonld(ld):
                     if entity["name"] not in seen_names:
                         entities.append(entity)
@@ -393,7 +396,10 @@ class LinkExpansionEnricher(EnricherPlugin):
                 max_tokens=1024,
                 response_format={"type": "json_object"},
             )
-            result = json_module.loads(response.choices[0].message.content)
+            message_content = response.choices[0].message.content
+            if message_content is None:
+                return {}
+            result: dict[str, Any] = json_module.loads(message_content)
             return result
         except Exception as e:
             logger.warning(f"LLM analysis failed: {e}")

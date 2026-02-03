@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Link Expansion Enricher
+- **New enricher**: `LinkExpansionEnricher` - Expands URLs in memory items into rich graph structures
+- **URL detection**: Regex-first extraction with fallback to extraction stage URLs
+- **Metadata extraction**: Title, description, OG tags, author, published date via BeautifulSoup
+- **Entity extraction**: Heuristic extraction from JSON-LD (Schema.org) structured data
+- **LLM analysis (optional)**: Summary and deeper entity extraction when `enable_llm=True`
+- **Graph integration**: Creates `WebResource` nodes linked to `Entity` nodes via `MENTIONS` edges
+- **Error handling**: Failed fetches create nodes with `status='failed'` for retry capability
+- **Config**: `LinkExpansionEnricherConfig` with timeout, max URLs, user agent settings
+
 #### Claude CLI Integration
 - **External package**: `claude-cli` extracted to `regression-io/claude-cli` (private)
 - **Optional dependency**: `pip install smartmemory[claude-cli]`
