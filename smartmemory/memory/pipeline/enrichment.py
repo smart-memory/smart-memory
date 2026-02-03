@@ -149,15 +149,25 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
 
             # Run enrichment
             try:
+                # Get per-enricher configs if provided
+                enricher_configs = getattr(config, 'enricher_configs', None) or {}
+
                 if enricher_names:
-                    # Run specific enrichers
+                    # Run specific enrichers with their configs
                     enrichment_result = {}
                     for enricher_name in enricher_names:
-                        partial_result = self.enrichment.enrich(context, enricher_names=[enricher_name])
+                        partial_result = self.enrichment.enrich(
+                            context,
+                            enricher_names=[enricher_name],
+                            enricher_configs=enricher_configs
+                        )
                         enrichment_result.update(partial_result)
                 else:
                     # Run all enrichers by default
-                    enrichment_result = self.enrichment.enrich(context)
+                    enrichment_result = self.enrichment.enrich(
+                        context,
+                        enricher_configs=enricher_configs
+                    )
 
                 enrichment_success = True
                 enrichment_error = None

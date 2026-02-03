@@ -131,6 +131,8 @@ class GroundingConfig(MemoryBaseModel):
 class EnrichmentConfig(MemoryBaseModel):
     """Configuration for EnrichmentPipeline stage."""
     enricher_names: Optional[List[str]] = None
+    enricher_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    """Per-enricher configuration. Keys are enricher names, values are config dicts."""
     execution_order: str = "parallel"
     enable_derived_items: bool = True
     max_enrichment_depth: int = 2

@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Error handling**: Failed fetches create nodes with `status='failed'` for retry capability
 - **Config**: `LinkExpansionEnricherConfig` with timeout, max URLs, user agent settings
 
+#### Per-Enricher Configuration Support
+- **New field**: `EnrichmentConfig.enricher_configs` - Dict mapping enricher names to config dicts
+- **Config passthrough**: Enrichment stage now passes per-enricher config to enricher instances
+- **Auto config class discovery**: Automatically finds `*Config` class for typed config instantiation
+- **Backward compatible**: Enrichers without config or with mismatched config continue to work
+
 #### Claude CLI Integration
 - **External package**: `claude-cli` extracted to `regression-io/claude-cli` (private)
 - **Optional dependency**: `pip install smartmemory[claude-cli]`
