@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.2] - 2026-02-05
 
+### Changed
+
+#### Extraction Pipeline
+- **Default extractor changed to Groq** (`GroqExtractor`): Llama-3.3-70b-versatile via Groq API — 100% E-F1, 89.3% R-F1, 878ms. Requires `GROQ_API_KEY` env var.
+- **New `GroqExtractor` class** in `llm_single.py`: Zero-arg constructor wrapper for registry lazy loading.
+- **Fallback chain updated**: groq → llm → llm_single → conversation_aware_llm → spaCy. SpaCy extractor (no API keys needed) re-registered as last-resort fallback.
+- **Direct module imports** in registry: Extractors now imported from specific module files (not `__init__.py`) to avoid transitive dependency failures (e.g., GLiNER not installed).
+- **Robust fallback iteration**: Extraction pipeline now tries ALL fallbacks (not just the first) when the primary extractor fails to instantiate.
+- **`select_default_extractor()` never returns `None`**: Raises `ValueError` with actionable message if no extractors are available.
+
 ### Added
 
 #### Graph Validation & Health (Wave 2)

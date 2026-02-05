@@ -33,22 +33,47 @@ class IngestionRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        """Register default extractor classes for lazy loading."""
-        # Register classes instead of instances - instantiated only when first requested
+        """Register default extractor classes for lazy loading.
 
-        # Import classes (lightweight, no model loading)
+        Uses direct module imports (not __init__.py) to avoid transitive dependency
+        failures — e.g. HybridExtractor needing GLiNER at import time.
+
+        Priority: groq (best quality+speed) > llm (OpenAI) > spaCy (no API key needed)
+        """
+        # Groq: 100% E-F1, 89.3% R-F1, 878ms — best overall extractor
         try:
-            from smartmemory.plugins.extractors import LLMExtractor
+            from smartmemory.plugins.extractors.llm_single import GroqExtractor
+            self.register_extractor_class('groq', GroqExtractor)
+        except ImportError as e:
+            logger.warning(f"Failed to import Groq extractor: {e}")
+
+        # OpenAI LLM extractor (two-call, higher precision)
+        try:
+            from smartmemory.plugins.extractors.llm import LLMExtractor
             self.register_extractor_class('llm', LLMExtractor)
         except ImportError as e:
             logger.warning(f"Failed to import LLM extractor: {e}")
 
-        # Register conversation-aware LLM extractor
+        # Single-call LLM extractor (faster, configurable model)
+        try:
+            from smartmemory.plugins.extractors.llm_single import LLMSingleExtractor
+            self.register_extractor_class('llm_single', LLMSingleExtractor)
+        except ImportError as e:
+            logger.warning(f"Failed to import LLM single extractor: {e}")
+
+        # Conversation-aware LLM extractor
         try:
             from smartmemory.plugins.extractors.conversation_aware_llm import ConversationAwareLLMExtractor
             self.register_extractor_class('conversation_aware_llm', ConversationAwareLLMExtractor)
         except ImportError as e:
             logger.warning(f"Failed to import conversation-aware LLM extractor: {e}")
+
+        # spaCy: last-resort fallback — no API keys needed, works offline
+        try:
+            from smartmemory.plugins.extractors.spacy import SpacyExtractor
+            self.register_extractor_class('spacy', SpacyExtractor)
+        except ImportError as e:
+            logger.warning(f"Failed to import spaCy extractor: {e}")
 
     def register_adapter(self, name: str, adapter_fn: Callable):
         """Register a new input adapter by name."""
@@ -108,7 +133,8 @@ class IngestionRegistry:
     def get_fallback_order(self, primary: Optional[str] = None) -> List[str]:
         """
         Return a config-driven extractor fallback order, filtered to registered extractors.
-        Defaults to ['llm', 'relik', 'gliner', 'spacy'] and removes the primary extractor if provided.
+        Defaults to ['groq', 'llm', 'llm_single', 'conversation_aware_llm', 'spacy'].
+        Removes the primary extractor if provided.
         """
         try:
             cfg = get_config('extractor') or {}
@@ -117,7 +143,7 @@ class IngestionRegistry:
 
         order = cfg.get('fallback_order')
         if not order:
-            order = ['llm', 'relik', 'gliner', 'spacy']
+            order = ['groq', 'llm', 'llm_single', 'conversation_aware_llm', 'spacy']
 
         # Remove duplicates while preserving order
         seen = set()
@@ -159,22 +185,24 @@ class IngestionRegistry:
         # Fall back to default selection
         return self.select_default_extractor()
 
-    def select_default_extractor(self) -> Optional[str]:
+    def select_default_extractor(self) -> str:
         """
         Select the default extractor name using config and availability.
-        Prefers extractor['default'] if registered, else the first available from the fallback order,
-        else 'ontology' if registered, else any registered extractor.
-        """
-        import logging
-        logger = logging.getLogger(__name__)
 
+        Prefers extractor['default'] if registered, else the first available from
+        the fallback order, else 'ontology' if registered, else any registered
+        extractor, else 'spacy' as the absolute last resort.
+
+        Raises:
+            ValueError: If no extractors are registered at all.
+        """
         try:
             cfg = get_config('extractor') or {}
         except Exception as e:
             logger.warning(f"Failed to load extractor config: {e}")
             cfg = {}
 
-        default = cfg.get('default', 'llm')
+        default = cfg.get('default', 'groq')
 
         if default and (default in self.extractor_registry or default in self.extractor_instances):
             return default
@@ -191,7 +219,14 @@ class IngestionRegistry:
         if 'ontology' in self.extractor_registry:
             return 'ontology'
 
-        return next(iter(self.extractor_registry.keys()), None)
+        first_available = next(iter(self.extractor_registry.keys()), None)
+        if first_available:
+            return first_available
+
+        raise ValueError(
+            "No extractors are registered. Ensure at least spaCy (en_core_web_sm) "
+            "is installed, or set OPENAI_API_KEY for LLM-based extraction."
+        )
 
     def get_extractor(self, name: str) -> Optional[Callable]:
         """Get an extractor by name, instantiating lazily if needed."""

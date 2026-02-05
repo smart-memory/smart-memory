@@ -52,7 +52,7 @@
     }
   },
   "extractor": {
-    "default": "${EXTRACTOR_DEFAULT:-gliner2}",
+    "default": "${EXTRACTOR_DEFAULT:-groq}",
     "gliner2": {
       "model_name": "${GLINER2_MODEL:-fastino/gliner2-base-v1}",
       "confidence_threshold": "${GLINER2_CONFIDENCE:-0.5}"

@@ -66,14 +66,20 @@ class ExtractionPipeline:
         if config.enable_fallback_chain:
             fallback_order = self.registry.get_fallback_order(primary=final_extractor_name)
 
-        # If the configured extractor isn't registered, pick the first available fallback
+        # If the configured extractor failed to load, try each fallback in order
         if extractor is None:
-            if fallback_order:
-                final_extractor_name = fallback_order[0]
-                extractor = self.registry.get_extractor(final_extractor_name)
-                fallback_order = self.registry.get_fallback_order(primary=final_extractor_name)
+            for fallback_name in fallback_order:
+                extractor = self.registry.get_extractor(fallback_name)
+                if extractor is not None:
+                    logger.info(f"Primary extractor '{final_extractor_name}' unavailable, using fallback '{fallback_name}'")
+                    final_extractor_name = fallback_name
+                    fallback_order = self.registry.get_fallback_order(primary=final_extractor_name)
+                    break
             if extractor is None:
-                raise ValueError(f"Extractor '{final_extractor_name}' not registered.")
+                raise ValueError(
+                    f"Extractor '{final_extractor_name}' not available and no fallbacks could be loaded. "
+                    f"Set GROQ_API_KEY or OPENAI_API_KEY, or ensure spaCy en_core_web_sm is installed."
+                )
 
         # Handle ontology-aware extractor differently
         if final_extractor_name == 'ontology' and config.ontology_extraction:
