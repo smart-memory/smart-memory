@@ -34,6 +34,7 @@ SmartMemory implements a multi-layered memory architecture with the following co
 - **Reasoning Memory**: Chain-of-thought traces capturing "why" decisions were made (System 2)
 - **Opinion Memory**: Beliefs with confidence scores, reinforced or contradicted over time
 - **Observation Memory**: Synthesized entity summaries from scattered facts
+- **Decision Memory**: First-class decisions with confidence tracking, provenance chains, and lifecycle management
 
 ### Storage Backend
 
@@ -58,7 +59,7 @@ The memory ingestion flow processes data through several stages:
 - **Graph-Based Storage**: FalkorDB backend for complex relationship modeling
 - **Vector Similarity**: FalkorDB vector storage for semantic search
 - **Extensible Pipeline**: Modular processing stages for ingestion and evolution
-- **Plugin Architecture**: 18 built-in plugins with external plugin support
+- **Plugin Architecture**: 20 built-in plugins with external plugin support
 - **Plugin Security**: Sandboxing, permissions, and resource limits for safe plugin execution
 - **Flexible Scoping**: Optional `ScopeProvider` for multi-tenancy or unrestricted OSS usage
 - **Zero Configuration**: Works out-of-the-box for single-user applications
@@ -317,6 +318,7 @@ SmartMemory includes built-in evolvers that automatically transform memories:
 - **EpisodicDecayEvolver**: Archives old episodic memories
 - **SemanticDecayEvolver**: Prunes low-relevance semantic facts
 - **ZettelPruneEvolver**: Merges duplicate or low-quality notes
+- **DecisionConfidenceEvolver**: Decays confidence on stale decisions, auto-retracts below threshold
 
 Evolvers run automatically as part of the memory lifecycle. See the [examples](examples/) directory for evolution demonstrations.
 
@@ -326,16 +328,16 @@ SmartMemory features a **unified, extensible plugin architecture** that allows y
 
 ### Built-in Plugins
 
-SmartMemory includes **18 built-in plugins** across 4 types:
+SmartMemory includes **20 built-in plugins** across 4 types:
 
-- **4 Extractors**: Extract entities and relationships
-  - `SpacyExtractor`, `LLMExtractor`, `RebelExtractor`, `RelikExtractor`
+- **5 Extractors**: Extract entities and relationships
+  - `SpacyExtractor`, `LLMExtractor`, `RebelExtractor`, `RelikExtractor`, `DecisionExtractor`
 - **6 Enrichers**: Add context and metadata to memories
   - `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `TopicEnricher`, `SkillsToolsEnricher`, `WikipediaEnricher`
 - **1 Grounder**: Connect to external knowledge
   - `WikipediaGrounder`
-- **7 Evolvers**: Transform memories based on rules
-  - `WorkingToEpisodicEvolver`, `EpisodicToSemanticEvolver`, `SemanticDecayEvolver`, etc.
+- **8 Evolvers**: Transform memories based on rules
+  - `WorkingToEpisodicEvolver`, `EpisodicToSemanticEvolver`, `SemanticDecayEvolver`, `DecisionConfidenceEvolver`, etc.
 
 ### Creating Custom Plugins
 
