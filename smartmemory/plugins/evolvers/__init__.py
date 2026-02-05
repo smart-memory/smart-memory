@@ -21,21 +21,27 @@ from .opinion_synthesis import OpinionSynthesisEvolver
 from .observation_synthesis import ObservationSynthesisEvolver
 from .opinion_reinforcement import OpinionReinforcementEvolver
 
+# Decision evolvers
+from .decision_confidence import DecisionConfidenceEvolver
+
 __all__ = [
     # Base
     'Evolver',
-    
+
     # Type promotion
     'WorkingToEpisodicEvolver',
     'EpisodicToSemanticEvolver',
     'WorkingToProceduralEvolver',
     'EpisodicToZettelEvolver',
-    
+
     # Maintenance
     'EpisodicDecayEvolver',
-    
+
     # Synthesis
     'OpinionSynthesisEvolver',
     'ObservationSynthesisEvolver',
     'OpinionReinforcementEvolver',
+
+    # Decision
+    'DecisionConfidenceEvolver',
 ]
