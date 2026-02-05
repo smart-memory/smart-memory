@@ -169,6 +169,39 @@ class GraphSchemaValidator:
             }
         ))
 
+        # DECISION NODE SCHEMA (Decision Memory - Phase 4)
+        self.register_node_schema(NodeSchema(
+            node_type="decision",
+            required_fields={"item_id", "content"},
+            optional_fields={
+                "decision_id", "decision_type", "confidence", "evidence_ids", "contradicting_ids",
+                "reinforcement_count", "contradiction_count", "source_type", "source_trace_id",
+                "source_session_id", "context_snapshot", "status", "superseded_by",
+                "domain", "tags", "created_at", "updated_at",
+            },
+            field_types={
+                "item_id": str,
+                "content": str,
+                "decision_id": (str, type(None)),
+                "decision_type": (str, type(None)),
+                "confidence": (float, type(None)),
+                "evidence_ids": (list, type(None)),
+                "contradicting_ids": (list, type(None)),
+                "reinforcement_count": (int, type(None)),
+                "contradiction_count": (int, type(None)),
+                "source_type": (str, type(None)),
+                "source_trace_id": (str, type(None)),
+                "source_session_id": (str, type(None)),
+                "context_snapshot": (dict, type(None)),
+                "status": (str, type(None)),
+                "superseded_by": (str, type(None)),
+                "domain": (str, type(None)),
+                "tags": (list, type(None)),
+                "created_at": (str, type(None)),
+                "updated_at": (str, type(None)),
+            }
+        ))
+
         # ZETTELKASTEN NODE SCHEMAS - CRITICAL MISSING SCHEMAS
 
         # Zettel (note) node schema
@@ -492,21 +525,76 @@ class GraphSchemaValidator:
         # Reasoning trace causes/produces an artifact
         self.register_edge_schema(EdgeSchema(
             edge_type="CAUSES",
-            source_node_types={"reasoning"},
-            target_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity"},
+            source_node_types={"reasoning", "decision", "episodic"},
+            target_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity", "decision"},
             required_properties=set(),
-            optional_properties={"confidence", "timestamp", "trace_id"},
-            property_types={"confidence": float, "timestamp": str, "trace_id": str}
+            optional_properties={"confidence", "timestamp", "trace_id", "mechanism", "lag_time_hours"},
+            property_types={
+                "confidence": float, "timestamp": str, "trace_id": str,
+                "mechanism": str, "lag_time_hours": float,
+            }
         ))
 
         # Inverse: artifact was caused by reasoning trace
         self.register_edge_schema(EdgeSchema(
             edge_type="CAUSED_BY",
-            source_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity"},
-            target_node_types={"reasoning"},
+            source_node_types={"semantic", "episodic", "procedural", "zettel", "entity", "Entity", "decision"},
+            target_node_types={"reasoning", "decision"},
             required_properties=set(),
             optional_properties={"confidence", "timestamp", "trace_id"},
             property_types={"confidence": float, "timestamp": str, "trace_id": str}
+        ))
+
+        # DECISION MEMORY EDGE SCHEMAS (Phase 4)
+
+        # Reasoning trace produced a decision
+        self.register_edge_schema(EdgeSchema(
+            edge_type="PRODUCED",
+            source_node_types={"reasoning"},
+            target_node_types={"decision", "semantic", "episodic", "procedural", "zettel"},
+            required_properties=set(),
+            optional_properties={"confidence", "step_index", "timestamp"},
+            property_types={"confidence": float, "step_index": int, "timestamp": str}
+        ))
+
+        # Decision derived from evidence
+        self.register_edge_schema(EdgeSchema(
+            edge_type="DERIVED_FROM",
+            source_node_types={"decision"},
+            target_node_types={"semantic", "episodic", "reasoning", "decision", "opinion"},
+            required_properties=set(),
+            optional_properties={"weight", "role"},
+            property_types={"weight": float, "role": str}
+        ))
+
+        # New decision supersedes old decision
+        self.register_edge_schema(EdgeSchema(
+            edge_type="SUPERSEDES",
+            source_node_types={"decision"},
+            target_node_types={"decision"},
+            required_properties={"timestamp"},
+            optional_properties={"reason"},
+            property_types={"reason": str, "timestamp": str}
+        ))
+
+        # Decisions or facts in conflict
+        self.register_edge_schema(EdgeSchema(
+            edge_type="CONTRADICTS",
+            source_node_types={"decision", "semantic", "opinion"},
+            target_node_types={"decision", "semantic", "opinion"},
+            required_properties=set(),
+            optional_properties={"detected_at", "resolution"},
+            property_types={"detected_at": str, "resolution": str}
+        ))
+
+        # Soft influence between decisions
+        self.register_edge_schema(EdgeSchema(
+            edge_type="INFLUENCES",
+            source_node_types={"decision", "semantic", "episodic"},
+            target_node_types={"decision", "semantic"},
+            required_properties=set(),
+            optional_properties={"weight"},
+            property_types={"weight": float}
         ))
 
     def register_node_schema(self, schema: NodeSchema):

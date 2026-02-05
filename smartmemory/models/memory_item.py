@@ -21,6 +21,7 @@ MEMORY_TYPES = {
     'reasoning',     # Chain-of-thought traces (System 2)
     'opinion',       # Beliefs with confidence scores (Phase 3)
     'observation',   # Synthesized entity summaries (Phase 3)
+    'decision',      # Conclusions, inferences, choices with provenance (Phase 4)
 }
 
 

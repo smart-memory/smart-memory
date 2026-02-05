@@ -18,6 +18,9 @@ from smartmemory.models.opinion import (
     Disposition,
 )
 
+# Decision models (Decision Memory - Phase 4)
+from smartmemory.models.decision import Decision
+
 __all__ = [
     'MEMORY_TYPES',
     'MemoryItem',
@@ -30,4 +33,6 @@ __all__ = [
     'OpinionMetadata',
     'ObservationMetadata',
     'Disposition',
+    # Phase 4: Decision
+    'Decision',
 ]

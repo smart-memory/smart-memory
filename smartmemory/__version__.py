@@ -32,6 +32,7 @@ except:
     __version_info__ = (0, 1, 6)
 
 # Version history:
+# 0.3.0 - Decision Memory: Decision model, DecisionManager, DecisionQueries, DecisionExtractor, edge schemas (PRODUCED, DERIVED_FROM, SUPERSEDES, CONTRADICTS, INFLUENCES)
 # 0.2.6 - SSG integration, user signature support, documentation updates, DRY version management (VERSION file as single source of truth)
 # 0.1.14 - Tenant isolation bug fix
 # 0.1.13 - Tenant isolation bug fix

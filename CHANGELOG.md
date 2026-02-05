@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-02-05
+
+### Added
+
+#### Decision Memory System
+- **New memory type**: `decision` - First-class decisions with confidence tracking and lifecycle management
+- **New model**: `Decision` - Dataclass with provenance, confidence (reinforce/contradict with diminishing returns), and lifecycle (active/superseded/retracted)
+- **New module**: `smartmemory.decisions` with:
+  - `DecisionManager` - Create, supersede, retract, reinforce, contradict decisions with graph edge management
+  - `DecisionQueries` - Filtered retrieval, provenance chains, recursive causal chain traversal
+- **New extractor**: `DecisionExtractor` - Regex-based extraction from text + `extract_from_trace()` for ReasoningTrace integration
+- **New edge types**: `PRODUCED`, `DERIVED_FROM`, `SUPERSEDES`, `CONTRADICTS`, `INFLUENCES` registered in schema validator
+- **Decision types**: inference, preference, classification, choice, belief, policy
+- **Conflict detection**: Semantic search + content overlap heuristic for finding contradicting decisions
+- **Keyword classification**: Automatic decision type classification from content (no LLM required)
+- **Provenance tracking**: Full chain from evidence → reasoning trace → decision → superseded decisions
+- **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, CAUSES, INFLUENCES, PRODUCED edges with configurable depth
+- **Graceful degradation**: All components work without graph (skip edge operations, return empty lists)
+- **Tests**: 125 unit tests covering model, manager, queries, and extractor
+
+---
+
 ## [Unreleased]
 
 ### Added
