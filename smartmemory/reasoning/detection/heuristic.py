@@ -4,11 +4,7 @@ import logging
 import re
 from typing import Optional, Set
 
-from smartmemory.reasoning.challenger import (
-    Conflict,
-    ConflictType,
-    ResolutionStrategy,
-)
+from smartmemory.reasoning.models import Conflict, ConflictType, ResolutionStrategy
 
 from .base import ContradictionDetector, DetectionContext
 

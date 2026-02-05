@@ -107,8 +107,8 @@ class SmartMemory(MemoryBase):
         self._graph.search.set_smart_memory(self)
 
         # Initialize sub-managers
-        self._monitoring_mgr = MonitoringManager(self._graph, self._monitoring)
-        self._evolution_mgr = EvolutionManager(self._graph, self._evolution, self._clustering)
+        self._monitoring_mgr = MonitoringManager(self._monitoring)
+        self._evolution_mgr = EvolutionManager(self._evolution, self._clustering)
         self._debug_mgr = DebugManager(self._graph, self._search, self.scope_provider)
         self._enrichment_mgr = EnrichmentManager(self._enrichment, self._grounding, self._external_resolver)
 
@@ -704,10 +704,9 @@ class SmartMemory(MemoryBase):
         return self._debug_mgr.get_all_items_debug()
 
     def fix_search_if_broken(self) -> dict:
-        result = self._debug_mgr.fix_search_if_broken()
-        # Sync back the potentially-reinitialized search component
-        self._search = self._debug_mgr._search
-        return result
+        fix_info, new_search = self._debug_mgr.fix_search_if_broken()
+        self._search = new_search
+        return fix_info
 
     def clear(self):
         """Clear all memory from ALL storage backends comprehensively."""

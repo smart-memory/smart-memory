@@ -5,7 +5,7 @@ import logging
 import re
 from typing import Any, Dict, Optional
 
-from smartmemory.reasoning.challenger import Conflict, ResolutionStrategy
+from smartmemory.reasoning.models import Conflict, ResolutionStrategy
 
 from .base import ConflictResolver
 

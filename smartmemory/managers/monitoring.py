@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 class MonitoringManager:
     """Manages summary, orphan detection, pruning, and reflection operations."""
 
-    def __init__(self, graph, monitoring):
-        self._graph = graph
+    def __init__(self, monitoring):
         self._monitoring = monitoring
 
     def summary(self) -> dict:

@@ -103,8 +103,13 @@ class DebugManager:
 
         return debug_info
 
-    def fix_search_if_broken(self) -> dict:
-        """Attempt to fix search functionality if it's broken."""
+    def fix_search_if_broken(self):
+        """Attempt to fix search functionality if it's broken.
+
+        Returns:
+            Tuple of (fix_info dict, new Search instance) so the caller can
+            update its own reference without reaching into our internals.
+        """
         from smartmemory.memory.pipeline.stages.search import Search
 
         fix_info: Dict[str, Any] = {"fixes_applied": [], "test_search_count": 0}
@@ -119,18 +124,18 @@ class DebugManager:
         test_results = self._search.search("test", top_k=1)
         fix_info["test_search_count"] = len(test_results)
 
-        return fix_info
+        return fix_info, self._search
 
     def clear(self):
         """Clear all memory from ALL storage backends comprehensively."""
-        print("Clearing all memory storage backends...")
+        logger.info("Clearing all memory storage backends...")
 
         # 1. Clear the graph backend (FalkorDB)
         from smartmemory.memory.pipeline.stages.graph_operations import GraphOperations
 
         graph_ops = GraphOperations(self._graph)
         graph_ops.clear_all()
-        print("Cleared Graph Database (FalkorDB)")
+        logger.info("Cleared Graph Database (FalkorDB)")
 
         # 2. Clear the vector database
         from smartmemory.stores.vector.vector_store import VectorStore
@@ -138,9 +143,9 @@ class DebugManager:
         try:
             vector_store = VectorStore()
             vector_store.clear()
-            print("Cleared Vector Store")
+            logger.info("Cleared Vector Store")
         except Exception as e:
-            print(f"Vector Store clear failed: {e}")
+            logger.warning(f"Vector Store clear failed: {e}")
 
         # 3. Clear ALL Redis cache types
         from smartmemory.utils.cache import get_cache
@@ -159,6 +164,6 @@ class DebugManager:
             cache.redis.delete(*remaining_keys)
             total_cleared += len(remaining_keys)
 
-        print(f"Cleared Redis Cache ({total_cleared} keys)")
-        print("All memory storage backends cleared successfully!")
+        logger.info(f"Cleared Redis Cache ({total_cleared} keys)")
+        logger.info("All memory storage backends cleared successfully!")
         return True

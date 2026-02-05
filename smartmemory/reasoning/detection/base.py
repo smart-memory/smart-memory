@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from smartmemory.models.memory_item import MemoryItem
-from smartmemory.reasoning.challenger import Conflict
+from smartmemory.reasoning.models import Conflict
 
 
 @dataclass
@@ -19,9 +19,12 @@ class DetectionContext:
 
 
 class ContradictionDetector(ABC):
-    """Strategy interface for a single contradiction detection method."""
+    """Strategy interface for a single contradiction detection method.
 
-    name: str = "base"
+    Subclasses MUST set ``name`` as a class attribute (used in cascade logging).
+    """
+
+    name: str  # No default -- subclasses must define
 
     @abstractmethod
     def detect(self, ctx: DetectionContext) -> Optional[Conflict]:

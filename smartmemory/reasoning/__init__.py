@@ -8,13 +8,15 @@ Provides:
 - ConfidenceManager: Confidence decay and history tracking
 """
 
-from .challenger import (
-    AssertionChallenger,
+from .models import (
     ChallengeResult,
     Conflict,
     ConflictType,
-    ResolutionStrategy,
     DetectionMethod,
+    ResolutionStrategy,
+)
+from .challenger import (
+    AssertionChallenger,
     should_challenge,
     FACTUAL_PATTERNS,
     SKIP_PATTERNS,

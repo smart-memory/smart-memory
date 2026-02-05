@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 class EvolutionManager:
     """Manages evolution cycles, memory promotion, and clustering."""
 
-    def __init__(self, graph, evolution_orchestrator, clustering):
-        self._graph = graph
+    def __init__(self, evolution_orchestrator, clustering):
         self._evolution = evolution_orchestrator
         self._clustering = clustering
 

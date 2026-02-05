@@ -3,7 +3,7 @@
 import logging
 from typing import List, Optional
 
-from smartmemory.reasoning.challenger import Conflict
+from smartmemory.reasoning.models import Conflict
 
 from .base import ContradictionDetector, DetectionContext
 
