@@ -117,9 +117,11 @@ def call_dspy(
         messages: List[Dict[str, str]],
         max_output_tokens: int,
         api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
         response_format: Optional[Dict[str, Any]] = None,
         temperature: Optional[float] = None,
         reasoning_effort: Optional[str] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """Invoke the target model via DSPy and return text.
 
@@ -146,7 +148,25 @@ def call_dspy(
 
     # Configure DSPy LM using provider/model spec string
     # Per DSPy docs: dspy.configure(lm=dspy.LM("openai/<model>", api_key=...))
-    provider_model = f"openai/{model}" if "/" not in model else model
+    # Detect provider from model name or explicit prefix
+    if api_base:
+        # Custom API base (e.g., LM Studio, Groq, Cerebras) — always use openai-compatible provider
+        # Always prepend openai/ so litellm routes to api_base. If model is "openai/gpt-oss-20b",
+        # this becomes "openai/openai/gpt-oss-20b" → litellm strips first prefix and sends
+        # "openai/gpt-oss-20b" to the endpoint, which is the correct model name.
+        provider_model = f"openai/{model}"
+    elif "/" not in model:
+        # Auto-detect provider from model name
+        if model.startswith("llama") or model.startswith("mixtral"):
+            provider_model = f"groq/{model}"
+        elif model.startswith("claude"):
+            provider_model = f"anthropic/{model}"
+        elif model.startswith("gemini"):
+            provider_model = f"gemini/{model}"
+        else:
+            provider_model = f"openai/{model}"
+    else:
+        provider_model = model
     
     # Check if this is a reasoning model (o1/o3/o4/gpt-5.x)
     mn = model.lower().strip()
@@ -155,7 +175,9 @@ def call_dspy(
     lm_kwargs: Dict[str, Any] = {}
     if api_key:
         lm_kwargs["api_key"] = api_key
-    
+    if api_base:
+        lm_kwargs["api_base"] = api_base
+
     if is_reasoning_model:
         # Reasoning models require temperature=1.0 and max_tokens >= 16000
         lm_kwargs["temperature"] = 1.0
@@ -165,6 +187,14 @@ def call_dspy(
             lm_kwargs["temperature"] = temperature
         if max_output_tokens:
             lm_kwargs["max_tokens"] = max_output_tokens
+
+    # Pass response_format to litellm for structured output (JSON schema support)
+    if response_format:
+        lm_kwargs["response_format"] = response_format
+
+    # Pass extra_body for provider-specific params (e.g. enable_thinking for LM Studio)
+    if extra_body:
+        lm_kwargs["extra_body"] = extra_body
 
     try:
         lm = dspy.LM(provider_model, **lm_kwargs)  # type: ignore[attr-defined]

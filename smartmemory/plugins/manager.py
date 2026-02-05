@@ -135,11 +135,13 @@ class PluginManager:
         # Load built-in extractors (all class-based now)
         try:
             from smartmemory.plugins.extractors.llm import LLMExtractor
+            from smartmemory.plugins.extractors.llm_single import LLMSingleExtractor
             from smartmemory.plugins.extractors.conversation_aware_llm import ConversationAwareLLMExtractor
-            
+
             # Primary extractors
             class_based_extractors = [
                 LLMExtractor,
+                LLMSingleExtractor,
                 ConversationAwareLLMExtractor,
             ]
             

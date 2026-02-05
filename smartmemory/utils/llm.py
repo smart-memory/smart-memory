@@ -51,6 +51,8 @@ def call_llm(
         seed: Optional[int] = None,  # Unused for DSPy transport; kept for signature stability
         # Auth/config
         api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
         config_section: Optional[str] = "extractor",
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
@@ -140,9 +142,11 @@ def call_llm(
             messages=fb_messages,
             max_output_tokens=(max_output_tokens or 2000),
             api_key=resolved_api_key,
+            api_base=api_base,
             response_format=rf,
             temperature=temp_arg,
             reasoning_effort=reasoning_effort,
+            extra_body=extra_body,
         )
     except Exception as e:
         logger.error(f"DSPy request failed: {e}")
