@@ -11,10 +11,9 @@ statements. Confidence follows the same reinforce/contradict pattern as OpinionM
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from smartmemory.models.base import MemoryBaseModel
-
 
 DecisionType = Literal[
     "inference",       # Concluded from evidence (e.g., "User prefers TypeScript")
@@ -47,32 +46,32 @@ class Decision(MemoryBaseModel):
 
     # Confidence & Evidence
     confidence: float = 0.8
-    evidence_ids: List[str] = field(default_factory=list)
-    contradicting_ids: List[str] = field(default_factory=list)
+    evidence_ids: list[str] = field(default_factory=list)
+    contradicting_ids: list[str] = field(default_factory=list)
     reinforcement_count: int = 0
     contradiction_count: int = 0
 
     # Provenance
     source_type: str = "inferred"  # One of DecisionSource values
-    source_trace_id: Optional[str] = None
-    source_session_id: Optional[str] = None
+    source_trace_id: str | None = None
+    source_session_id: str | None = None
 
     # Context at decision time
-    context_snapshot: Optional[Dict[str, Any]] = None
+    context_snapshot: dict[str, Any] | None = None
 
     # Lifecycle
     status: str = "active"  # One of DecisionStatus values
-    superseded_by: Optional[str] = None
+    superseded_by: str | None = None
 
     # Domain tagging (for filtered retrieval)
-    domain: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    domain: str | None = None
+    tags: list[str] = field(default_factory=list)
 
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: Optional[datetime] = None
-    last_reinforced_at: Optional[datetime] = None
-    last_contradicted_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    last_reinforced_at: datetime | None = None
+    last_contradicted_at: datetime | None = None
 
     @property
     def is_active(self) -> bool:
@@ -115,7 +114,7 @@ class Decision(MemoryBaseModel):
             self.contradicting_ids.append(evidence_id)
         self.confidence = max(0.0, self.confidence - self.confidence * 0.15)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for storage in MemoryItem.metadata."""
         return {
             "decision_id": self.decision_id,
@@ -143,7 +142,7 @@ class Decision(MemoryBaseModel):
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Decision":
+    def from_dict(cls, d: dict[str, Any]) -> "Decision":
         """Deserialize from dict (e.g., from MemoryItem.metadata)."""
         data = d
         created_at = data.get("created_at")

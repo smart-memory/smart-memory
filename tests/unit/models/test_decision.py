@@ -1,6 +1,5 @@
 """Unit tests for Decision model."""
 
-from datetime import datetime, timezone
 
 import pytest
 
