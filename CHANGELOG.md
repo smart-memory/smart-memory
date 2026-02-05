@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, CAUSES, INFLUENCES, PRODUCED edges with configurable depth
 - **New evolver**: `DecisionConfidenceEvolver` - Confidence decay for stale decisions with automatic retraction below threshold
 - **Graceful degradation**: All components work without graph (skip edge operations, return empty lists)
+- **Service API**: 11 REST endpoints at `/memory/decisions/*` for full decision lifecycle (create, get, list, search, supersede, retract, reinforce, contradict, provenance, causal-chain, conflicts)
 - **Tests**: 149 unit tests covering model, manager, queries, extractor, and evolver
 
 ---
