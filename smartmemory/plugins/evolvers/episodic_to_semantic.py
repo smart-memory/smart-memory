@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -20,7 +19,7 @@ class EpisodicToSemanticRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class EpisodicToSemanticEvolver(Evolver, EvolverPlugin):
+class EpisodicToSemanticEvolver(EvolverPlugin):
     """
     Promotes stable facts/events from episodic to semantic memory based on confidence/frequency.
     """

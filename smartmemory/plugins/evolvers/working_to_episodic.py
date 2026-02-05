@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -20,7 +19,7 @@ class WorkingToEpisodicRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class WorkingToEpisodicEvolver(Evolver, EvolverPlugin):
+class WorkingToEpisodicEvolver(EvolverPlugin):
     """
     Evolves (summarizes) working memory buffer to episodic memory when overflowed (N turns).
     """

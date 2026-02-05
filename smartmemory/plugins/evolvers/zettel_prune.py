@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -26,7 +25,7 @@ class ZettelPruneRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class ZettelPruneEvolver(Evolver, EvolverPlugin):
+class ZettelPruneEvolver(EvolverPlugin):
     """
     Prunes/merges low-quality or duplicate zettels for graph health.
     

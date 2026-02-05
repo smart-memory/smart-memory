@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 from smartmemory.models.base import MemoryBaseModel
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from smartmemory.plugins.evolvers.base import Evolver
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ class DecisionConfidenceConfig(MemoryBaseModel):
     enable_decay: bool = True
 
 
-class DecisionConfidenceEvolver(Evolver, EvolverPlugin):
+class DecisionConfidenceEvolver(EvolverPlugin):
     """Apply confidence decay to stale decisions and retract weak ones.
 
     Operations:

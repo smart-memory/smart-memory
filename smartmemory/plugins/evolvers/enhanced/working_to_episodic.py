@@ -5,7 +5,7 @@ from typing import Dict, Optional, List
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.models.memory_item import MemoryItem
-from smartmemory.plugins.evolvers.base import Evolver
+from smartmemory.plugins.base import EvolverPlugin
 
 
 @dataclass
@@ -20,7 +20,7 @@ class EnhancedWorkingToEpisodicRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class EnhancedWorkingToEpisodicEvolver(Evolver):
+class EnhancedWorkingToEpisodicEvolver(EvolverPlugin):
     """
     Enhanced working memory consolidation with semantic clustering and adaptive thresholds.
 

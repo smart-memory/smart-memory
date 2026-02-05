@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2026-02-05
+
+### Changed
+
+#### Evolver Inheritance Cleanup
+- Eliminate dual-inheritance in all 12 evolvers: inherit only from `EvolverPlugin` (not `Evolver` + `EvolverPlugin`)
+- `Evolver` base class in `plugins/evolvers/base.py` is now a backwards-compatible alias for `EvolverPlugin`
+
+#### AssertionChallenger Strategy Pattern Extraction
+- Extract 4 contradiction detection strategies into `reasoning/detection/` package: `LLMDetector`, `GraphDetector`, `EmbeddingDetector`, `HeuristicDetector`
+- Extract 4 conflict resolution strategies into `reasoning/resolution/` package: `WikipediaResolver`, `LLMResolver`, `GroundingResolver`, `RecencyResolver`
+- Add `DetectionCascade` and `ResolutionCascade` orchestrators for ordered strategy execution
+- Extract confidence operations into `ConfidenceManager` class (`reasoning/confidence.py`)
+- Slim `AssertionChallenger` from 1,249 to ~200 lines while preserving all public API methods
+
+#### SmartMemory Decomposition
+- Extract monitoring operations into `MonitoringManager` (7 methods: summary, orphaned_notes, prune, find_old_notes, self_monitor, reflect, summarize)
+- Extract evolution operations into `EvolutionManager` (4 methods: run_evolution_cycle, commit_working_to_episodic, commit_working_to_procedural, run_clustering)
+- Extract debug operations into `DebugManager` (4 methods: debug_search, get_all_items_debug, fix_search_if_broken, clear)
+- Extract enrichment operations into `EnrichmentManager` (4 methods: enrich, ground, ground_context, resolve_external)
+- SmartMemory reduced from 961 to ~750 lines; all public methods preserved as one-line delegates
+
+#### Constructor Injection
+- Add optional dependency injection parameters to `SmartMemory.__init__` for all 13 dependencies (graph, crud, search, linking, enrichment, grounding, personalization, monitoring, evolution, clustering, external_resolver, version_tracker, temporal)
+- All parameters default to `None` (existing behavior preserved); when provided, injected instances are used instead of creating defaults
+- Enables unit testing with mocks without requiring FalkorDB/Redis infrastructure
+
+---
+
 ## [0.3.1] - 2026-02-05
 
 ### Fixed

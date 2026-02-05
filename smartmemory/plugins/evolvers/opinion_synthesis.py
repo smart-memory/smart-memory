@@ -22,7 +22,6 @@ from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.models.opinion import OpinionMetadata, Disposition
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from smartmemory.plugins.evolvers.base import Evolver
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ class OpinionSynthesisRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class OpinionSynthesisEvolver(Evolver, EvolverPlugin):
+class OpinionSynthesisEvolver(EvolverPlugin):
     """
     Synthesizes opinions from episodic memory patterns.
     

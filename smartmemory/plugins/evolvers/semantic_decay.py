@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -18,7 +17,7 @@ class SemanticDecayRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class SemanticDecayEvolver(Evolver, EvolverPlugin):
+class SemanticDecayEvolver(EvolverPlugin):
     """
     Prunes/archives semantic facts based on low relevance, age, or feedback.
     """

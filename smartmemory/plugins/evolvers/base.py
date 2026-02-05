@@ -1,17 +1,11 @@
-from typing import Any, Dict
+"""Backwards-compatible alias for the canonical EvolverPlugin base class.
 
+All evolvers should inherit from ``EvolverPlugin`` (defined in
+``smartmemory.plugins.base``).  The ``Evolver`` name is kept here so that
+existing ``from .base import Evolver`` imports continue to work.
+"""
 
-class Evolver:
-    """
-    Base class for all memory evolvers.
-    """
+from smartmemory.plugins.base import EvolverPlugin
 
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-
-    def evolve(self, memory, logger=None):
-        """
-        Apply evolution logic to the memory system.
-        Should be overridden by subclasses.
-        """
-        raise NotImplementedError("Evolver subclasses must implement evolve()")
+# Deprecated: use EvolverPlugin directly.
+Evolver = EvolverPlugin

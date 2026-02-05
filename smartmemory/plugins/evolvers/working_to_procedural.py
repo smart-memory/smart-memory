@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -18,7 +17,7 @@ class WorkingToProceduralRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class WorkingToProceduralEvolver(Evolver, EvolverPlugin):
+class WorkingToProceduralEvolver(EvolverPlugin):
     """
     Evolves repeated skill/tool patterns in working memory to procedural memory (macro creation).
     """

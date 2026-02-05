@@ -18,7 +18,6 @@ from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.models.opinion import OpinionMetadata
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from smartmemory.plugins.evolvers.base import Evolver
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +28,11 @@ class OpinionReinforcementConfig(MemoryBaseModel):
     min_confidence_threshold: float = 0.2  # Archive opinions below this
     lookback_days: int = 7  # How far back to look for new evidence
     similarity_threshold: float = 0.7  # Threshold for evidence matching
-    
+
     # Reinforcement/contradiction factors
     reinforcement_boost: float = 0.1  # How much to increase confidence
     contradiction_penalty: float = 0.15  # How much to decrease confidence
-    
+
     # Decay for stale opinions
     enable_decay: bool = True
     decay_after_days: int = 30  # Start decaying after this many days without reinforcement
@@ -47,7 +46,7 @@ class OpinionReinforcementRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class OpinionReinforcementEvolver(Evolver, EvolverPlugin):
+class OpinionReinforcementEvolver(EvolverPlugin):
     """
     Updates opinion confidence scores based on new evidence.
     

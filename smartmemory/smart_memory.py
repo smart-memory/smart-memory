@@ -24,6 +24,10 @@ from smartmemory.temporal.version_tracker import VersionTracker
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.plugins.resolvers.external_resolver import ExternalResolver
 from smartmemory.interfaces import ScopeProvider
+from smartmemory.managers.debug import DebugManager
+from smartmemory.managers.enrichment import EnrichmentManager
+from smartmemory.managers.evolution import EvolutionManager
+from smartmemory.managers.monitoring import MonitoringManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,118 +50,78 @@ class SmartMemory(MemoryBase):
     # Preconfigured emitter for memory operations
     _MEM_EMIT = make_emitter(component="smart_memory", default_type="memory_operation")
 
-    def __init__(self, scope_provider: Optional[ScopeProvider] = None, *args, **kwargs):
+    def __init__(
+        self,
+        scope_provider: Optional[ScopeProvider] = None,
+        *args,
+        # Optional dependency injection (all default to None = create defaults)
+        graph: Optional["SmartGraph"] = None,
+        crud: Optional["CRUD"] = None,
+        search: Optional["Search"] = None,
+        linking: Optional["Linking"] = None,
+        enrichment: Optional["Enrichment"] = None,
+        grounding: Optional["Grounding"] = None,
+        personalization: Optional["Personalization"] = None,
+        monitoring: Optional["Monitoring"] = None,
+        evolution: Optional["EvolutionOrchestrator"] = None,
+        clustering: Optional["GlobalClustering"] = None,
+        external_resolver: Optional["ExternalResolver"] = None,
+        version_tracker: Optional["VersionTracker"] = None,
+        temporal: Optional["TemporalQueries"] = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
-        
+
         # Use DefaultScopeProvider if none provided (for OSS usage)
         # Service layer should always provide a secure ScopeProvider
         if scope_provider is None:
             # Lazy import to avoid circular dependency
             from smartmemory.scope_provider import DefaultScopeProvider
             scope_provider = DefaultScopeProvider()
-        
-        self.scope_provider = scope_provider  # Store for use in filtering methods
-        self._graph = SmartGraph(scope_provider=scope_provider)  # Direct SmartGraph backend is the canonical store
 
-        # Initialize stages with proper delegation
+        self.scope_provider = scope_provider  # Store for use in filtering methods
+        self._graph = graph or SmartGraph(scope_provider=scope_provider)
+
+        # Initialize stages with proper delegation (use injected or create defaults)
         self._graph_ops = GraphOperations(self._graph)
-        self._crud = CRUD(self._graph)
-        self._linking = Linking(self._graph)
-        self._enrichment = Enrichment(self._graph)
-        self._grounding = Grounding(self._graph)
-        self._personalization = Personalization(self._graph)
-        self._search = Search(self._graph)
-        self._monitoring = Monitoring(self._graph)
-        self._evolution = EvolutionOrchestrator(self)
-        self._clustering = GlobalClustering(self)
-        self._external_resolver = ExternalResolver()
+        self._crud = crud or CRUD(self._graph)
+        self._linking = linking or Linking(self._graph)
+        self._enrichment = enrichment or Enrichment(self._graph)
+        self._grounding = grounding or Grounding(self._graph)
+        self._personalization = personalization or Personalization(self._graph)
+        self._search = search or Search(self._graph)
+        self._monitoring = monitoring or Monitoring(self._graph)
+        self._evolution = evolution or EvolutionOrchestrator(self)
+        self._clustering = clustering or GlobalClustering(self)
+        self._external_resolver = external_resolver or ExternalResolver()
 
         # Initialize temporal queries
-        self.version_tracker = VersionTracker(self._graph)
-        self.temporal = TemporalQueries(self)
+        self.version_tracker = version_tracker or VersionTracker(self._graph)
+        self.temporal = temporal or TemporalQueries(self)
         self._temporal_context = None  # For time-travel context manager
-        
+
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
-        
+
         # Set self on graph search module for SSG traversal
         self._graph.search.set_smart_memory(self)
+
+        # Initialize sub-managers
+        self._monitoring_mgr = MonitoringManager(self._graph, self._monitoring)
+        self._evolution_mgr = EvolutionManager(self._graph, self._evolution, self._clustering)
+        self._debug_mgr = DebugManager(self._graph, self._search, self.scope_provider)
+        self._enrichment_mgr = EnrichmentManager(self._enrichment, self._grounding, self._external_resolver)
 
     @property
     def graph(self):
         """Access to underlying graph storage."""
         return self._graph
 
-    def clear(self):
-        """Clear all memory from ALL storage backends comprehensively."""
-        print("🧹 Clearing all memory storage backends...")
+    # =========================================================================
+    # Core operations (ingest, add, get, search, update, delete, link)
+    # These stay inline as the hot path.
+    # =========================================================================
 
-        # 1. Clear the graph backend (FalkorDB)
-        self._graph_ops.clear_all()
-        print("✅ Cleared Graph Database (FalkorDB)")
-
-        # 2. Clear the vector database (FalkorDB vector index)
-        from smartmemory.stores.vector.vector_store import VectorStore
-        try:
-            # Create vector store instance directly
-            vector_store = VectorStore()
-            vector_store.clear()
-            print("✅ Cleared Vector Store")
-        except Exception as e:
-            print(f"⚠️  Vector Store clear failed: {e}")
-
-        # 3. Clear ALL Redis cache types
-        from smartmemory.utils.cache import get_cache
-        cache = get_cache()
-
-        cache_types = ['embedding', 'search', 'entity_extraction', 'similarity', 'graph_query']
-        total_cleared = 0
-        for cache_type in cache_types:
-            cleared_count = cache.clear_type(cache_type)
-            total_cleared += cleared_count
-
-        # Clear any remaining keys with our prefix
-        pattern = f"{cache.prefix}:*"
-        remaining_keys = cache.redis.keys(pattern)
-        if remaining_keys:
-            cache.redis.delete(*remaining_keys)
-            total_cleared += len(remaining_keys)
-
-        print(f"✅ Cleared Redis Cache ({total_cleared} keys)")
-
-        # 4. Clear working memory buffer
-        if hasattr(self, '_working_buffer'):
-            self._working_buffer.clear()
-            print("✅ Cleared Working Memory Buffer")
-
-        # 5. Clear canonical memory store
-        if hasattr(self, '_canonical_store'):
-            self._canonical_store.clear()
-            print("✅ Cleared Canonical Memory Store")
-
-        # 6. Clear in-memory caches and mixins
-        if hasattr(self, '_cache'):
-            self._cache.clear()
-
-        if hasattr(self, '_operation_stats'):
-            for key in self._operation_stats:
-                self._operation_stats[key] = 0
-
-        print("✅ Cleared In-memory Caches")
-
-        # 7. Clear any remaining memory type stores
-        memory_types = ['semantic', 'episodic', 'procedural', 'zettelkasten']
-        for memory_type in memory_types:
-            if hasattr(self, f'_{memory_type}_store'):
-                store = getattr(self, f'_{memory_type}_store')
-                if hasattr(store, 'clear'):
-                    store.clear()
-                    print(f"✅ Cleared {memory_type.title()} Memory Store")
-
-        print("🎉 All memory storage backends cleared successfully!")
-        return True
-
-    # Store management
     def ingest(self,
             item,
             context=None,
@@ -174,7 +138,7 @@ class SmartMemory(MemoryBase):
         Primary entry point for ingesting items into SmartMemory.
         Runs the full canonical agentic memory ingestion flow with extraction, linking, enrichment, and evolution.
         For basic storage without the full pipeline, use add().
-        
+
         Args:
             item: Content to ingest (str, dict, or MemoryItem)
             context: Additional context for processing
@@ -188,7 +152,7 @@ class SmartMemory(MemoryBase):
             auto_challenge: If True, automatically challenge factual claims before ingesting.
                            If None, uses smart triggering (only challenges semantic facts with factual patterns).
             **kwargs: Additional processing options
-            
+
         Returns:
             str: The item_id of the stored memory item (sync=True)
             dict: {"item_id": str, "queued": bool} (sync=False)
@@ -201,7 +165,7 @@ class SmartMemory(MemoryBase):
                 sync = (mode != 'async')  # Default to sync unless explicitly async
             except Exception:
                 sync = True  # Default to sync
-        
+
         # Async path: quick persist + queue for background processing
         if not sync:
             normalized_item = self._crud.normalize_item(item)
@@ -257,11 +221,11 @@ class SmartMemory(MemoryBase):
         # Only runs when: auto_challenge=True, or auto_challenge=None and smart triggering says yes
         try:
             from smartmemory.reasoning.challenger import should_challenge, AssertionChallenger
-            
+
             content = normalized_item.content or ""
             metadata = normalized_item.metadata or {}
             source = metadata.get('source') or (context or {}).get('source')
-            
+
             do_challenge = auto_challenge
             if do_challenge is None:
                 # Smart triggering: only challenge semantic facts with factual patterns
@@ -271,11 +235,11 @@ class SmartMemory(MemoryBase):
                     source=source,
                     metadata=metadata
                 )
-            
+
             if do_challenge:
                 challenger = AssertionChallenger(self, use_llm=False)  # Heuristics for speed
                 challenge_result = challenger.challenge(content, memory_type=memory_type)
-                
+
                 if challenge_result.has_conflicts:
                     # Store challenge result in metadata for downstream handling
                     normalized_item.metadata['challenge_result'] = {
@@ -363,7 +327,7 @@ class SmartMemory(MemoryBase):
             item_id = result.item_id
         else:
             item_id = str(result) if result else None
-            
+
         # Auto-version initial creation
         if item_id and self.version_tracker:
             try:
@@ -379,24 +343,24 @@ class SmartMemory(MemoryBase):
                     )
             except Exception as e:
                 logger.debug(f"Failed to create initial version for {item_id}: {e}")
-                
+
         return item_id
 
     def add(self, item, **kwargs) -> str:
         """
         Simple storage without the full ingestion pipeline.
-        
+
         Use this for:
         - Internal operations (evolution, enrichment creating derived items)
         - Direct storage when extraction/linking/enrichment is not needed
         - Avoiding recursion in pipeline stages
-        
+
         For full agentic ingestion with all processing stages, use ingest().
-        
+
         Args:
             item: Content to store (str, dict, or MemoryItem)
             **kwargs: Additional storage options
-            
+
         Returns:
             str: The item_id of the stored memory item
         """
@@ -483,10 +447,7 @@ class SmartMemory(MemoryBase):
 
     # Archive facades (provider hidden behind SmartMemory interface)
     def archive_put(self, conversation_id: str, payload: Union[bytes, Dict[str, Any]], metadata: Dict[str, Any]) -> Dict[str, str]:
-        """Persist a raw conversation artifact durably and return { archive_uri, content_hash }.
-
-        Delegates to the configured ArchiveProvider. Errors are logged and re-raised; callers should handle.
-        """
+        """Persist a raw conversation artifact durably and return { archive_uri, content_hash }."""
         try:
             if metadata is None:
                 metadata = {}
@@ -515,18 +476,6 @@ class SmartMemory(MemoryBase):
         """Can take either dict or MemoryItem."""
         return self._crud.update(item)
 
-    def run_evolution_cycle(self):
-        """
-        Public wrapper to run a single evolution cycle with automatic scope filtering.
-        
-        Filtering is determined by the ScopeProvider that was injected at initialization.
-        """
-        return self._evolution.run_evolution_cycle()
-
-    def ground_context(self, context: dict):
-        """Public wrapper to ground using a pre-built context dict."""
-        return self._grounding.ground(context)
-
     def add_edge(self, source_id: str, target_id: str, relation_type: str, properties: dict | None = None):
         """Public wrapper to add an edge between two nodes."""
         properties = properties or {}
@@ -549,14 +498,10 @@ class SmartMemory(MemoryBase):
         })
         return result
 
-    def resolve_external(self, node: MemoryItem) -> Optional[list]:
-        """Delegate resolve_external to ExternalResolver submodule."""
-        return self._external_resolver.resolve_external(node)
-
     def search(self, query: str, top_k: int = 5, memory_type: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None, **kwargs):
         """
         Search using canonical search component with automatic scope filtering.
-        
+
         Filtering by tenant/workspace/user is handled automatically by ScopeProvider.
         This ensures consistent isolation across all search operations.
         """
@@ -574,7 +519,7 @@ class SmartMemory(MemoryBase):
                 # Use canonical search for working memory stored in graph
                 # ScopeProvider handles tenant/user filtering automatically
                 results = self._search.search(query, top_k=top_k, memory_type='working', **kwargs)
-                
+
                 # Optional: filter by conversation_id when provided
                 conv_id = None
                 try:
@@ -587,7 +532,7 @@ class SmartMemory(MemoryBase):
                     conv_id = None
                 if conv_id and results:
                     results = [r for r in results if getattr(r, 'metadata', {}).get('conversation_id') == conv_id]
-                
+
                 return results[:top_k]
             else:
                 # Fallback to in-memory buffer behavior
@@ -636,7 +581,7 @@ class SmartMemory(MemoryBase):
         # ScopeProvider handles all tenant/workspace/user filtering automatically
         t0 = perf_counter()
         results = self._search.search(query, top_k=top_k, memory_type=memory_type, **kwargs)
-        
+
         # Emit memory_retrieve event for observability
         # noinspection PyArgumentList
         SmartMemory._MEM_EMIT("memory_retrieve", "search", {
@@ -646,138 +591,39 @@ class SmartMemory(MemoryBase):
             "results_count": len(results) if results else 0,
             "duration_ms": (perf_counter() - t0) * 1000.0
         })
-        
+
         return results[:top_k]
 
     # Linking
     def link(self, source_id: str, target_id: str, link_type: Union[str, "LinkType"] = "RELATED") -> str:
-        """
-        Link two memory items. (Delegates to internal Linking helper.)
-        Always use this method instead of accessing Linking directly.
-        """
-        # Accept both Enum and string for link_type
+        """Link two memory items."""
         if hasattr(link_type, 'value'):
             link_type = link_type.value
         return self._linking.link(source_id, target_id, link_type)
 
     def get_links(self, item_id: str, memory_type: str = "semantic") -> List[str]:
-        """
-        Get all links (triples) for a memory item. (Delegates to internal Linking helper.)
-        Always use this method instead of accessing Linking directly.
-        """
+        """Get all links (triples) for a memory item."""
         return self._linking.get_links(item_id, memory_type)
 
     def get_neighbors(self, item_id: str):
-        """
-        Return neighboring MemoryItems for a node with link types.
-        Delegates to GraphOperations component for proper abstraction.
-        
-        Returns:
-            List of tuples: [(MemoryItem, link_type), ...]
-        """
-        neighbors = self._graph_ops.get_neighbors(item_id)
-        # neighbors is now [(MemoryItem, link_type), ...] from graph_ops
-        # Just return them directly since they're already MemoryItem objects
-        return neighbors
-
-    # Enrichment & Transformation
-    def enrich(self, item_id: str, routines: Optional[List[str]] = None) -> None:
-        """
-        Enrich a memory item using registered enrichment routines.
-        Args:
-            item_id: ID of the memory item to enrich.
-            routines: Optional list of enrichment routines to apply.
-        """
-        return self._enrichment.enrich(item_id, routines)
-
-    # Grounding & Provenance
-    def ground(self, item_id: str, source_url: str, validation: Optional[dict] = None) -> None:
-        """
-        Ground a memory item to an external source (e.g., for provenance).
-        Args:
-            item_id: ID of the memory item to ground.
-            source_url: URL of the external source.
-            validation: Optional validation metadata.
-        """
-        context = {
-            "item_id": item_id,
-            "source_url": source_url,
-            "validation": validation
-        }
-        return self._grounding.ground(context)
+        """Return neighboring MemoryItems for a node with link types."""
+        return self._graph_ops.get_neighbors(item_id)
 
     # Personalization & Feedback
     def personalize(self, traits: dict = None, preferences: dict = None) -> None:
-        """
-        Personalize the memory system for the current user.
-        
-        The current user is determined by ScopeProvider automatically.
-        """
+        """Personalize the memory system for the current user."""
         return self._personalization.personalize(traits, preferences)
 
     def update_from_feedback(self, feedback: dict, memory_type: str = "semantic") -> None:
         return self._personalization.update_from_feedback(feedback, memory_type)
 
-    # Existing summary/monitoring methods can be refactored to use store_manager or moved to a new analytics module if needed.
-    def summary(self) -> dict:
-        """Delegate summary to Monitoring submodule."""
-        return self._monitoring.summary()
-
-    def orphaned_notes(self) -> list:
-        """Delegate orphaned_notes to Monitoring submodule."""
-        return self._monitoring.orphaned_notes()
-
-    def prune(self, strategy="old", days=365, **kwargs):
-        """Delegate prune to Monitoring submodule."""
-        return self._monitoring.prune(strategy, days, **kwargs)
-
-    def find_old_notes(self, days: int = 365) -> list:
-        """Delegate find_old_notes to Monitoring submodule."""
-        return self._monitoring.find_old_notes(days)
-
-    def self_monitor(self) -> dict:
-        """Delegate self_monitor to Monitoring submodule."""
-        return self._monitoring.self_monitor()
-
-    def reflect(self, top_k: int = 5) -> dict:
-        """Delegate reflect to Monitoring submodule."""
-        return self._monitoring.reflect(top_k)
-
-    def summarize(self, max_items: int = 10) -> dict:
-        """Delegate summarize to Monitoring submodule."""
-        return self._monitoring.summarize(max_items)
-
     def embeddings_search(self, embedding, top_k=5):
-        """
-        Search for memory items most similar to the given embedding using the vector store.
-        Delegates to Search component for proper abstraction.
-        """
+        """Search for memory items most similar to the given embedding."""
         return self._search.embeddings_search(embedding, top_k=top_k)
 
     def add_tags(self, item_id: str, tags: list) -> bool:
         """Delegate add_tags to CRUD submodule."""
         return self._crud.add_tags(item_id, tags)
-
-    # Evolution operations - delegate to EvolutionOrchestrator
-    def commit_working_to_episodic(self, remove_from_source: bool = True) -> List[str]:
-        """Delegate evolution to EvolutionOrchestrator component."""
-        return self._evolution.commit_working_to_episodic(remove_from_source)
-
-    def commit_working_to_procedural(self, remove_from_source: bool = True) -> List[str]:
-        """Delegate evolution to EvolutionOrchestrator component."""
-        return self._evolution.commit_working_to_procedural(remove_from_source)
-
-    def run_clustering(self) -> dict:
-        """
-        Run clustering to deduplicate entities with automatic scope filtering.
-        
-        Filtering is determined by the ScopeProvider that was injected at initialization.
-        This ensures consistent tenant/workspace/user isolation.
-        
-        Returns:
-            Dict with stats about merged entities
-        """
-        return self._clustering.run()
 
     def challenge(
         self,
@@ -785,170 +631,131 @@ class SmartMemory(MemoryBase):
         memory_type: str = "semantic",
         use_llm: bool = True
     ):
-        """
-        Challenge an assertion against existing knowledge to detect contradictions.
-        
-        Args:
-            assertion: The new fact/assertion to challenge
-            memory_type: Type of memory to search (default: semantic)
-            use_llm: Whether to use LLM for deep contradiction analysis
-            
-        Returns:
-            ChallengeResult with any detected conflicts
-            
-        Example:
-            >>> result = memory.challenge("Paris is the capital of Germany")
-            >>> if result.has_conflicts:
-            ...     for conflict in result.conflicts:
-            ...         print(f"Contradicts: {conflict.existing_fact}")
-        """
+        """Challenge an assertion against existing knowledge to detect contradictions."""
         from smartmemory.reasoning.challenger import AssertionChallenger
-        
-        challenger = AssertionChallenger(
-            self,
-            use_llm=use_llm
-        )
+        challenger = AssertionChallenger(self, use_llm=use_llm)
         return challenger.challenge(assertion, memory_type=memory_type)
 
-    # Debug and troubleshooting methods
+    # =========================================================================
+    # Delegated to MonitoringManager
+    # =========================================================================
+
+    def summary(self) -> dict:
+        return self._monitoring_mgr.summary()
+
+    def orphaned_notes(self) -> list:
+        return self._monitoring_mgr.orphaned_notes()
+
+    def prune(self, strategy="old", days=365, **kwargs):
+        return self._monitoring_mgr.prune(strategy, days, **kwargs)
+
+    def find_old_notes(self, days: int = 365) -> list:
+        return self._monitoring_mgr.find_old_notes(days)
+
+    def self_monitor(self) -> dict:
+        return self._monitoring_mgr.self_monitor()
+
+    def reflect(self, top_k: int = 5) -> dict:
+        return self._monitoring_mgr.reflect(top_k)
+
+    def summarize(self, max_items: int = 10) -> dict:
+        return self._monitoring_mgr.summarize(max_items)
+
+    # =========================================================================
+    # Delegated to EvolutionManager
+    # =========================================================================
+
+    def run_evolution_cycle(self):
+        return self._evolution_mgr.run_evolution_cycle()
+
+    def commit_working_to_episodic(self, remove_from_source: bool = True) -> List[str]:
+        return self._evolution_mgr.commit_working_to_episodic(remove_from_source)
+
+    def commit_working_to_procedural(self, remove_from_source: bool = True) -> List[str]:
+        return self._evolution_mgr.commit_working_to_procedural(remove_from_source)
+
+    def run_clustering(self) -> dict:
+        return self._evolution_mgr.run_clustering()
+
+    # =========================================================================
+    # Delegated to EnrichmentManager
+    # =========================================================================
+
+    def enrich(self, item_id: str, routines: Optional[List[str]] = None) -> None:
+        return self._enrichment_mgr.enrich(item_id, routines)
+
+    def ground(self, item_id: str, source_url: str, validation: Optional[dict] = None) -> None:
+        return self._enrichment_mgr.ground(item_id, source_url, validation)
+
+    def ground_context(self, context: dict):
+        return self._enrichment_mgr.ground_context(context)
+
+    def resolve_external(self, node: MemoryItem) -> Optional[list]:
+        return self._enrichment_mgr.resolve_external(node)
+
+    # =========================================================================
+    # Delegated to DebugManager
+    # =========================================================================
+
     def debug_search(self, query: str, top_k: int = 5) -> dict:
-        """Debug search functionality with detailed logging."""
-        debug_info = {
-            'query': query,
-            'top_k': top_k,
-            'graph_backend': str(type(self._graph.backend)),
-            'search_component': str(type(self._search)),
-            'results': []
-        }
-
-        # Test direct graph search
-        graph_results = self._graph.search(query, top_k=top_k)
-        debug_info['graph_search_count'] = len(graph_results)
-        debug_info['graph_search_results'] = [
-            {
-                'item_id': getattr(r, 'item_id', 'No ID'),
-                'content_preview': str(getattr(r, 'content', 'No content'))[:50] + '...',
-                'type': str(type(r))
-            } for r in graph_results[:3]
-        ]
-
-        # Test search component
-        search_results = self._search.search(query, top_k=top_k)
-        debug_info['search_component_count'] = len(search_results)
-        debug_info['search_component_results'] = [
-            {
-                'item_id': getattr(r, 'item_id', 'No ID'),
-                'content_preview': str(getattr(r, 'content', 'No content'))[:50] + '...',
-                'type': str(type(r))
-            } for r in search_results[:3]
-        ]
-
-        debug_info['results'] = search_results
-        return debug_info
+        return self._debug_mgr.debug_search(query, top_k)
 
     def get_all_items_debug(self) -> Dict[str, Any]:
-        """Get all items for debugging, automatically filtered by ScopeProvider.
-        
-        Uses ScopeProvider.get_isolation_filters() to determine which items to return.
-        This ensures consistent filtering across all operations.
-        """
-        debug_info = {
-            'total_items': 0,
-            'items_by_type': {},
-            'sample_items': []
-        }
-        
-        # Get isolation filters from ScopeProvider (single source of truth)
-        filters = {}
-        if self.scope_provider:
-            filters = self.scope_provider.get_isolation_filters()
-        
-        # Get all node IDs - self._graph.nodes is SmartGraphNodes object with nodes() method
-        if hasattr(self._graph, 'nodes'):
-            all_node_ids = self._graph.nodes.nodes()  # Call nodes() method on nodes property
-            debug_info['total_node_ids'] = len(all_node_ids)
-            
-            # Filter and collect items
-            seen_ids = set()
-            for node_id in all_node_ids:
-                item = self._graph.get_node(node_id)
-                if not item:
-                    continue
-                
-                # Get item_id for deduplication
-                item_id = getattr(item, 'item_id', node_id)
-                if item_id in seen_ids:
-                    continue
-                
-                # Apply filters from ScopeProvider (generic filtering)
-                if filters:
-                    item_metadata = getattr(item, 'metadata', {})
-                    skip_item = False
-                    
-                    for filter_key, filter_value in filters.items():
-                        # Check both direct property and metadata
-                        item_value = getattr(item, filter_key, None) or item_metadata.get(filter_key)
-                        
-                        # Skip if filter is set and doesn't match
-                        if filter_value and item_value != filter_value:
-                            skip_item = True
-                            break
-                    
-                    if skip_item:
-                        continue
-                
-                seen_ids.add(item_id)
-                debug_info['total_items'] += 1
-                item_type = getattr(item, 'memory_type', 'unknown')
-                debug_info['items_by_type'][item_type] = debug_info['items_by_type'].get(item_type, 0) + 1
-
-                if len(debug_info['sample_items']) < 3:
-                    debug_info['sample_items'].append({
-                        'item_id': item_id,
-                        'content_preview': str(getattr(item, 'content', 'No content'))[:50] + '...',
-                        'memory_type': item_type,
-                        'type': str(type(item))
-                    })
-
-        return debug_info
+        return self._debug_mgr.get_all_items_debug()
 
     def fix_search_if_broken(self) -> dict:
-        """Attempt to fix search functionality if it's broken."""
-        fix_info = {
-            'fixes_applied': [],
-            'test_search_count': 0
-        }
+        result = self._debug_mgr.fix_search_if_broken()
+        # Sync back the potentially-reinitialized search component
+        self._search = self._debug_mgr._search
+        return result
 
-        # Reinitialize search component
-        self._search = Search(self._graph)
-        fix_info['fixes_applied'].append('Reinitialized search component')
+    def clear(self):
+        """Clear all memory from ALL storage backends comprehensively."""
+        result = self._debug_mgr.clear()
 
-        # Clear any caches
-        if hasattr(self._graph, 'clear_cache'):
-            self._graph.clear_cache()
-            fix_info['fixes_applied'].append('Cleared graph cache')
+        # Clear working memory buffer
+        if hasattr(self, '_working_buffer'):
+            self._working_buffer.clear()
 
-        # Test search after fixes
-        test_results = self._search.search("test", top_k=1)
-        fix_info['test_search_count'] = len(test_results)
+        # Clear canonical memory store
+        if hasattr(self, '_canonical_store'):
+            self._canonical_store.clear()
 
-        return fix_info
-    
+        # Clear in-memory caches and mixins
+        if hasattr(self, '_cache'):
+            self._cache.clear()
+
+        if hasattr(self, '_operation_stats'):
+            for key in self._operation_stats:
+                self._operation_stats[key] = 0
+
+        # Clear any remaining memory type stores
+        memory_types = ['semantic', 'episodic', 'procedural', 'zettelkasten']
+        for memory_type in memory_types:
+            if hasattr(self, f'_{memory_type}_store'):
+                store = getattr(self, f'_{memory_type}_store')
+                if hasattr(store, 'clear'):
+                    store.clear()
+
+        return result
+
+    # =========================================================================
     # Temporal query methods
-    
+    # =========================================================================
+
     def time_travel(self, to: str):
         """
         Time travel context manager.
-        
+
         All queries executed within this context will use the specified
         time point as their reference.
-        
+
         Args:
             to: Time point to travel to (ISO format: "2024-09-01" or "2024-09-01T00:00:00")
-            
+
         Returns:
             Context manager
-            
+
         Example:
             with memory.time_travel("2024-09-01"):
                 # All queries in this block use Sept 1st as reference
@@ -957,4 +764,3 @@ class SmartMemory(MemoryBase):
         """
         from smartmemory.temporal.context import time_travel
         return time_travel(self, to)
-    

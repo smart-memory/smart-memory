@@ -3,7 +3,9 @@ Reasoning module for SmartMemory.
 
 Provides:
 - AssertionChallenger: Detect contradictions between new and existing facts
-- Reasoner: Logical reasoning over memory (if available)
+- Detection strategies: LLM, Graph, Embedding, Heuristic
+- Resolution strategies: Wikipedia, LLM, Grounding, Recency
+- ConfidenceManager: Confidence decay and history tracking
 """
 
 from .challenger import (

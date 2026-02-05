@@ -19,7 +19,6 @@ from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.models.opinion import ObservationMetadata
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from smartmemory.plugins.evolvers.base import Evolver
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class ObservationSynthesisConfig(MemoryBaseModel):
     min_facts_per_entity: int = 2  # Minimum facts needed to create observation
     lookback_days: int = 90  # How far back to look for facts
     max_observations_per_run: int = 20  # Limit observations per evolution cycle
-    
+
     # LLM settings for synthesis
     use_llm: bool = True
     model_name: str = "gpt-4o-mini"
@@ -44,7 +43,7 @@ class ObservationSynthesisRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class ObservationSynthesisEvolver(Evolver, EvolverPlugin):
+class ObservationSynthesisEvolver(EvolverPlugin):
     """
     Creates entity summaries by synthesizing facts across memories.
     

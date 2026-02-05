@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -18,7 +17,7 @@ class EpisodicToZettelRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class EpisodicToZettelEvolver(Evolver, EvolverPlugin):
+class EpisodicToZettelEvolver(EvolverPlugin):
     """
     Rolls up episodic events into zettels (notes) on a periodic basis.
     """

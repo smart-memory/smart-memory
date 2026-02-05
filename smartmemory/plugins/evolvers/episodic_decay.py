@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 from smartmemory.models.base import MemoryBaseModel, StageRequest
 from smartmemory.plugins.base import EvolverPlugin, PluginMetadata
-from .base import Evolver
 
 
 @dataclass
@@ -18,7 +17,7 @@ class EpisodicDecayRequest(StageRequest):
     run_id: Optional[str] = None
 
 
-class EpisodicDecayEvolver(Evolver, EvolverPlugin):
+class EpisodicDecayEvolver(EvolverPlugin):
     """
     Archives or deletes stale episodic events based on age or relevance.
     """
