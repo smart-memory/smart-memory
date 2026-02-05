@@ -177,7 +177,7 @@ class GraphSchemaValidator:
                 "decision_id", "decision_type", "confidence", "evidence_ids", "contradicting_ids",
                 "reinforcement_count", "contradiction_count", "source_type", "source_trace_id",
                 "source_session_id", "context_snapshot", "status", "superseded_by",
-                "domain", "tags", "created_at", "updated_at",
+                "domain", "tags", "pending_requirements", "created_at", "updated_at",
             },
             field_types={
                 "item_id": str,
@@ -595,6 +595,26 @@ class GraphSchemaValidator:
             required_properties=set(),
             optional_properties={"weight"},
             property_types={"weight": float}
+        ))
+
+        # INFERENCE PROVENANCE (Wave 2 - Graph Quality)
+        self.register_edge_schema(EdgeSchema(
+            edge_type="INFERRED_FROM",
+            source_node_types={"semantic", "episodic", "decision", "entity", "Entity"},
+            target_node_types={"semantic", "episodic", "decision", "entity", "Entity"},
+            required_properties=set(),
+            optional_properties={"rule_name", "confidence", "inferred_at"},
+            property_types={"rule_name": str, "confidence": float, "inferred_at": str}
+        ))
+
+        # RESIDUATION REQUIREMENT TRACKING (Wave 2 - Symbolic Reasoning)
+        self.register_edge_schema(EdgeSchema(
+            edge_type="REQUIRES",
+            source_node_types={"decision"},
+            target_node_types={"semantic", "episodic", "decision", "entity", "Entity"},
+            required_properties=set(),
+            optional_properties={"requirement_type", "description", "resolved"},
+            property_types={"requirement_type": str, "description": str, "resolved": bool}
         ))
 
     def register_node_schema(self, schema: NodeSchema):

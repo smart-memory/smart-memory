@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.2] - 2026-02-05
 
+### Added
+
+#### Graph Validation & Health (Wave 2)
+- **New package**: `smartmemory.validation` - Runtime schema validation for memories and edges
+  - `MemoryValidator` - Validates memory items against schema constraints (required fields, content length, type validity, metadata types)
+  - `EdgeValidator` - Validates edges against registered schemas (allowed source/target types, required metadata, cardinality limits)
+- **New package**: `smartmemory.metrics` - Graph health metrics collection
+  - `GraphHealthChecker` - Collects orphan ratio, type distribution, edge distribution, provenance coverage via Cypher queries
+  - `HealthReport` dataclass with `is_healthy` property (thresholds: orphan < 20%, provenance > 50%)
+- **New package**: `smartmemory.inference` - Automatic graph inference engine
+  - `InferenceEngine` - Runs pattern-matching rules to create inferred edges with provenance metadata
+  - `InferenceRule` dataclass with Cypher pattern, edge type, and confidence
+  - 3 built-in rules: causal transitivity, contradiction symmetry, topic inheritance
+
+#### Symbolic Reasoning Layer (Wave 2)
+- **New module**: `smartmemory.reasoning.residuation` - Pause reasoning when data is incomplete
+  - `ResiduationManager` - Manages pending requirements on decisions; auto-resumes when data arrives via `check_and_resume()`
+  - `PendingRequirement` model added to `Decision` with description, created_at, resolved flag
+- **New module**: `smartmemory.reasoning.query_router` - Route queries to cheapest effective retrieval
+  - `QueryRouter` - Classifies queries as SYMBOLIC (graph Cypher), SEMANTIC (vector search), or HYBRID (both)
+  - Pattern-based classification with priority: hybrid > semantic > symbolic
+- **New module**: `smartmemory.reasoning.proof_tree` - Auditable reasoning chains
+  - `ProofTreeBuilder` - Builds proof trees from graph traversal tracing evidence back to sources
+  - `ProofTree` and `ProofNode` with `render_text()` for human-readable proof output
+- **New module**: `smartmemory.reasoning.fuzzy_confidence` - Multi-dimensional confidence scoring
+  - `FuzzyConfidenceCalculator` - Scores decisions on 4 dimensions: evidence, recency, consensus, directness
+  - `ConfidenceScore` with per-dimension breakdown and weighted composite
+
+#### Extended Decision Model (Wave 2)
+- `Decision.status` now supports `"pending"` for residuation (decisions awaiting data)
+- `Decision.pending_requirements` list for tracking what data is needed
+- `PendingRequirement` dataclass with description, created_at, resolved fields
+- New edge types: `INFERRED_FROM` (inference provenance), `REQUIRES` (residuation dependencies)
+
 ### Changed
 
 #### Evolver Inheritance Cleanup

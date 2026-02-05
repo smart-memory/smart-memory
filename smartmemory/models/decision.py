@@ -25,7 +25,46 @@ DecisionType = Literal[
 ]
 
 DecisionSource = Literal["reasoning", "explicit", "imported", "inferred"]
-DecisionStatus = Literal["active", "superseded", "retracted"]
+DecisionStatus = Literal["active", "superseded", "retracted", "pending"]
+
+
+@dataclass
+class PendingRequirement(MemoryBaseModel):
+    """What's needed to complete a pending decision."""
+
+    requirement_id: str = ""
+    description: str = ""
+    requirement_type: str = "evidence"  # evidence, confirmation, data
+    query_hint: str | None = None
+    resolved: bool = False
+    resolved_by: str | None = None
+    resolved_at: datetime | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "requirement_id": self.requirement_id,
+            "description": self.description,
+            "requirement_type": self.requirement_type,
+            "query_hint": self.query_hint,
+            "resolved": self.resolved,
+            "resolved_by": self.resolved_by,
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "PendingRequirement":
+        resolved_at = d.get("resolved_at")
+        if isinstance(resolved_at, str):
+            resolved_at = datetime.fromisoformat(resolved_at)
+        return cls(
+            requirement_id=d.get("requirement_id", ""),
+            description=d.get("description", ""),
+            requirement_type=d.get("requirement_type", "evidence"),
+            query_hint=d.get("query_hint"),
+            resolved=d.get("resolved", False),
+            resolved_by=d.get("resolved_by"),
+            resolved_at=resolved_at,
+        )
 
 
 @dataclass
@@ -67,6 +106,9 @@ class Decision(MemoryBaseModel):
     domain: str | None = None
     tags: list[str] = field(default_factory=list)
 
+    # Residuation (pending decisions)
+    pending_requirements: list[PendingRequirement] = field(default_factory=list)
+
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = None
@@ -77,6 +119,16 @@ class Decision(MemoryBaseModel):
     def is_active(self) -> bool:
         """Whether this decision is currently active."""
         return self.status == "active"
+
+    @property
+    def is_pending(self) -> bool:
+        """Whether this decision is waiting for more data."""
+        return self.status == "pending"
+
+    @property
+    def has_unresolved_requirements(self) -> bool:
+        """Whether any pending requirements remain unresolved."""
+        return any(not r.resolved for r in self.pending_requirements)
 
     @property
     def has_provenance(self) -> bool:
@@ -133,6 +185,7 @@ class Decision(MemoryBaseModel):
             "superseded_by": self.superseded_by,
             "domain": self.domain,
             "tags": self.tags,
+            "pending_requirements": [r.to_dict() for r in self.pending_requirements],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_reinforced_at": self.last_reinforced_at.isoformat() if self.last_reinforced_at else None,
@@ -163,6 +216,9 @@ class Decision(MemoryBaseModel):
         if isinstance(last_contradicted, str):
             last_contradicted = datetime.fromisoformat(last_contradicted)
 
+        pending_reqs_raw = data.get("pending_requirements", [])
+        pending_requirements = [PendingRequirement.from_dict(r) for r in pending_reqs_raw]
+
         return cls(
             decision_id=data.get("decision_id", ""),
             content=data.get("content", ""),
@@ -180,6 +236,7 @@ class Decision(MemoryBaseModel):
             superseded_by=data.get("superseded_by"),
             domain=data.get("domain"),
             tags=data.get("tags", []),
+            pending_requirements=pending_requirements,
             created_at=created_at,
             updated_at=updated_at,
             last_reinforced_at=last_reinforced,
