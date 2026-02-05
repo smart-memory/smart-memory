@@ -284,7 +284,7 @@ class FalkorDBGraphService:
 
             try:
                 result = self.graph.query(query)
-            except:
+            except Exception:
                 result = self.graph.query(fallback_query)
 
             # Process result into nodes/edges format

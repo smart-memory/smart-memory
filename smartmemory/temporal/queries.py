@@ -580,15 +580,15 @@ class TemporalQueries:
         try:
             # Try ISO format with timezone
             return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-        except:
+        except Exception:
             try:
                 # Try date only
                 return datetime.strptime(time_str, '%Y-%m-%d')
-            except:
+            except Exception:
                 try:
                     # Try datetime without timezone
                     return datetime.strptime(time_str, '%Y-%m-%dT%H:%M:%S')
-                except:
+                except Exception:
                     logger.warning(f"Could not parse time: {time_str}, using now")
                     return datetime.now()
     

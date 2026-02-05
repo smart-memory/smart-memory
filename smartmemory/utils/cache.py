@@ -165,7 +165,7 @@ class RedisCache:
         try:
             info = self.redis.info('memory')
             memory_usage = info.get('used_memory_human', 'unknown')
-        except:
+        except Exception:
             memory_usage = 'unknown'
 
         return {

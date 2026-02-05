@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-02-05
+
+### Fixed
+- Replace all bare `except:` clauses with `except Exception:` across 6 core files to avoid catching SystemExit/KeyboardInterrupt
+- Fix undefined `setFilteredCategories`/`setFilteredNodeTypes` in KnowledgeGraph.jsx (delegate to prop callbacks)
+- Fix rules-of-hooks violation in TripleResultsViewer.jsx (conditional `useMemoryStore` call moved to top level)
+- Fix undefined `predicateTypes` variable in TripleResultsViewer.jsx (fall back to store value)
+- Fix undefined `properties` variable in insights database.py (6 references)
+- Add missing `SAMPLE_USER_PROFILE` fixture in maya test_proactive_scheduler.py
+- Replace bare `except:` in zettelkasten.py (6 instances), mcp_memory_manager.py (2), background_tasks.py (1)
+
+### Changed
+- Standardize ruff config across all Python projects: select `E`, `F`, `B`; ignore `B008`, `E501`
+- Fix studio ruff config: move `select` under `[tool.ruff.lint]`, line-length 100 -> 120
+- Create ruff configs for maya and insights (previously unconfigured)
+- Add `react/prop-types: "off"` to all ESLint configs (web, studio, insights)
+- Add `process: "readonly"` global to all ESLint configs
+
+### Version
+- Bump all repos to 0.3.1
+
+---
+
 ## [0.3.0] - 2026-02-05
 
 ### Added

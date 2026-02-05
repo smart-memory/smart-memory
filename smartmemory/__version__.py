@@ -28,7 +28,7 @@ __version__ = _get_version()
 # Parse version info
 try:
     __version_info__ = tuple(int(x) for x in __version__.split("."))
-except:
+except Exception:
     __version_info__ = (0, 1, 6)
 
 # Version history:

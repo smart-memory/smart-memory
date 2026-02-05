@@ -324,7 +324,7 @@ class FalkorDBBackend(SmartGraphBackend):
                 # Fallback: try to convert to dict
                 try:
                     props = dict(node)
-                except:
+                except Exception:
                     continue
             # Return tuple of (neighbor, link_type) to match expected format
             out.append((unflatten_dict(props), link_type))

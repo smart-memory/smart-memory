@@ -517,6 +517,6 @@ class OntologyRegistry:
             else:
                 parts.append('1')
             return f"v{'.'.join(parts)}"
-        except:
+        except Exception:
             # Fallback to timestamp-based versioning
             return f"v1.0.{int(datetime.now().timestamp())}"
