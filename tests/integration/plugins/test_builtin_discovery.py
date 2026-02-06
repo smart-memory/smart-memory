@@ -67,17 +67,17 @@ class TestBuiltinPluginDiscovery:
         extractors = manager.registry.list_plugins('extractor')
         
         # Should have at least the built-in extractors
-        assert len(extractors) >= 4, f"Expected at least 5 extractors, found {len(extractors)}"
+        assert len(extractors) >= 6, f"Expected at least 6 extractors, found {len(extractors)}"
         
-        expected_extractors = ['spacy', 'rebel', 'llm', 'relik']
+        expected_extractors = ['spacy', 'llm', 'llm_single', 'relik', 'gliner2', 'conversation_aware_llm']
         for extractor_name in expected_extractors:
             assert extractor_name in extractors, f"Extractor '{extractor_name}' not discovered"
     def test_total_plugin_count(self, manager):
         """Test total plugin count."""
         total_plugins = len(manager.loaded_plugins)
         
-        # 6 enrichers + 7 evolvers + 4 extractors + 1 grounder = 18
-        assert total_plugins == 18, f"Expected 18 total plugins (6 enrichers + 7 evolvers + 4 extractors + 1 grounder), found {total_plugins}"
+        # 6 enrichers + 7 evolvers + 6 extractors + 1 grounder = 20
+        assert total_plugins == 20, f"Expected 20 total plugins (6 enrichers + 7 evolvers + 6 extractors + 1 grounder), found {total_plugins}"
     
     def test_enricher_metadata(self, manager):
         """Test that enricher metadata is correct."""

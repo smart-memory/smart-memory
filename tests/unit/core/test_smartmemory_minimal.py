@@ -20,17 +20,23 @@ class TestSmartMemoryMinimal:
     @patch('smartmemory.smart_memory.Monitoring')
     @patch('smartmemory.smart_memory.EvolutionOrchestrator')
     @patch('smartmemory.smart_memory.ExternalResolver')
-    @patch('smartmemory.smart_memory.MemoryIngestionFlow')
+    @patch('smartmemory.smart_memory.GlobalClustering')
+    @patch('smartmemory.smart_memory.VersionTracker')
+    @patch('smartmemory.smart_memory.TemporalQueries')
     def test_smartmemory_basic_initialization(
-        self, mock_ingestion_flow, mock_external_resolver, mock_evolution,
+        self, mock_temporal_queries, mock_version_tracker, mock_clustering,
+        mock_external_resolver, mock_evolution,
         mock_monitoring, mock_search, mock_personalization, mock_grounding,
         mock_enrichment, mock_linking, mock_crud, mock_graph_ops, mock_smart_graph
     ):
         """Test basic SmartMemory initialization with mocked dependencies."""
         from smartmemory.smart_memory import SmartMemory
-        
+
         # Configure mocks
-        mock_smart_graph.return_value = Mock()
+        mock_graph = Mock()
+        mock_graph.search = Mock()
+        mock_graph.search.set_smart_memory = Mock()
+        mock_smart_graph.return_value = mock_graph
         mock_graph_ops.return_value = Mock()
         mock_crud.return_value = Mock()
         mock_linking.return_value = Mock()
@@ -41,18 +47,20 @@ class TestSmartMemoryMinimal:
         mock_monitoring.return_value = Mock()
         mock_evolution.return_value = Mock()
         mock_external_resolver.return_value = Mock()
-        mock_ingestion_flow.return_value = Mock()
-        
+        mock_clustering.return_value = Mock()
+        mock_version_tracker.return_value = Mock()
+        mock_temporal_queries.return_value = Mock()
+
         # Test initialization
         memory = SmartMemory()
-        
+
         # Verify core components are initialized
         assert memory._graph is not None
         assert memory._graph_ops is not None
         assert memory._crud is not None
         assert memory._linking is not None
         assert memory._enrichment is not None
-        
+
         # Verify mocks were called
         mock_smart_graph.assert_called_once()
         mock_graph_ops.assert_called_once()
@@ -92,13 +100,13 @@ class TestConfigurationMinimal:
     def test_environment_handler_exists(self):
         """Test that EnvironmentHandler class exists."""
         from smartmemory.configuration.environment import EnvironmentHandler
-        
+
         # Test that the class exists and can be instantiated
         handler = EnvironmentHandler()
         assert handler is not None
-        
+
         # Test that it has the expected method
-        assert hasattr(EnvironmentHandler, 'load_dotenv')
+        assert hasattr(EnvironmentHandler, 'load_secrets')
 
 
 class TestUtilitiesMinimal:

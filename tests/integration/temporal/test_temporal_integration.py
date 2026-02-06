@@ -85,19 +85,22 @@ class TestVersionTracking:
     
     def test_version_history_retrieval(self, memory):
         """Test retrieving history of versioned items."""
-        # Create versions
+        # Create item and register version explicitly (add() doesn't auto-version)
         v1 = MemoryItem(content="Version 1", metadata={"version": 1})
         v1_id = memory.add(v1)
-        
-        time.sleep(0.1)
-        
-        v2 = MemoryItem(
-            content="Version 2",
-            metadata={"version": 2, "original_id": v1_id}
+        memory.version_tracker.create_version(
+            item_id=v1_id, content=v1.content, metadata=v1.metadata
         )
-        memory.add(v2)
-        
-        # Get history - should have at least the original version
+
+        time.sleep(0.1)
+
+        # Create second version of the same item
+        memory.version_tracker.create_version(
+            item_id=v1_id, content="Version 2",
+            metadata={"version": 2}, change_reason="update"
+        )
+
+        # Get history - should have both versions
         history = memory.temporal.get_history(v1_id)
         
         assert isinstance(history, list), "History must be a list"
@@ -114,7 +117,7 @@ class TestAuditTrailGeneration:
     """Test audit trail generation for compliance."""
     
     def test_audit_trail_creation(self, memory):
-        """Test that audit trail is created on add."""
+        """Test that audit trail is created when versioned."""
         item = MemoryItem(
             content="Sensitive data",
             metadata={
@@ -123,7 +126,11 @@ class TestAuditTrailGeneration:
             }
         )
         item_id = memory.add(item)
-        
+        # add() doesn't auto-version; create version explicitly
+        memory.version_tracker.create_version(
+            item_id=item_id, content=item.content, metadata=item.metadata
+        )
+
         # Get audit trail
         trail = memory.temporal.get_audit_trail(item_id)
         
@@ -145,7 +152,10 @@ class TestAuditTrailGeneration:
             }
         )
         item_id = memory.add(item)
-        
+        memory.version_tracker.create_version(
+            item_id=item_id, content=item.content, metadata=item.metadata
+        )
+
         trail = memory.temporal.get_audit_trail(item_id, include_metadata=True)
         
         assert len(trail) >= 1, "Should have at least one audit event"
@@ -167,7 +177,10 @@ class TestAuditTrailGeneration:
             metadata={"compliance_required": True}
         )
         item_id = memory.add(item)
-        
+        memory.version_tracker.create_version(
+            item_id=item_id, content=item.content, metadata=item.metadata
+        )
+
         trail = memory.temporal.get_audit_trail(item_id)
         
         assert len(trail) >= 1, "Should have audit events"
@@ -291,10 +304,13 @@ class TestComplianceScenarios:
             }
         )
         record_id = memory.add(record)
-        
+        memory.version_tracker.create_version(
+            item_id=record_id, content=record.content, metadata=record.metadata
+        )
+
         # Get audit trail
         trail = memory.temporal.get_audit_trail(record_id, include_metadata=True)
-        
+
         assert len(trail) >= 1, "HIPAA: Must have audit trail for medical records"
         
         # Verify audit trail structure for compliance
@@ -320,10 +336,13 @@ class TestComplianceScenarios:
             }
         )
         data_id = memory.add(personal_data)
-        
+        memory.version_tracker.create_version(
+            item_id=data_id, content=personal_data.content, metadata=personal_data.metadata
+        )
+
         # Should be able to track all changes
         trail = memory.temporal.get_audit_trail(data_id)
-        
+
         assert len(trail) >= 1, "GDPR: Must track all changes to personal data"
         
         # Verify action types are valid
@@ -349,10 +368,13 @@ class TestComplianceScenarios:
             }
         )
         event_id = memory.add(event)
-        
+        memory.version_tracker.create_version(
+            item_id=event_id, content=event.content, metadata=event.metadata
+        )
+
         # Audit trail should capture security events
         trail = memory.temporal.get_audit_trail(event_id, include_metadata=True)
-        
+
         assert len(trail) >= 1, "SOC2: Must have audit trail for security events"
         
         # Verify security event is logged

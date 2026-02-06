@@ -23,7 +23,7 @@ class FalkorDBGraphService:
 
         self.config = config
         host = config.graph_db.get("host", "localhost")
-        port = config.graph_db.get("port", 6379)
+        port = config.graph_db.get("port", 9010)
         graph_name = config.graph_db.get("graph_name", "ontology")
         self.host = host
         self.port = port

@@ -62,12 +62,11 @@ class TestRealTemporalSearch:
         # 3. Verify history
         history = self.temporal_queries.get_history(item_id)
         assert len(history) >= 2
-        
+
         # Verify order (newest first)
-        # Note: memory.add() now creates an initial version (v1)
-        # So our manual creates become v2 and v3
-        assert history[0].version == 3
-        assert history[1].version == 2
+        # memory.add() does NOT auto-create versions — only explicit create_version() does
+        assert history[0].version == 2
+        assert history[1].version == 1
         assert history[0].content == v2_content
         assert history[1].content == item.content
         

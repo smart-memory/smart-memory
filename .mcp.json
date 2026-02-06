@@ -1,5 +1,18 @@
 {
   "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "description": "Browser automation for web scraping and testing"
+    },
+    "notebooklm-mcp": {
+      "command": "notebooklm-mcp",
+      "args": [],
+      "description": "Google NotebookLM integration for podcast generation and research"
+    },
     "filesystem": {
       "command": "npx",
       "args": [
@@ -13,13 +26,6 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-memory"
-      ]
-    },
-    "fetch": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
       ]
     },
     "smartmemory": {

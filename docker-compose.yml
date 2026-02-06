@@ -7,7 +7,7 @@ services:
     image: falkordb/falkordb:latest
     container_name: smartmemory-falkordb
     ports:
-      - "6379:6379"
+      - "9010:6379"
     command: ["falkordb-server", "--bind", "0.0.0.0", "--protected-mode", "no"]
     volumes:
       - falkordb_data:/data

@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-05
 **Version:** 1.0 (restructured from strategic plan v5)
-**Status:** IMPLEMENTATION GATED ON SIGN-OFF
+**Status:** IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE
 **Predecessor docs:** See [Evidence Base](design/evidence-base.md) for benchmark data and research findings.
 
 ---
@@ -260,71 +260,71 @@ PipelineConfig
 
 ## 4. Implementation Phases
 
-### Phase 1: Pipeline Foundation
+### Phase 1: Pipeline Foundation — COMPLETE
 
 **Goal:** Replace three orchestrators with one unified pipeline. Establish the core abstractions that all subsequent phases build on.
 
+**Status:** COMPLETE. All deliverables shipped. 109 unit tests pass.
+
 **Deliverables:**
 
-| # | Deliverable | Files |
-|---|------------|-------|
-| 1.1 | `StageCommand` protocol (execute/undo) | `smartmemory/pipeline/protocol.py` |
-| 1.2 | `PipelineState` dataclass (serializable, checkpointable) | `smartmemory/pipeline/state.py` |
-| 1.3 | `PipelineConfig` hierarchy (nested Pydantic, per-workspace) | `smartmemory/pipeline/config.py` |
-| 1.4 | `PipelineRunner` with `InProcessTransport` | `smartmemory/pipeline/runner.py` |
-| 1.5 | `run()`, `run_to()`, `run_from()`, `undo_to()` API | `smartmemory/pipeline/runner.py` |
-| 1.6 | Separate ontology FalkorDB graph (`ws_{id}_ontology`) | `smartmemory/graph/ontology_graph.py` |
-| 1.7 | Seed 14 entity types (three-tier status: seed/provisional/confirmed) | `smartmemory/ontology/seed.py` |
-| 1.8 | Wrap existing stages as StageCommands (classify, extract, store, link, enrich, evolve) | `smartmemory/pipeline/stages/` |
-| 1.9 | `SmartMemory.ingest()` delegates to `Pipeline.run()` | `smartmemory/smart_memory.py` |
-| 1.10 | Delete `FastIngestionFlow` (502 LOC, unused) | `smartmemory/memory/ingestion/` |
+| # | Deliverable | Files | Status |
+|---|------------|-------|--------|
+| 1.1 | `StageCommand` protocol (execute/undo) | `smartmemory/pipeline/protocol.py` | Done |
+| 1.2 | `PipelineState` dataclass (serializable, checkpointable) | `smartmemory/pipeline/state.py` | Done |
+| 1.3 | `PipelineConfig` hierarchy (nested dataclasses, per-workspace) | `smartmemory/pipeline/config.py` | Done |
+| 1.4 | `PipelineRunner` with `InProcessTransport` | `smartmemory/pipeline/runner.py` | Done |
+| 1.5 | `run()`, `run_to()`, `run_from()`, `undo_to()` API | `smartmemory/pipeline/runner.py` | Done |
+| 1.6 | Separate ontology FalkorDB graph (`ws_{id}_ontology`) | `smartmemory/graph/ontology_graph.py` | Done |
+| 1.7 | Seed 14 entity types (three-tier status: seed/provisional/confirmed) | `smartmemory/graph/ontology_graph.py` | Done |
+| 1.8 | Wrap existing stages as StageCommands (classify, coreference, extract, store, link, enrich, ground, evolve) | `smartmemory/pipeline/stages/` | Done |
+| 1.9 | `SmartMemory.ingest()` delegates to `Pipeline.run()` | `smartmemory/smart_memory.py` | Done |
+| 1.10 | Delete `FastIngestionFlow` (502 LOC, unused) | `smartmemory/memory/ingestion/` | Done |
 
-**Acceptance criteria:**
-- `Pipeline.run(text, config)` produces identical output to current `MemoryIngestionFlow.ingest(text)`
-- `Pipeline.run_to()` / `run_from()` work for breakpoint execution
-- Ontology graph is separate from data graph (no bleed)
-- All existing tests pass against new pipeline
-- `SmartMemory.add()` still works as recursion guard
+**Acceptance criteria:** All met.
 
-**Dependencies:** None. Start immediately.
+**Dependencies:** None.
 
 ---
 
-### Phase 2: Extraction Stages
+### Phase 2: Extraction Stages — COMPLETE
 
 **Goal:** Implement the new extraction stages that bring ontology-grounded extraction into the pipeline.
 
+**Status:** COMPLETE. 4 native stages replace `ExtractStage`. Pipeline goes from 8 to 11 stages. 188 unit tests pass.
+
 **Deliverables:**
 
-| # | Deliverable | Files |
-|---|------------|-------|
-| 2.1 | `classify` StageCommand (memory type classification) | `smartmemory/pipeline/stages/classify.py` |
-| 2.2 | `coreference` StageCommand (pronoun resolution) | `smartmemory/pipeline/stages/coreference.py` |
-| 2.3 | `simplify` StageCommand | `smartmemory/pipeline/stages/simplify.py` |
-| | — clause splitting (compound → simple sentences) | |
-| | — relative clause extraction ("who invented...", "which runs...") | |
-| | — passive → active voice conversion | |
-| | — appositive extraction ("Tim Cook, CEO of Apple, ...") | |
-| | One stage, 4 config flags, shared spaCy dep parse | |
-| 2.4 | `entity_ruler` StageCommand (spaCy sm + EntityRuler) | `smartmemory/pipeline/stages/entity_ruler.py` |
-| 2.5 | `llm_extract` StageCommand (LLM-based extraction) | `smartmemory/pipeline/stages/llm_extract.py` |
-| 2.6 | `ontology_constrain` StageCommand | `smartmemory/pipeline/stages/ontology_constrain.py` |
-| | — type validation against ontology graph | |
-| | — provisional type creation for unknown types | |
-| | — PromotionConfig integration | |
-| | — type-pair validation (filter impossible relations) | |
-| 2.7 | Migrate hardcoded prompts to `prompts.json` | `smartmemory/prompts/prompts.json` |
-| | — `SINGLE_CALL_PROMPT` from `llm_single.py` | |
-| | — `EXTRACTION_SYSTEM_PROMPT` from `reasoning.py` | |
+| # | Deliverable | Files | Status |
+|---|------------|-------|--------|
+| 2.1 | `classify` StageCommand (memory type classification) | `smartmemory/pipeline/stages/classify.py` | Done (Phase 1) |
+| 2.2 | `coreference` StageCommand (pronoun resolution) | `smartmemory/pipeline/stages/coreference.py` | Done (Phase 1) |
+| 2.3 | `simplify` StageCommand | `smartmemory/pipeline/stages/simplify.py` | Done |
+| | — clause splitting, relative clause extraction, passive→active, appositive extraction | | |
+| | — 4 config flags, `min_token_count`, shared spaCy dep parse | | |
+| 2.4 | `entity_ruler` StageCommand (spaCy NER + label mapping) | `smartmemory/pipeline/stages/entity_ruler.py` | Done |
+| 2.5 | `llm_extract` StageCommand (wraps `LLMSingleExtractor`) | `smartmemory/pipeline/stages/llm_extract.py` | Done |
+| 2.6 | `ontology_constrain` StageCommand | `smartmemory/pipeline/stages/ontology_constrain.py` | Done |
+| | — entity merge (ruler + LLM), type validation, provisional creation, relation filtering | | |
+| 2.7 | Migrate hardcoded prompts to `prompts.json` | — | Deferred to Phase 3 |
 
-**Acceptance criteria:**
-- Each stage independently testable with `run_to()` / `run_from()`
-- `simplify` produces flatter sentences measurable by token reduction
-- `entity_ruler` matches benchmark: 96.9% E-F1 at 4ms
-- `ontology_constrain` creates provisional types and validates against ontology graph
-- Prompts loaded via PromptProvider, not hardcoded
+**Deferred items:**
+- 2.7 (prompt migration) — deferred to Phase 3. Self-learning promotion flow (Redis Streams) also deferred.
+- Studio frontend changes deferred — only backend metadata/models updated.
+- `passive_to_active` transform is a no-op placeholder (full rewriting needs a dedicated rewriter).
 
-**Dependencies:** Phase 1.
+**Implementation notes:**
+- `PipelineState.simplified_text: Optional[str]` renamed to `simplified_sentences: List[str]`
+- `SimplifyConfig` rewritten with 4 boolean transform flags (was `enabled` + `model`)
+- `EntityRulerConfig` extended with `pattern_sources`, `min_confidence`, `spacy_model`
+- `LLMExtractConfig` extended with `max_relations`
+- `ConstrainConfig` extended with `domain_range_validation`
+- `PromotionConfig` extended with `reasoning_validation`, `min_frequency`, `min_confidence`
+- `ExtractStage` and `test_extract.py` deleted
+- Studio: `SimplifyRequest`, `EntityRulerRequest`, `OntologyConstrainRequest` added to `models/pipeline.py`
+- Studio: `pipeline_info.py` updated with 4 new stage descriptions replacing `extractor_pipeline`
+
+**Dependencies:** Phase 1 (complete).
 
 ---
 

@@ -16,10 +16,10 @@ from smartmemory.models.memory_item import MemoryItem
 @pytest.mark.integration
 class TestSmartMemoryRealBackendIntegration:
     """Integration tests using real backends - NO MOCKS.
-    
+
     These tests require:
-    - Running Redis instance (localhost:6379 or configured port)
-    - Running FalkorDB instance (localhost:6379 or configured port) 
+    - Running Redis instance (localhost:9012 or configured port)
+    - Running FalkorDB instance (localhost:9010 or configured port) 
     - Optional: OpenAI API key for embedding tests
     
     Run with: pytest -m integration --tb=short

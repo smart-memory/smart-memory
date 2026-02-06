@@ -38,7 +38,7 @@ class OntologyRegistry:
         """Initialize FalkorDB connection."""
         try:
             host = self.config.graph_db.get("host", "localhost")
-            port = self.config.graph_db.get("port", 6379)
+            port = self.config.graph_db.get("port", 9010)
             graph_name = self.config.graph_db.get("graph_name", "ontology")
 
             self.client = falkordb.FalkorDB(host=host, port=port)

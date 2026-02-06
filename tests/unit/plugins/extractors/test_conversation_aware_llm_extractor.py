@@ -164,32 +164,35 @@ class TestConversationAwareLLMExtractor:
     @patch('smartmemory.plugins.extractors.conversation_aware_llm.call_llm')
     def test_extract_with_context(self, mock_call_llm, extractor, conversation_context):
         """Test extraction with conversation context."""
-        # Mock LLM responses
+        # Mock LLM responses — call_llm returns (parsed_dict, raw_text) tuples
         mock_call_llm.side_effect = [
             # Entity extraction response
-            {
-                'parsed': {
+            (
+                {
                     'entities': [
                         {'name': 'neural networks', 'entity_type': 'concept', 'confidence': 0.9}
                     ]
-                }
-            },
+                },
+                '{"entities": [{"name": "neural networks", "entity_type": "concept", "confidence": 0.9}]}'
+            ),
             # Relation extraction response
-            {
-                'parsed': {
+            (
+                {
                     'relations': [
                         {'subject': 'neural networks', 'predicate': 'part_of', 'object': 'machine learning'}
                     ]
-                }
-            },
+                },
+                '{"relations": [{"subject": "neural networks", "predicate": "part_of", "object": "machine learning"}]}'
+            ),
             # Speaker relation extraction response
-            {
-                'parsed': {
+            (
+                {
                     'speaker_relations': [
                         {'subject': 'User', 'predicate': 'ASKS_ABOUT', 'object': 'neural networks'}
                     ]
-                }
-            }
+                },
+                '{"speaker_relations": [{"subject": "User", "predicate": "ASKS_ABOUT", "object": "neural networks"}]}'
+            ),
         ]
         
         # Mock API key
@@ -220,8 +223,8 @@ class TestConversationAwareLLMExtractor:
             
             result = extractor.extract("Some text", conversation_context=None)
             
-            # Should call parent extract
-            mock_parent_extract.assert_called_once_with("Some text", None)
+            # Should call parent extract (no context = fallback to base class)
+            mock_parent_extract.assert_called_once_with("Some text")
     
     def test_metadata(self):
         """Test plugin metadata."""

@@ -14,7 +14,6 @@ from typing import Dict, Any
 
 from smartmemory.plugins.extractors.spacy import SpacyExtractor
 from smartmemory.plugins.extractors.llm import LLMExtractor
-from smartmemory.plugins.extractors.rebel import RebelExtractor
 from smartmemory.plugins.extractors.relik import RelikExtractor
 
 
@@ -149,19 +148,17 @@ class TestLLMExtractor:
     
     def test_extract_basic(self, extractor, mock_llm_client):
         """Test basic LLM extraction."""
-        # Mock LLM response
-        mock_response = {
+        parsed_response = {
             "entities": [
-                {"text": "Python", "type": "technology", "start": 0, "end": 6}
+                {"name": "Python", "entity_type": "technology", "confidence": 0.9}
             ],
-            "relations": []
         }
-        
-        with patch('litellm.completion') as mock_completion:
-            mock_completion.return_value.choices[0].message.content = str(mock_response)
-            
+
+        with patch('smartmemory.plugins.extractors.llm.call_llm') as mock_call:
+            mock_call.return_value = (parsed_response, '{"entities": []}')
+
             result = extractor.extract("Python is a programming language")
-            
+
             assert isinstance(result, dict)
             assert 'entities' in result
             assert 'relations' in result
@@ -174,51 +171,6 @@ class TestLLMExtractor:
             # Should return empty result on error
             assert result['entities'] == []
             assert result['relations'] == []
-
-
-class TestRebelExtractor:
-    """Test RebelExtractor plugin."""
-    
-    @pytest.fixture
-    def mock_rebel_pipeline(self):
-        """Create mock REBEL pipeline."""
-        mock_pipeline = Mock()
-        mock_pipeline.return_value = [{"generated_text": ""}]
-        return mock_pipeline
-    
-    @pytest.fixture
-    def extractor(self, mock_rebel_pipeline):
-        """Create RebelExtractor with mocked pipeline."""
-        with patch('transformers.pipeline', return_value=mock_rebel_pipeline):
-            return RebelExtractor()
-    
-    def test_initialization(self, extractor):
-        """Test extractor initializes correctly."""
-        assert extractor is not None
-        metadata = extractor.metadata()
-        assert metadata.name == "rebel"
-    
-    def test_extract_basic(self, extractor, mock_rebel_pipeline):
-        """Test basic REBEL extraction."""
-        # Mock REBEL output
-        mock_rebel_pipeline.return_value = [{
-            "generated_text": "<triplet> Einstein <subj> developed <obj> relativity"
-        }]
-        
-        result = extractor.extract("Einstein developed relativity")
-        
-        assert isinstance(result, dict)
-        assert 'entities' in result
-        assert 'relations' in result
-    
-    def test_parse_triplets(self, extractor):
-        """Test triplet parsing."""
-        text = "<triplet> subject <subj> predicate <obj> object"
-        
-        # This would test the internal parsing logic
-        # Implementation depends on actual REBEL output format
-        result = extractor.extract(text)
-        assert isinstance(result, dict)
 
 
 class TestRelikExtractor:

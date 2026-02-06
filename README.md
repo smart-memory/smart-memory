@@ -291,17 +291,17 @@ SmartMemory uses environment variables for configuration:
 
 Key environment variables:
 - `FALKORDB_HOST`: FalkorDB server host (default: localhost)
-- `FALKORDB_PORT`: FalkorDB server port (default: 6379)
+- `FALKORDB_PORT`: FalkorDB server port (default: 9010)
 - `REDIS_HOST`: Redis server host (default: localhost)
-- `REDIS_PORT`: Redis server port (default: 6379)
+- `REDIS_PORT`: Redis server port (default: 9012)
 - `OPENAI_API_KEY`: OpenAI API key for embeddings
 
 ```bash
 # Example .env file
 export FALKORDB_HOST=localhost
-export FALKORDB_PORT=6379
+export FALKORDB_PORT=9010
 export REDIS_HOST=localhost
-export REDIS_PORT=6379
+export REDIS_PORT=9012
 export OPENAI_API_KEY=your-api-key-here
 ```
 

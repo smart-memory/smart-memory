@@ -33,14 +33,16 @@ def unit_isolation_patches():
         
         # Config returns attribute-accessible sections
         cfg = AttrDict({
-            'graph_db': AttrDict({'backend_class': 'FalkorDBBackend', 'host': 'localhost', 'port': 6379}),
+            'graph_db': AttrDict({'backend_class': 'FalkorDBBackend', 'host': 'localhost', 'port': 9010}),
             'vector_store': AttrDict({'backend': 'falkordb'}),
-            'cache': AttrDict({'redis': AttrDict({'host': 'localhost', 'port': 6379, 'db': 15})}),
+            'cache': AttrDict({'redis': AttrDict({'host': 'localhost', 'port': 9012, 'db': 15})}),
         })
         mock_get_config.side_effect = lambda section=None: cfg.get(section) if section else cfg
         
-        # Provide default mock instances
-        mock_smartgraph.return_value = Mock()
+        # Provide default mock instances with safe defaults for graph queries
+        mock_graph = Mock()
+        mock_graph.execute_query.return_value = []  # Prevent "Mock not iterable" in VersionTracker
+        mock_smartgraph.return_value = mock_graph
         mock_graph_ops.return_value = Mock()
         mock_crud.return_value = Mock()
         mock_linking.return_value = Mock()

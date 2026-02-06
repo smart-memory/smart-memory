@@ -2,7 +2,7 @@
   "graph_db": {
     "backend_class": "FalkorDBBackend",
     "host": "${FALKORDB_HOST:-localhost}",
-    "port": "${FALKORDB_PORT:-6379}",
+    "port": "${FALKORDB_PORT:-9010}",
     "graph_name": "${GRAPH_NAME:-ontology}"
   },
   "semantic": {},
@@ -26,7 +26,7 @@
     "hnsw_ef_construction": "${VECTOR_HNSW_EF_CONSTRUCTION:-200}",
     "hnsw_ef_runtime": "${VECTOR_HNSW_EF_RUNTIME:-64}",
     "host": "${FALKORDB_HOST:-localhost}",
-    "port": "${FALKORDB_PORT:-6379}",
+    "port": "${FALKORDB_PORT:-9010}",
     "embedding": {
       "provider": "${EMBEDDING_PROVIDER:-openai}",
       "model": "${EMBEDDING_MODEL:-text-embedding-ada-002}",

@@ -23,7 +23,7 @@ class FalkorVectorBackend(VectorBackend):
         graph_cfg = get_config("graph_db") or {}
         # graph_cfg is a ValidatedConfigDict; support dict access too for safety
         host = getattr(graph_cfg, "host", None) or (graph_cfg.get("host") if isinstance(graph_cfg, dict) else None) or "localhost"
-        port = getattr(graph_cfg, "port", None) or (graph_cfg.get("port") if isinstance(graph_cfg, dict) else None) or 6379
+        port = getattr(graph_cfg, "port", None) or (graph_cfg.get("port") if isinstance(graph_cfg, dict) else None) or 9010
         graph_name = getattr(graph_cfg, "graph_name", None) or (graph_cfg.get("graph_name") if isinstance(graph_cfg, dict) else None) or "smartmemory"
         self.db = FalkorDB(host=host, port=port)
         self.graph = self.db.select_graph(graph_name)

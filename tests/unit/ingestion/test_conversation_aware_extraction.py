@@ -24,19 +24,19 @@ class TestConversationAwareExtractorSelection:
         return IngestionRegistry()
 
     def test_select_default_without_context(self, registry):
-        """Without conversation context, select default extractor (llm)."""
+        """Without conversation context, select default extractor (groq)."""
         selected = registry.select_extractor_for_context(None)
-        assert selected == 'llm'
+        assert selected == 'groq'
 
     def test_select_default_with_empty_context(self, registry):
         """With empty conversation context, select default extractor."""
         selected = registry.select_extractor_for_context({})
-        assert selected == 'llm'
+        assert selected == 'groq'
 
     def test_select_default_with_empty_turn_history(self, registry):
         """With empty turn_history, select default extractor."""
         selected = registry.select_extractor_for_context({'turn_history': []})
-        assert selected == 'llm'
+        assert selected == 'groq'
 
     def test_select_conversation_aware_with_context(self, registry):
         """With conversation context containing turns, select conversation_aware_llm."""

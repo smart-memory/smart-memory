@@ -31,7 +31,7 @@ class IngestionObserver:
                 from smartmemory.observability import EventSpooler as _ObsSpooler
                 self._obs_spooler = _ObsSpooler(
                     redis_host=os.getenv('REDIS_HOST', 'localhost'),
-                    redis_port=int(os.getenv('REDIS_PORT', 6379)),
+                    redis_port=int(os.getenv('REDIS_PORT', 9012)),
                     session_id=self._session_id,
                 )
             except Exception:

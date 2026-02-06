@@ -22,7 +22,7 @@ def test_config():
         "graph_db": {
             "backend_class": "FalkorDBBackend",
             "host": "localhost",
-            "port": 6379,
+            "port": 9010,
             "database": "test_smartmemory"
         },
         "vector_store": {
@@ -32,7 +32,7 @@ def test_config():
         "cache": {
             "redis": {
                 "host": "localhost",
-                "port": 6379,
+                "port": 9012,
                 "db": 15  # Use separate test database
             }
         }
@@ -215,7 +215,7 @@ def mock_smartmemory_dependencies():
         # Mock configuration with proper object structure
         mock_config = Mock()
         mock_config.host = 'localhost'
-        mock_config.port = 6379
+        mock_config.port = 9010
         mock_config.backend = 'falkordb'
         mock_get_config.return_value = mock_config
         
