@@ -19,7 +19,7 @@ class TestPipelineStateConstruction:
         assert state.team_id is None
         assert state.memory_type is None
         assert state.resolved_text is None
-        assert state.simplified_text is None
+        assert state.simplified_sentences == []
         assert state.classified_types == []
         assert state.ruler_entities == []
         assert state.llm_entities == []
@@ -143,7 +143,7 @@ class TestPipelineStateToDict:
             "raw_metadata",
             "memory_type",
             "resolved_text",
-            "simplified_text",
+            "simplified_sentences",
             "classified_types",
             "ruler_entities",
             "llm_entities",

@@ -1,10 +1,15 @@
-"""
-ExtractorPipeline component for componentized memory ingestion pipeline.
-Handles entity/relation extraction with fallback chain and multiple extractor support.
+"""ExtractorPipeline component for componentized memory ingestion pipeline.
 
+.. deprecated::
+    Use ``smartmemory.pipeline.stages`` (SimplifyStage, EntityRulerStage,
+    LLMExtractStage, OntologyConstrainStage) via PipelineRunner instead.
+    This class will be removed in a future version.
+
+Handles entity/relation extraction with fallback chain and multiple extractor support.
 Includes automatic chunking for large texts.
 """
 import logging
+import warnings
 from typing import Dict, Any, Optional, List
 
 from smartmemory.memory.pipeline.components import PipelineComponent, ComponentResult
@@ -22,12 +27,22 @@ DEFAULT_CHUNK_OVERLAP = 200
 
 
 class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
-    """
-    Component responsible for entity and relation extraction with fallback chain.
+    """Entity and relation extraction with fallback chain.
+
+    .. deprecated::
+        Use ``smartmemory.pipeline.stages`` (SimplifyStage, EntityRulerStage,
+        LLMExtractStage, OntologyConstrainStage) via ``PipelineRunner`` instead.
+        This class will be removed in a future version.
+
     Supports multiple extractors (llm, spacy, gliner, relik, ontology) with automatic fallback.
     """
 
     def __init__(self, memory=None):
+        warnings.warn(
+            "ExtractorPipeline is deprecated. Use smartmemory.pipeline.stages via PipelineRunner instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._logger = logging.getLogger(__name__)
         self.memory = memory
         # Registry maps extractor name -> extractor class

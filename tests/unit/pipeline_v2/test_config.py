@@ -4,13 +4,16 @@ import pytest
 
 from smartmemory.pipeline.config import (
     ClassifyConfig,
+    ConstrainConfig,
     CoreferenceConfig,
     EnrichConfig,
+    EntityRulerConfig,
     EvolveConfig,
     ExtractionConfig,
     LLMExtractConfig,
     LinkConfig,
     PipelineConfig,
+    PromotionConfig,
     RetryConfig,
     SimplifyConfig,
     StoreConfig,
@@ -207,3 +210,116 @@ class TestPipelineConfigSerialization:
         assert restored.max_retries == 3
         assert restored.backoff_seconds == 2.5
         assert restored.on_failure == "skip"
+
+
+class TestSimplifyConfigPhase2:
+    """Tests for Phase 2 SimplifyConfig with transform flags."""
+
+    def test_default_enabled(self):
+        """SimplifyConfig is enabled by default."""
+        cfg = SimplifyConfig()
+        assert cfg.enabled is True
+
+    def test_default_transform_flags(self):
+        """All four transform flags default to True."""
+        cfg = SimplifyConfig()
+        assert cfg.split_clauses is True
+        assert cfg.extract_relative is True
+        assert cfg.passive_to_active is True
+        assert cfg.extract_appositives is True
+
+    def test_min_token_count_default(self):
+        """min_token_count defaults to 4."""
+        cfg = SimplifyConfig()
+        assert cfg.min_token_count == 4
+
+    def test_override_flags(self):
+        """Transform flags can be individually disabled."""
+        cfg = SimplifyConfig(split_clauses=False, passive_to_active=False)
+        assert cfg.split_clauses is False
+        assert cfg.passive_to_active is False
+        assert cfg.extract_relative is True
+        assert cfg.extract_appositives is True
+
+
+class TestEntityRulerConfigPhase2:
+    """Tests for Phase 2 EntityRulerConfig extensions."""
+
+    def test_default_pattern_sources(self):
+        """pattern_sources defaults to ['builtin']."""
+        cfg = EntityRulerConfig()
+        assert cfg.pattern_sources == ["builtin"]
+
+    def test_default_min_confidence(self):
+        """min_confidence defaults to 0.85."""
+        cfg = EntityRulerConfig()
+        assert cfg.min_confidence == 0.85
+
+    def test_default_spacy_model(self):
+        """spacy_model defaults to en_core_web_sm."""
+        cfg = EntityRulerConfig()
+        assert cfg.spacy_model == "en_core_web_sm"
+
+    def test_patterns_path_preserved(self):
+        """Original patterns_path field still works."""
+        cfg = EntityRulerConfig(patterns_path="/custom/patterns.jsonl")
+        assert cfg.patterns_path == "/custom/patterns.jsonl"
+
+
+class TestLLMExtractConfigPhase2:
+    """Tests for Phase 2 LLMExtractConfig max_relations field."""
+
+    def test_default_max_relations(self):
+        """max_relations defaults to 30."""
+        cfg = LLMExtractConfig()
+        assert cfg.max_relations == 30
+
+    def test_override_max_relations(self):
+        """max_relations can be overridden."""
+        cfg = LLMExtractConfig(max_relations=50)
+        assert cfg.max_relations == 50
+
+    def test_existing_fields_preserved(self):
+        """Existing fields are unchanged."""
+        cfg = LLMExtractConfig()
+        assert cfg.max_entities == 10
+        assert cfg.enable_relations is True
+
+
+class TestConstrainConfigPhase2:
+    """Tests for Phase 2 ConstrainConfig domain_range_validation field."""
+
+    def test_default_domain_range_validation(self):
+        """domain_range_validation defaults to True."""
+        cfg = ConstrainConfig()
+        assert cfg.domain_range_validation is True
+
+    def test_override_domain_range_validation(self):
+        """domain_range_validation can be disabled."""
+        cfg = ConstrainConfig(domain_range_validation=False)
+        assert cfg.domain_range_validation is False
+
+
+class TestPromotionConfigPhase2:
+    """Tests for Phase 2 PromotionConfig extensions."""
+
+    def test_default_reasoning_validation(self):
+        """reasoning_validation defaults to False."""
+        cfg = PromotionConfig()
+        assert cfg.reasoning_validation is False
+
+    def test_default_min_frequency(self):
+        """min_frequency defaults to 2."""
+        cfg = PromotionConfig()
+        assert cfg.min_frequency == 2
+
+    def test_default_min_confidence(self):
+        """min_confidence defaults to 0.7."""
+        cfg = PromotionConfig()
+        assert cfg.min_confidence == 0.7
+
+    def test_existing_fields_preserved(self):
+        """Original fields are unchanged."""
+        cfg = PromotionConfig()
+        assert cfg.auto_promote_threshold == 3
+        assert cfg.require_approval is False

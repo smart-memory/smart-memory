@@ -8,6 +8,7 @@ from smartmemory.memory.pipeline.components import PipelineComponent, ComponentR
 from smartmemory.memory.pipeline.config import EnrichmentConfig
 from smartmemory.memory.pipeline.state import LinkingState
 from smartmemory.memory.pipeline.transactions.change_set import ChangeOp, ChangeSet
+from smartmemory.memory.ingestion.utils import sanitize_relation_type
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.utils.pipeline_utils import create_error_result
 
@@ -27,10 +28,6 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
             raise ValueError("EnrichmentPipeline requires a valid memory_instance")
         self.enrichment = enrichment_instance
         self.memory = memory_instance
-
-    def _sanitize_relation_type(self, rel_type: str) -> str:
-        """Sanitize relation type for graph storage"""
-        return rel_type.replace(' ', '_') if isinstance(rel_type, str) else rel_type
 
     def _add_derived_items(self, context: Dict[str, Any], enrichment_result: Dict[str, Any], *, preview_mode: bool = False, proposed_ops: List[ChangeOp] | None = None) -> List[
         str]:
@@ -76,7 +73,7 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
                             proposed_ops.append(ChangeOp(op_type='add_edge', args={
                                 'source': derived_id,
                                 'target': original_id,
-                                'relation_type': self._sanitize_relation_type('CANONICAL'),
+                                'relation_type': sanitize_relation_type('CANONICAL'),
                                 'properties': {'provenance': 'enrichment'}
                             }))
                         except Exception:
@@ -91,7 +88,7 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
                         self.memory._graph.add_edge(
                             source_id=derived_id,
                             target_id=original_id,
-                            edge_type=self._sanitize_relation_type('CANONICAL'),
+                            edge_type=sanitize_relation_type('CANONICAL'),
                             properties={'provenance': 'enrichment'},
                         )
                     except Exception:
@@ -196,7 +193,7 @@ class EnrichmentPipeline(PipelineComponent[EnrichmentConfig]):
                         proposed_ops.append(ChangeOp(op_type='add_edge', args={
                             'source': src,
                             'target': tgt,
-                            'relation_type': self._sanitize_relation_type(rel_type) if isinstance(rel_type, str) else (rel_type or 'RELATED'),
+                            'relation_type': sanitize_relation_type(rel_type) if isinstance(rel_type, str) else (rel_type or 'RELATED'),
                             'properties': props or {}
                         }))
                         proposed_relation_edges += 1

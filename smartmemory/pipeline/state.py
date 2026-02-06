@@ -36,7 +36,7 @@ class PipelineState:
 
     # -- Pre-processing --
     resolved_text: Optional[str] = None
-    simplified_text: Optional[str] = None
+    simplified_sentences: List[str] = field(default_factory=list)
 
     # -- Classification --
     classified_types: List[str] = field(default_factory=list)

@@ -9,6 +9,7 @@ from smartmemory.memory.pipeline.components import PipelineComponent, ComponentR
 from smartmemory.memory.pipeline.config import StorageConfig
 from smartmemory.memory.pipeline.state import ExtractionState
 from smartmemory.memory.pipeline.transactions.change_set import ChangeOp, ChangeSet
+from smartmemory.memory.ingestion.utils import sanitize_relation_type
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.utils.pipeline_utils import create_error_result
 
@@ -279,7 +280,7 @@ class StorageEngine(PipelineComponent[StorageConfig]):
                             proposed_ops.append(ChangeOp(op_type='add_edge', args={
                                 'source': subject,
                                 'target': obj,
-                                'relation_type': self._sanitize_relation_type(predicate) if hasattr(self, '_sanitize_relation_type') else (predicate or 'RELATED'),
+                                'relation_type': sanitize_relation_type(predicate),
                                 'properties': {}
                             }))
                             edges_created += 1

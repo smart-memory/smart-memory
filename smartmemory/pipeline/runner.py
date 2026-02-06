@@ -17,6 +17,12 @@ from smartmemory.pipeline.protocol import StageCommand
 from smartmemory.pipeline.state import PipelineState
 from smartmemory.pipeline.transport import InProcessTransport, Transport
 
+# Avoid circular import — TYPE_CHECKING guard not needed since we use string annotation
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from smartmemory.pipeline.metrics import PipelineMetricsEmitter
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,9 +33,11 @@ class PipelineRunner:
         self,
         stages: List[StageCommand],
         transport: Optional[Transport] = None,
+        metrics_emitter: Optional["PipelineMetricsEmitter"] = None,
     ):
         self.stages = stages
         self.transport: Transport = transport or InProcessTransport()
+        self._metrics = metrics_emitter
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -125,6 +133,11 @@ class PipelineRunner:
             state,
             completed_at=datetime.now(timezone.utc),
         )
+        if self._metrics:
+            try:
+                self._metrics.on_pipeline_complete(state)
+            except Exception:
+                pass
         return state
 
     def _execute_stage(
@@ -150,6 +163,11 @@ class PipelineRunner:
                     stage_history=[*new_state.stage_history, stage.name],
                     stage_timings={**new_state.stage_timings, stage.name: elapsed},
                 )
+                if self._metrics:
+                    try:
+                        self._metrics.on_stage_complete(stage.name, elapsed, new_state)
+                    except Exception:
+                        pass
                 return new_state
             except Exception as exc:
                 last_exc = exc
@@ -165,7 +183,13 @@ class PipelineRunner:
                     time.sleep(backoff)
                     backoff *= 2  # exponential backoff
 
-        # All retries exhausted
+        # All retries exhausted — emit error metric
+        if self._metrics and last_exc:
+            try:
+                self._metrics.on_stage_complete(stage.name, 0.0, state, error=last_exc)
+            except Exception:
+                pass
+
         if on_failure == "skip":
             logger.warning("Stage '%s' failed after %d attempts — skipping", stage.name, max_retries + 1)
             return replace(

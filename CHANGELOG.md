@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Pipeline v2 Storage & Post-Processing (Phase 3)
+- **`PipelineMetricsEmitter`** (`smartmemory/pipeline/metrics.py`): Fire-and-forget pipeline metrics emission via Redis Streams. Emits `stage_complete` events per stage and `pipeline_complete` summary with timing breakdown, entity/relation counts, and workspace context. Stream: `smartmemory:metrics:pipeline`
+- **`SmartMemory.create_pipeline_runner()`**: Public factory method exposing the v2 `PipelineRunner` for Studio and other consumers that need `run_to()`/`run_from()` breakpoint execution
+- **Studio `get_v2_runner()`** (`pipeline_registry.py`): Cached v2 `PipelineRunner` per tenant for Studio backend, backed by `SecureSmartMemory`
+- **Studio `run_extraction_v2()`** (`extraction.py`): Extraction preview via `PipelineRunner.run_to("ontology_constrain")` — replaces old pipeline path for extraction previews
+
+### Changed
+- **`PipelineRunner`** accepts optional `metrics_emitter` parameter — calls `on_stage_complete()` after each stage and `on_pipeline_complete()` after full run
+- **Extraction preview** in Studio (`transaction.py`) now uses v2 `PipelineRunner` with fallback to v1 `ExtractorPipeline`
+- **Normalization deduplication**: `EnrichmentPipeline` and `StorageEngine` now use canonical `sanitize_relation_type()` from `memory.ingestion.utils` instead of weak local `_sanitize_relation_type()` (space→underscore only). Relation types now get regex normalization, uppercase, FalkorDB-safe prefix, and 50-char limit
+
+### Deprecated
+- **`ExtractorPipeline`** (`smartmemory/memory/pipeline/extractor.py`): Emits `DeprecationWarning` on instantiation. Use `smartmemory.pipeline.stages` via `PipelineRunner` instead. Full removal deferred to Phase 7
+
+#### Pipeline v2 Native Extraction (Phase 2)
+- **4 native extraction stages** replace the single `ExtractStage` wrapper — pipeline grows from 8 to 11 stages:
+  - `SimplifyStage` — splits complex sentences into atomic statements using spaCy dependency parsing with configurable transforms (clause splitting, relative clause extraction, appositive extraction)
+  - `EntityRulerStage` — rule-based entity extraction using spaCy NER with label mapping, deduplication, and confidence filtering
+  - `LLMExtractStage` — LLM-based entity/relation extraction via `LLMSingleExtractor` with configurable truncation limits
+  - `OntologyConstrainStage` — merges ruler + LLM entities, validates types against `OntologyGraph`, filters relations by accepted endpoints, auto-promotes provisional types
+- **Extended `PipelineConfig`** with Phase 2 fields:
+  - `SimplifyConfig` — 4 boolean transform flags, `min_token_count`
+  - `EntityRulerConfig` — `pattern_sources`, `min_confidence`, `spacy_model`
+  - `LLMExtractConfig` — `max_relations`
+  - `ConstrainConfig` — `domain_range_validation`
+  - `PromotionConfig` — `reasoning_validation`, `min_frequency`, `min_confidence`
+- **`PipelineState.simplified_sentences`** — renamed from `simplified_text` (Optional[str]) to `List[str]` for multi-sentence output
+- **Studio backend models** — `SimplifyRequest`, `EntityRulerRequest`, `OntologyConstrainRequest` dataclasses added; pipeline component descriptions updated
+
 #### Pipeline v2 Foundation (Phase 1)
 - **New unified pipeline architecture** (`smartmemory/pipeline/`): Replaces three separate orchestrators with a single composable pipeline built on the StageCommand protocol
   - `StageCommand` protocol (structural subtyping) with `execute()` and `undo()` methods
@@ -18,13 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PipelineConfig` nested dataclass hierarchy with named factories (`default()`, `preview()`)
   - `Transport` protocol with `InProcessTransport` for in-process execution
   - `PipelineRunner` with `run()`, `run_to()`, `run_from()`, `undo_to()` — supports breakpoints, resumption, rollback, and per-stage retry with exponential backoff
-- **8 stage wrappers** (`smartmemory/pipeline/stages/`): classify, coreference, extract, store, link, enrich, ground, evolve — each wraps existing pipeline components as StageCommands
+- **11 stage wrappers** (`smartmemory/pipeline/stages/`): classify, coreference, simplify, entity_ruler, llm_extract, ontology_constrain, store, link, enrich, ground, evolve
 - **OntologyGraph** (`smartmemory/graph/ontology_graph.py`): Dedicated FalkorDB graph for entity type definitions with three-tier status (seed → provisional → confirmed) and 14 seed types
 
 ### Changed
 - `SmartMemory.ingest()` now delegates to `PipelineRunner.run()` instead of `MemoryIngestionFlow.run()` — identical output, new internal architecture
+- Pipeline stage count increased from 8 to 11 with native extraction stages
 
 ### Removed
+- `ExtractStage` (`smartmemory/pipeline/stages/extract.py`) — replaced by 4 native extraction stages (simplify, entity_ruler, llm_extract, ontology_constrain)
+- `ExtractionPipeline` and `IngestionRegistry` no longer needed for pipeline v2 extraction
 - `FastIngestionFlow` (`smartmemory/memory/fast_ingestion_flow.py`, 502 LOC) — async ingestion is now a config flag (`mode="async"`) on the unified pipeline
 
 ---

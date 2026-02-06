@@ -6,7 +6,10 @@ Dependencies are injected via constructor, not from state or config.
 
 from smartmemory.pipeline.stages.classify import ClassifyStage
 from smartmemory.pipeline.stages.coreference import CoreferenceStageCommand
-from smartmemory.pipeline.stages.extract import ExtractStage
+from smartmemory.pipeline.stages.simplify import SimplifyStage
+from smartmemory.pipeline.stages.entity_ruler import EntityRulerStage
+from smartmemory.pipeline.stages.llm_extract import LLMExtractStage
+from smartmemory.pipeline.stages.ontology_constrain import OntologyConstrainStage
 from smartmemory.pipeline.stages.store import StoreStage
 from smartmemory.pipeline.stages.link import LinkStage
 from smartmemory.pipeline.stages.enrich import EnrichStage
@@ -16,7 +19,10 @@ from smartmemory.pipeline.stages.evolve import EvolveStage
 __all__ = [
     "ClassifyStage",
     "CoreferenceStageCommand",
-    "ExtractStage",
+    "SimplifyStage",
+    "EntityRulerStage",
+    "LLMExtractStage",
+    "OntologyConstrainStage",
     "StoreStage",
     "LinkStage",
     "EnrichStage",

@@ -52,10 +52,14 @@ class CoreferenceConfig(MemoryBaseModel):
 
 @dataclass
 class SimplifyConfig(MemoryBaseModel):
-    """Text simplification stage knobs (future)."""
+    """Text simplification stage knobs."""
 
-    enabled: bool = False
-    model: Optional[str] = None
+    enabled: bool = True
+    split_clauses: bool = True
+    extract_relative: bool = True
+    passive_to_active: bool = True
+    extract_appositives: bool = True
+    min_token_count: int = 4
 
 
 @dataclass
@@ -64,6 +68,9 @@ class EntityRulerConfig(MemoryBaseModel):
 
     enabled: bool = True
     patterns_path: Optional[str] = None
+    pattern_sources: List[str] = field(default_factory=lambda: ["builtin"])
+    min_confidence: float = 0.85
+    spacy_model: str = "en_core_web_sm"
 
 
 @dataclass
@@ -75,6 +82,7 @@ class LLMExtractConfig(MemoryBaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     max_entities: int = 10
+    max_relations: int = 30
     enable_relations: bool = True
 
 
@@ -84,6 +92,9 @@ class PromotionConfig(MemoryBaseModel):
 
     auto_promote_threshold: int = 3
     require_approval: bool = False
+    reasoning_validation: bool = False
+    min_frequency: int = 2
+    min_confidence: float = 0.7
 
 
 @dataclass
@@ -93,6 +104,7 @@ class ConstrainConfig(MemoryBaseModel):
     max_entities: int = 20
     max_relations: int = 40
     confidence_threshold: float = 0.5
+    domain_range_validation: bool = True
 
 
 # ------------------------------------------------------------------ #

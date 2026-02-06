@@ -128,17 +128,19 @@ class SmartMemory(MemoryBase):
         from smartmemory.pipeline.transport import InProcessTransport
         from smartmemory.pipeline.stages.classify import ClassifyStage
         from smartmemory.pipeline.stages.coreference import CoreferenceStageCommand
-        from smartmemory.pipeline.stages.extract import ExtractStage
+        from smartmemory.pipeline.stages.simplify import SimplifyStage
+        from smartmemory.pipeline.stages.entity_ruler import EntityRulerStage
+        from smartmemory.pipeline.stages.llm_extract import LLMExtractStage
+        from smartmemory.pipeline.stages.ontology_constrain import OntologyConstrainStage
         from smartmemory.pipeline.stages.store import StoreStage
         from smartmemory.pipeline.stages.link import LinkStage
         from smartmemory.pipeline.stages.enrich import EnrichStage
         from smartmemory.pipeline.stages.ground import GroundStage
         from smartmemory.pipeline.stages.evolve import EvolveStage
         from smartmemory.memory.ingestion.flow import MemoryIngestionFlow
-        from smartmemory.memory.ingestion.extraction import ExtractionPipeline
         from smartmemory.memory.ingestion.enrichment import EnrichmentPipeline
-        from smartmemory.memory.ingestion.registry import IngestionRegistry
         from smartmemory.memory.ingestion.observer import IngestionObserver
+        from smartmemory.graph.ontology_graph import OntologyGraph
 
         # Reuse the existing ingestion flow for classify (it has the logic)
         if self._ingestion_flow is None:
@@ -146,16 +148,26 @@ class SmartMemory(MemoryBase):
                 self, linking=self._linking, enrichment=self._enrichment
             )
 
-        # Build extraction and enrichment pipelines
-        registry = IngestionRegistry()
+        # Build enrichment pipeline
         observer = IngestionObserver()
-        extraction_pipeline = ExtractionPipeline(registry, observer)
         enrichment_pipeline = EnrichmentPipeline(self, self._enrichment, observer)
+
+        # Build ontology graph for constraint stage
+        workspace_id = "default"
+        try:
+            scope = self.scope_provider.get_scope()
+            workspace_id = getattr(scope, "workspace_id", None) or "default"
+        except Exception:
+            pass
+        ontology_graph = OntologyGraph(workspace_id=workspace_id)
 
         stages = [
             ClassifyStage(self._ingestion_flow),
             CoreferenceStageCommand(),
-            ExtractStage(extraction_pipeline),
+            SimplifyStage(),
+            EntityRulerStage(),
+            LLMExtractStage(),
+            OntologyConstrainStage(ontology_graph),
             StoreStage(self),
             LinkStage(self._linking),
             EnrichStage(enrichment_pipeline),
@@ -163,7 +175,19 @@ class SmartMemory(MemoryBase):
             EvolveStage(self),
         ]
 
-        return PipelineRunner(stages, InProcessTransport())
+        from smartmemory.pipeline.metrics import PipelineMetricsEmitter
+        emitter = PipelineMetricsEmitter(workspace_id=workspace_id)
+        return PipelineRunner(stages, InProcessTransport(), metrics_emitter=emitter)
+
+    def create_pipeline_runner(self):
+        """Create a configured PipelineRunner for breakpoint execution.
+
+        Public API for Studio and other consumers that need run_to()/run_from().
+        Returns cached runner instance (stateless — state flows through PipelineState).
+        """
+        if self._pipeline_runner is None:
+            self._pipeline_runner = self._create_pipeline_runner()
+        return self._pipeline_runner
 
     def _build_pipeline_config(
         self,
