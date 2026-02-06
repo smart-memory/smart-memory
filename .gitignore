@@ -173,15 +173,10 @@ test_data/
 .DS_Store
 .cascade/
 
-# Ignore markdown files except in docs/
-*.md
-!docs/public/*.md
-!DESIGN_STANDARDS.md
-!CHANGELOG.md
 
 .claude/
-!.claude/rules/*.md
-!.claude/commands/*.md
+!.claude/rules/
+!.claude/commands/
 
 # Benchmark result artifacts
 benchmark_*.json
