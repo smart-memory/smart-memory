@@ -146,10 +146,23 @@ class PipelineRunner:
         state: PipelineState,
         config: PipelineConfig,
     ) -> PipelineState:
-        """Execute a single stage with retry logic."""
-        max_retries = config.retry.max_retries
-        backoff = config.retry.backoff_seconds
-        on_failure = config.retry.on_failure
+        """Execute a single stage with retry logic.
+
+        Uses per-stage retry policy from ``config.stage_retry_policies`` if set,
+        otherwise falls back to the global ``config.retry``.
+        """
+        # Resolve retry parameters: per-stage policy takes precedence
+        stage_policy = config.stage_retry_policies.get(stage.name)
+        if stage_policy:
+            max_retries = stage_policy.max_retries
+            backoff = stage_policy.backoff_seconds
+            backoff_multiplier = stage_policy.backoff_multiplier
+            on_failure = stage_policy.on_failure
+        else:
+            max_retries = config.retry.max_retries
+            backoff = config.retry.backoff_seconds
+            backoff_multiplier = 2.0
+            on_failure = config.retry.on_failure
 
         last_exc: Optional[Exception] = None
         for attempt in range(max_retries + 1):
@@ -181,9 +194,15 @@ class PipelineRunner:
                         backoff,
                     )
                     time.sleep(backoff)
-                    backoff *= 2  # exponential backoff
+                    backoff *= backoff_multiplier
 
-        # All retries exhausted — emit error metric
+        # All retries exhausted — undo partial work
+        try:
+            state = stage.undo(state)
+        except Exception as undo_exc:
+            logger.warning("Undo for stage '%s' failed: %s", stage.name, undo_exc)
+
+        # Emit error metric
         if self._metrics and last_exc:
             try:
                 self._metrics.on_stage_complete(stage.name, 0.0, state, error=last_exc)

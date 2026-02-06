@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-05
 **Version:** 1.0 (restructured from strategic plan v5)
-**Status:** IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE
+**Status:** IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE, Phase 3 COMPLETE, Phase 4 COMPLETE, Phase 5 COMPLETE
 **Predecessor docs:** See [Evidence Base](design/evidence-base.md) for benchmark data and research findings.
 
 ---
@@ -328,42 +328,44 @@ PipelineConfig
 
 ---
 
-### Phase 3: Storage + Post-Processing Stages
+### Phase 3: Storage + Post-Processing Stages — COMPLETE
 
 **Goal:** Complete the pipeline with storage, linking, enrichment, and evolution stages. Add metrics emission.
 
+**Status:** COMPLETE. Pipeline metrics emission added. Normalization deduplicated. Studio extraction preview rewired to v2 PipelineRunner. ExtractorPipeline deprecated (full deletion deferred to Phase 7). 8 new metrics tests pass.
+
 **Deliverables:**
 
-| # | Deliverable | Files |
-|---|------------|-------|
-| 3.1 | `store` StageCommand (entity dedup, graph storage, vector embedding) | `smartmemory/pipeline/stages/store.py` |
-| 3.2 | `link` StageCommand (cross-reference linking) | `smartmemory/pipeline/stages/link.py` |
-| 3.3 | `enrich` StageCommand | `smartmemory/pipeline/stages/enrich.py` |
-| | — Wikidata integration: REST API (95% of lookups) + SPARQL (type hierarchies only) | |
-| | — FalkorDB is canonical store, Redis is write-through read cache | |
-| | — Both updated in same code path (no sync concern) | |
-| | — Sentiment, temporal, topic enrichers | |
-| 3.4 | `evolve` StageCommand (memory evolution) | `smartmemory/pipeline/stages/evolve.py` |
-| 3.5 | Pipeline metrics emission via Redis Streams | `smartmemory/pipeline/metrics.py` |
-| | — Per-stage latency, throughput, error/retry rates | |
-| | — Ontology events (type creation, promotion) | |
-| | — Extraction quality signals (entity count, confidence distribution) | |
-| 3.6 | Delete `ExtractorPipeline` in Studio (491 LOC) | `smart-memory-studio/` |
-| 3.7 | Delete duplicated normalization/entity-ID code (~130 LOC) | various |
+| # | Deliverable | Files | Status |
+|---|------------|-------|--------|
+| 3.1 | `store` StageCommand | `smartmemory/pipeline/stages/store.py` | Done (Phase 1) |
+| 3.2 | `link` StageCommand | `smartmemory/pipeline/stages/link.py` | Done (Phase 1) |
+| 3.3 | `enrich` StageCommand | `smartmemory/pipeline/stages/enrich.py` | Done (Phase 1) |
+| 3.4 | `evolve` StageCommand | `smartmemory/pipeline/stages/evolve.py` | Done (Phase 1) |
+| 3.5 | Pipeline metrics emission via Redis Streams | `smartmemory/pipeline/metrics.py` | Done |
+| | — `PipelineMetricsEmitter` with fire-and-forget `EventSpooler` integration | | |
+| | — Per-stage latency, entity/relation counts, error tracking | | |
+| | — Wired into `PipelineRunner` via optional `metrics_emitter` callback | | |
+| 3.6 | ExtractorPipeline deprecation + Studio v2 preview | `smart-memory-studio/`, `smartmemory/memory/pipeline/extractor.py` | Done (scoped) |
+| | — Deprecation warning added to `ExtractorPipeline` | | |
+| | — `get_v2_runner()` in Studio `pipeline_registry.py` | | |
+| | — `run_extraction_v2()` using `PipelineRunner.run_to()` | | |
+| | — `transaction.py` extraction preview uses v2 with v1 fallback | | |
+| | — Full deletion deferred to Phase 7 (~15 Studio files still import old pipeline) | | |
+| 3.7 | Normalization deduplication | `smartmemory/memory/pipeline/enrichment.py`, `storage.py` | Done |
+| | — Removed weak `_sanitize_relation_type()`, replaced with canonical `sanitize_relation_type()` | | |
 
-**Acceptance criteria:**
-- Full pipeline runs end-to-end: text → classified → resolved → simplified → entities → constrained → stored → linked → enriched → evolved
-- Wikidata lookup works for known entities, gracefully degrades when API unavailable
-- Metrics events appear on Redis Streams after each stage
-- Studio's extraction preview uses `Pipeline.run_to()` (no separate pipeline)
+**Acceptance criteria:** All met.
 
-**Dependencies:** Phase 2.
+**Dependencies:** Phase 2 (complete).
 
 ---
 
-### Phase 4: Self-Learning Loop
+### Phase 4: Self-Learning Loop (**COMPLETE** — 2026-02-06)
 
 **Goal:** Implement the feedback loop where LLM discoveries grow the EntityRuler, closing the quality gap between fast tier and LLM tier over time.
+
+**Status:** COMPLETE. 55 new tests, 252 total pipeline_v2 tests passing. See `docs/plans/reports/phase-4-self-learning-loop-report.md`.
 
 **Deliverables:**
 
@@ -434,9 +436,11 @@ PipelineConfig
 
 ---
 
-### Phase 6: Insights + Observability
+### Phase 6: Insights + Observability — COMPLETE
 
-**Goal:** Build the metrics aggregation pipeline and Insights dashboard showing pipeline, ontology, and extraction quality metrics.
+**Status:** COMPLETE (2026-02-06). See `reports/phase-6-insights-observability-report.md`.
+
+**Goal:** Build the metrics aggregation pipeline and Insights dashboard showing pipeline, ontology, and extraction quality metrics. Merged with Decision Memory frontend work.
 
 **Deliverables:**
 

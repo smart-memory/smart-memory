@@ -58,12 +58,43 @@ def _get_nlp(model_name: str = "en_core_web_sm"):
     return nlp
 
 
+def _ngram_scan(text: str, patterns: Dict[str, str]) -> List[tuple[str, str]]:
+    """Scan text for n-gram matches against pattern dictionary.
+
+    Returns list of (matched_text, entity_type) pairs.
+    """
+    matches: List[tuple[str, str]] = []
+    words = text.split()
+    seen_spans: set[str] = set()
+
+    # Try up to 4-grams (covers most entity names)
+    for n in range(4, 0, -1):
+        for i in range(len(words) - n + 1):
+            span = " ".join(words[i : i + n])
+            span_lower = span.lower()
+            if span_lower in seen_spans:
+                continue
+            if span_lower in patterns:
+                matches.append((span, patterns[span_lower]))
+                seen_spans.add(span_lower)
+                # Mark component words so shorter n-grams don't re-match
+                for j in range(n):
+                    if i + j < len(words):
+                        seen_spans.add(words[i + j].lower())
+
+    return matches
+
+
 class EntityRulerStage:
     """Extract entities using spaCy NER with rule-based patterns."""
 
-    def __init__(self, nlp=None):
-        """Args: nlp — optional pre-loaded spaCy Language (for testing)."""
+    def __init__(self, nlp=None, pattern_manager=None):
+        """Args:
+        nlp: Optional pre-loaded spaCy Language (for testing).
+        pattern_manager: Optional PatternManager for learned pattern dictionary scan.
+        """
         self._nlp = nlp
+        self._pattern_manager = pattern_manager
 
     @property
     def name(self) -> str:
@@ -120,6 +151,23 @@ class EntityRulerStage:
                         "end": ent.end_char,
                     }
                 )
+
+            # Dictionary scan against learned patterns
+            if self._pattern_manager:
+                learned = self._pattern_manager.get_patterns()
+                if learned:
+                    for span_text, entity_type in _ngram_scan(text, learned):
+                        key = (span_text.lower(), entity_type)
+                        if key not in seen:
+                            seen.add(key)
+                            entities.append(
+                                {
+                                    "name": span_text,
+                                    "entity_type": entity_type,
+                                    "confidence": 0.85,
+                                    "source": "entity_ruler_learned",
+                                }
+                            )
 
             return replace(state, ruler_entities=entities)
         except Exception as e:

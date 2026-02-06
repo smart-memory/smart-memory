@@ -10,6 +10,8 @@ from smartmemory.pipeline.state import PipelineState
 
 if TYPE_CHECKING:
     from smartmemory.graph.ontology_graph import OntologyGraph
+    from smartmemory.observability.events import RedisStreamQueue
+    from smartmemory.ontology.entity_pair_cache import EntityPairCache
     from smartmemory.pipeline.config import PipelineConfig
 
 logger = logging.getLogger(__name__)
@@ -18,8 +20,15 @@ logger = logging.getLogger(__name__)
 class OntologyConstrainStage:
     """Merge ruler + LLM entities, validate types against ontology, filter relations."""
 
-    def __init__(self, ontology_graph: OntologyGraph):
+    def __init__(
+        self,
+        ontology_graph: OntologyGraph,
+        promotion_queue: RedisStreamQueue | None = None,
+        entity_pair_cache: EntityPairCache | None = None,
+    ):
         self._ontology = ontology_graph
+        self._promotion_queue = promotion_queue
+        self._entity_pair_cache = entity_pair_cache
 
     @property
     def name(self) -> str:
@@ -32,7 +41,7 @@ class OntologyConstrainStage:
         # Step 1: Merge ruler + LLM entities
         merged = self._merge_entities(state.ruler_entities, state.llm_entities)
 
-        # Step 2: Validate entity types against ontology
+        # Step 2: Validate entity types against ontology + track frequency
         accepted: List[Dict[str, Any]] = []
         rejected: List[Dict[str, Any]] = []
         promotion_candidates: List[Dict[str, Any]] = []
@@ -47,14 +56,23 @@ class OntologyConstrainStage:
             if status in ("seed", "confirmed", "provisional"):
                 accepted.append(entity)
                 accepted_names.add(name.lower())
+                # Track frequency for accepted entities
+                self._ontology.increment_frequency(entity_type.title(), confidence)
             elif confidence >= constrain_cfg.confidence_threshold:
                 # Unknown type with sufficient confidence — add as provisional
                 self._ontology.add_provisional(entity_type.title())
+                self._ontology.increment_frequency(entity_type.title(), confidence)
                 promotion_candidates.append(entity)
                 accepted.append(entity)
                 accepted_names.add(name.lower())
             else:
                 rejected.append(entity)
+
+        # Step 2b: Inject cached entity-pair relations
+        if self._entity_pair_cache and len(accepted) >= 2:
+            cached_relations = self._lookup_cached_relations(accepted, state.workspace_id)
+            if cached_relations:
+                state = replace(state, llm_relations=list(state.llm_relations) + cached_relations)
 
         # Step 3: Filter relations — keep only those with both endpoints accepted
         valid_relations = self._filter_relations(state.llm_relations, accepted, accepted_names)
@@ -63,11 +81,9 @@ class OntologyConstrainStage:
         accepted = accepted[: constrain_cfg.max_entities]
         valid_relations = valid_relations[: constrain_cfg.max_relations]
 
-        # Step 5: Auto-promote if threshold met
+        # Step 5: Enqueue promotion candidates (async) or auto-promote (fallback)
         if not promotion_cfg.require_approval:
-            for candidate in promotion_candidates:
-                entity_type = self._get_entity_type(candidate)
-                self._ontology.promote(entity_type.title())
+            self._handle_promotion(promotion_candidates)
 
         return replace(
             state,
@@ -76,6 +92,55 @@ class OntologyConstrainStage:
             rejected=rejected,
             promotion_candidates=promotion_candidates,
         )
+
+    def _handle_promotion(self, candidates: List[Dict[str, Any]]) -> None:
+        """Enqueue candidates to promotion stream, or auto-promote as fallback."""
+        for candidate in candidates:
+            entity_type = self._get_entity_type(candidate)
+            entity_name = self._get_entity_name(candidate)
+            confidence = self._get_confidence(candidate)
+
+            if self._promotion_queue:
+                try:
+                    self._promotion_queue.enqueue(
+                        {
+                            "entity_name": entity_name,
+                            "entity_type": entity_type,
+                            "confidence": confidence,
+                        }
+                    )
+                    continue
+                except Exception as e:
+                    logger.debug("Promotion queue unavailable, falling back to inline: %s", e)
+
+            # Fallback: direct promote
+            self._ontology.promote(entity_type.title())
+
+    def _lookup_cached_relations(
+        self, accepted: List[Dict[str, Any]], workspace_id: str | None
+    ) -> List[Dict[str, Any]]:
+        """Look up cached entity-pair relations for accepted entities."""
+        cached: List[Dict[str, Any]] = []
+        ws = workspace_id or "default"
+        names = [self._get_entity_name(e) for e in accepted]
+        for i, name_a in enumerate(names):
+            for name_b in names[i + 1 :]:
+                try:
+                    relations = self._entity_pair_cache.lookup(name_a, name_b, ws)  # type: ignore[union-attr]
+                    if relations:
+                        for rel in relations:
+                            cached.append(
+                                {
+                                    "source_id": name_a.lower(),
+                                    "target_id": name_b.lower(),
+                                    "relation_type": rel.get("relation_type", "RELATED"),
+                                    "confidence": rel.get("confidence", 0.5),
+                                    "source": "entity_pair_cache",
+                                }
+                            )
+                except Exception:
+                    pass
+        return cached
 
     def _merge_entities(
         self,

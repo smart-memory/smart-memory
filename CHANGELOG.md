@@ -11,6 +11,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Insights + Observability & Decision Memory UI (Phase 6)
+- **`MetricsConsumer`** (`smartmemory/pipeline/metrics_consumer.py`): Reads pipeline metric events from Redis Streams, aggregates into 5-min time buckets, writes pre-aggregated metrics to Redis Hashes for fast dashboard reads
+- **Pipeline Metrics API** (`smart-memory-insights/server/observability/api.py`): `GET /api/pipeline/metrics`, `/api/pipeline/bottlenecks` — per-stage latency, throughput, error rates from MetricsConsumer aggregated data
+- **Ontology Metrics API**: `GET /api/ontology/status`, `/api/ontology/growth`, `/api/ontology/promotion-rates` — direct FalkorDB Cypher queries for type/pattern counts, convergence estimates, promotion rates
+- **Extraction Quality API**: `GET /api/extraction/quality`, `/api/extraction/attribution` — confidence distribution histograms, provisional ratio, ruler vs LLM attribution from graph entity data
+- **Pipeline Performance dashboard** (`smart-memory-insights/web/src/pages/Pipeline.jsx`): Summary cards, per-stage latency bar chart, throughput area chart, error rate chart with 1H/6H/24H period selector
+- **Ontology Health dashboard** (`smart-memory-insights/web/src/pages/Ontology.jsx`): Summary cards, type status donut, pattern layers donut, convergence curve, pattern growth area chart, promotion rates bar chart
+- **Extraction Quality dashboard update** (`smart-memory-insights/web/src/pages/Extraction.jsx`): ConfidenceDistribution histogram, AttributionChart pie, TypeRatioChart bar replacing previous stub data
+- **Decision Memory client SDK** (`smart-memory-client`): `create_decision()`, `get_decision()`, `list_decisions()`, `supersede_decision()`, `retract_decision()`, `reinforce_decision()`, `get_provenance_chain()`, `get_causal_chain()` methods
+- **Decision Memory web UI** (`smart-memory-web`): DecisionCard, DecisionList, ProvenanceChain components; standalone `/Decisions` route with Scale icon + amber accent in navigation
+- **Insights navigation**: Pipeline and Ontology pages added to sidebar and router
+
+#### Pipeline v2 Service + API (Phase 5)
+- **Pipeline Config CRUD** (`smart-memory-service/memory_service/api/routes/pipeline.py`): Named pipeline config management — `GET/POST/PUT/DELETE /memory/pipeline/configs` with FalkorDB storage as `PipelineConfig` nodes in the ontology graph
+- **`OntologyGraph` pipeline config storage**: `save_pipeline_config()`, `get_pipeline_config()`, `list_pipeline_configs()`, `delete_pipeline_config()` for persistent named configs per workspace
+- **Pattern Admin routes** (`smart-memory-service/memory_service/api/routes/ontology.py`): `GET/POST/DELETE /memory/ontology/patterns` for entity pattern management with stats, Redis pub/sub reload notifications
+- **`OntologyGraph.delete_entity_pattern()`**: Delete EntityPattern nodes with workspace scoping
+- **Ontology Status endpoint** (`GET /memory/ontology/status`): Convergence metrics — pattern counts by source layer, entity type status distribution (seed/provisional/confirmed)
+- **Ontology Import/Export** (`POST /memory/ontology/import`, `GET /memory/ontology/export`): Portable ontology data for backup/migration with entity type and pattern support
+- **`EventBusTransport`** (`smartmemory/pipeline/transport/event_bus.py`): Redis Streams transport for async pipeline execution with per-stage consumer groups, status polling, and result retrieval
+- **`StageConsumer`**: Worker class for consuming and executing pipeline stages from Redis Streams
+- **Async ingest mode**: `POST /memory/ingest?mode=async` submits via `EventBusTransport`, returns `run_id` for polling; `GET /memory/ingest/async/{run_id}` for status
+- **`StageRetryPolicy`** (`smartmemory/pipeline/config.py`): Per-stage retry policy with configurable `backoff_multiplier`, overrides global `RetryConfig`
+- **`PipelineConfig.stage_retry_policies`**: Dict mapping stage names to `StageRetryPolicy` for fine-grained retry control
+
+### Changed
+- **`PipelineRunner._execute_stage()`** now checks `config.stage_retry_policies` for per-stage overrides, calls `stage.undo()` on retry exhaustion before raising or skipping
+- **`transport.py` → `transport/` package**: Converted single file to package to accommodate `event_bus.py`; backward-compatible imports preserved
+
+#### Pipeline v2 Self-Learning Loop (Phase 4)
+- **`PromotionEvaluator`** (`smartmemory/ontology/promotion.py`): Six-gate evaluation pipeline for entity type promotion — min name length, common word blocklist (~200 words), min confidence, min frequency, type consistency, optional LLM reasoning validation
+- **`PromotionWorker`** (`smartmemory/ontology/promotion_worker.py`): Background Redis Stream consumer for async promotion candidate processing with DLQ error handling
+- **`PatternManager`** (`smartmemory/ontology/pattern_manager.py`): Hot-reloadable dictionary of learned entity patterns with Redis pub/sub reload notifications and common word filtering
+- **`EntityPairCache`** (`smartmemory/ontology/entity_pair_cache.py`): Redis read-through cache for known entity-pair relations with 30-min TTL, graph fallback, and invalidation
+- **`ReasoningValidator`** (`smartmemory/ontology/reasoning_validator.py`): LLM-based validation for promotion candidates with ReasoningTrace storage as `reasoning` memory type
+- **`OntologyGraph` frequency tracking**: `increment_frequency()`, `get_frequency()` for atomic type frequency and running average confidence tracking
+- **`OntologyGraph` entity patterns**: `add_entity_pattern()`, `get_entity_patterns()`, `get_type_assignments()` for three-layer pattern storage (seed / promoted / tenant)
+- **`OntologyGraph` pattern layers**: `seed_entity_patterns()` for bootstrap, `get_pattern_stats()` for layer counts
+- **`RedisStreamQueue.for_promote()`**: Factory method for promotion job queue (follows `for_enrich()` pattern)
+- **`_ngram_scan()`**: N-gram dictionary scan (up to 4-grams) for entity pattern matching in `EntityRulerStage`
+
+### Changed
+- **`OntologyConstrainStage`** now tracks entity type frequency on every accepted entity, enqueues promotion candidates to Redis stream (with inline fallback), and injects cached entity-pair relations
+- **`EntityRulerStage`** now accepts optional `PatternManager` for learned pattern dictionary scan after spaCy NER
+- **`PromotionConfig`** extended with `min_type_consistency` (0.8) and `min_name_length` (3) fields
+- **`SmartMemory._create_pipeline_runner()`** wires `PatternManager`, `EntityPairCache`, and promotion queue into the pipeline
+
 #### Pipeline v2 Storage & Post-Processing (Phase 3)
 - **`PipelineMetricsEmitter`** (`smartmemory/pipeline/metrics.py`): Fire-and-forget pipeline metrics emission via Redis Streams. Emits `stage_complete` events per stage and `pipeline_complete` summary with timing breakdown, entity/relation counts, and workspace context. Stream: `smartmemory:metrics:pipeline`
 - **`SmartMemory.create_pipeline_runner()`**: Public factory method exposing the v2 `PipelineRunner` for Studio and other consumers that need `run_to()`/`run_from()` breakpoint execution

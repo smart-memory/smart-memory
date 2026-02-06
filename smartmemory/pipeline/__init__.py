@@ -10,6 +10,7 @@ from smartmemory.pipeline.config import PipelineConfig
 from smartmemory.pipeline.transport import Transport, InProcessTransport
 from smartmemory.pipeline.runner import PipelineRunner
 from smartmemory.pipeline.metrics import PipelineMetricsEmitter
+from smartmemory.pipeline.metrics_consumer import MetricsConsumer
 
 __all__ = [
     "StageCommand",
@@ -19,4 +20,5 @@ __all__ = [
     "InProcessTransport",
     "PipelineRunner",
     "PipelineMetricsEmitter",
+    "MetricsConsumer",
 ]

@@ -20,10 +20,27 @@ from smartmemory.models.base import MemoryBaseModel
 
 @dataclass
 class RetryConfig(MemoryBaseModel):
-    """Per-stage retry behaviour."""
+    """Global retry behaviour (default for all stages)."""
 
     max_retries: int = 2
     backoff_seconds: float = 1.0
+    on_failure: str = "abort"  # "abort" | "skip"
+
+    def __post_init__(self):
+        if self.on_failure not in ("abort", "skip"):
+            raise ValueError(f"on_failure must be 'abort' or 'skip', got '{self.on_failure}'")
+
+
+@dataclass
+class StageRetryPolicy(MemoryBaseModel):
+    """Per-stage retry policy override.
+
+    When set for a stage, overrides the global RetryConfig for that stage.
+    """
+
+    max_retries: int = 2
+    backoff_seconds: float = 1.0
+    backoff_multiplier: float = 2.0
     on_failure: str = "abort"  # "abort" | "skip"
 
     def __post_init__(self):
@@ -95,6 +112,8 @@ class PromotionConfig(MemoryBaseModel):
     reasoning_validation: bool = False
     min_frequency: int = 2
     min_confidence: float = 0.7
+    min_type_consistency: float = 0.8
+    min_name_length: int = 3
 
 
 @dataclass
@@ -202,6 +221,7 @@ class PipelineConfig(MemoryBaseModel):
     workspace_id: Optional[str] = None
     mode: str = "sync"  # "sync" | "async" | "preview"
     retry: RetryConfig = field(default_factory=RetryConfig)
+    stage_retry_policies: Dict[str, StageRetryPolicy] = field(default_factory=dict)
     classify: ClassifyConfig = field(default_factory=ClassifyConfig)
     coreference: CoreferenceConfig = field(default_factory=CoreferenceConfig)
     simplify: SimplifyConfig = field(default_factory=SimplifyConfig)

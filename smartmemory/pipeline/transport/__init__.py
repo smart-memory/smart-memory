@@ -1,8 +1,7 @@
 """Transport abstraction — how stages are invoked.
 
 InProcessTransport calls ``stage.execute()`` directly (one-liner).
-Future transports (EventBusTransport, CeleryTransport) can serialize
-state to a queue and execute stages in workers.
+EventBusTransport serializes state to Redis Streams for async execution.
 """
 
 from __future__ import annotations

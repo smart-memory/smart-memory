@@ -77,6 +77,7 @@ class SmartMemory(MemoryBase):
         if scope_provider is None:
             # Lazy import to avoid circular dependency
             from smartmemory.scope_provider import DefaultScopeProvider
+
             scope_provider = DefaultScopeProvider()
 
         self.scope_provider = scope_provider  # Store for use in filtering methods
@@ -144,9 +145,7 @@ class SmartMemory(MemoryBase):
 
         # Reuse the existing ingestion flow for classify (it has the logic)
         if self._ingestion_flow is None:
-            self._ingestion_flow = MemoryIngestionFlow(
-                self, linking=self._linking, enrichment=self._enrichment
-            )
+            self._ingestion_flow = MemoryIngestionFlow(self, linking=self._linking, enrichment=self._enrichment)
 
         # Build enrichment pipeline
         observer = IngestionObserver()
@@ -161,13 +160,34 @@ class SmartMemory(MemoryBase):
             pass
         ontology_graph = OntologyGraph(workspace_id=workspace_id)
 
+        # Phase 4: PatternManager for learned entity pattern dictionary scan
+        from smartmemory.ontology.pattern_manager import PatternManager
+
+        pattern_manager = PatternManager(ontology_graph, workspace_id=workspace_id)
+
+        # Phase 4: EntityPairCache for relation caching
+        from smartmemory.ontology.entity_pair_cache import EntityPairCache
+
+        entity_pair_cache = EntityPairCache()
+
+        # Phase 4: Promotion queue (optional — requires Redis)
+        promotion_queue = None
+        try:
+            from smartmemory.observability.events import RedisStreamQueue
+
+            promotion_queue = RedisStreamQueue.for_promote()
+        except Exception:
+            pass
+
         stages = [
             ClassifyStage(self._ingestion_flow),
             CoreferenceStageCommand(),
             SimplifyStage(),
-            EntityRulerStage(),
+            EntityRulerStage(pattern_manager=pattern_manager),
             LLMExtractStage(),
-            OntologyConstrainStage(ontology_graph),
+            OntologyConstrainStage(
+                ontology_graph, promotion_queue=promotion_queue, entity_pair_cache=entity_pair_cache
+            ),
             StoreStage(self),
             LinkStage(self._linking),
             EnrichStage(enrichment_pipeline),
@@ -176,6 +196,7 @@ class SmartMemory(MemoryBase):
         ]
 
         from smartmemory.pipeline.metrics import PipelineMetricsEmitter
+
         emitter = PipelineMetricsEmitter(workspace_id=workspace_id)
         return PipelineRunner(stages, InProcessTransport(), metrics_emitter=emitter)
 
@@ -229,18 +250,20 @@ class SmartMemory(MemoryBase):
     # These stay inline as the hot path.
     # =========================================================================
 
-    def ingest(self,
-            item,
-            context=None,
-            adapter_name=None,
-            converter_name=None,
-            extractor_name=None,
-            enricher_names=None,
-            conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
-            pipeline_config: Optional[PipelineConfigBundle] = None,
-            sync: Optional[bool] = None,
-            auto_challenge: Optional[bool] = None,
-            **kwargs) -> Union[str, Dict[str, Any]]:
+    def ingest(
+        self,
+        item,
+        context=None,
+        adapter_name=None,
+        converter_name=None,
+        extractor_name=None,
+        enricher_names=None,
+        conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
+        pipeline_config: Optional[PipelineConfigBundle] = None,
+        sync: Optional[bool] = None,
+        auto_challenge: Optional[bool] = None,
+        **kwargs,
+    ) -> Union[str, Dict[str, Any]]:
         """
         Primary entry point for ingesting items into SmartMemory.
         Runs the full canonical agentic memory ingestion flow with extraction, linking, enrichment, and evolution.
@@ -268,8 +291,9 @@ class SmartMemory(MemoryBase):
         if sync is None:
             try:
                 from smartmemory.utils import get_config
-                mode = ((get_config('ingestion') or {}).get('mode') or '').lower()
-                sync = (mode != 'async')  # Default to sync unless explicitly async
+
+                mode = ((get_config("ingestion") or {}).get("mode") or "").lower()
+                sync = mode != "async"  # Default to sync unless explicitly async
             except Exception:
                 sync = True  # Default to sync
 
@@ -278,17 +302,18 @@ class SmartMemory(MemoryBase):
             normalized_item = self._crud.normalize_item(item)
             add_result = self._crud.add(normalized_item)
             if isinstance(add_result, dict):
-                item_id = add_result.get('memory_node_id')
+                item_id = add_result.get("memory_node_id")
             else:
                 item_id = add_result
             try:
                 from smartmemory.observability.events import RedisStreamQueue
+
                 q = RedisStreamQueue.for_enrich()
-                q.enqueue({'job_type': 'enrich', 'item_id': item_id})
+                q.enqueue({"job_type": "enrich", "item_id": item_id})
                 queued = True
             except Exception:
                 queued = False
-            return {'item_id': item_id, 'queued': queued}
+            return {"item_id": item_id, "queued": queued}
         # Normalize item using CRUD component (eliminates mixed abstraction)
         normalized_item = self._crud.normalize_item(item)
 
@@ -307,21 +332,21 @@ class SmartMemory(MemoryBase):
                     logger.warning("MemoryItem.metadata was not a dict; normalizing to empty dict")
                     normalized_item.metadata = {}
                 # Only store lightweight identifiers to avoid bloat
-                conv_id = convo_dict.get('conversation_id')
+                conv_id = convo_dict.get("conversation_id")
                 if conv_id is not None:
-                    normalized_item.metadata.setdefault('conversation_id', conv_id)
-                    normalized_item.metadata.setdefault('provenance', {})
+                    normalized_item.metadata.setdefault("conversation_id", conv_id)
+                    normalized_item.metadata.setdefault("provenance", {})
                     try:
-                        if isinstance(normalized_item.metadata['provenance'], dict):
-                            normalized_item.metadata['provenance'].setdefault('source', 'conversation')
+                        if isinstance(normalized_item.metadata["provenance"], dict):
+                            normalized_item.metadata["provenance"].setdefault("source", "conversation")
                     except Exception as e:
                         logger.debug(f"Failed to set conversation provenance on metadata: {e}")
         except Exception as e:
             logger.warning(f"Failed to annotate item with conversation metadata: {e}")
 
         # Special handling for working memory - bypass ingestion pipeline
-        memory_type = getattr(normalized_item, 'memory_type', 'semantic')
-        if memory_type == 'working':
+        memory_type = getattr(normalized_item, "memory_type", "semantic")
+        if memory_type == "working":
             return self.add(normalized_item, **kwargs)
 
         # Auto-challenge: detect contradictions before ingesting
@@ -331,16 +356,13 @@ class SmartMemory(MemoryBase):
 
             content = normalized_item.content or ""
             metadata = normalized_item.metadata or {}
-            source = metadata.get('source') or (context or {}).get('source')
+            source = metadata.get("source") or (context or {}).get("source")
 
             do_challenge = auto_challenge
             if do_challenge is None:
                 # Smart triggering: only challenge semantic facts with factual patterns
                 do_challenge = should_challenge(
-                    content=content,
-                    memory_type=memory_type,
-                    source=source,
-                    metadata=metadata
+                    content=content, memory_type=memory_type, source=source, metadata=metadata
                 )
 
             if do_challenge:
@@ -349,29 +371,28 @@ class SmartMemory(MemoryBase):
 
                 if challenge_result.has_conflicts:
                     # Store challenge result in metadata for downstream handling
-                    normalized_item.metadata['challenge_result'] = {
-                        'has_conflicts': True,
-                        'conflict_count': len(challenge_result.conflicts),
-                        'overall_confidence': challenge_result.overall_confidence,
-                        'conflicts': [c.to_dict() for c in challenge_result.conflicts[:3]]  # Limit stored
+                    normalized_item.metadata["challenge_result"] = {
+                        "has_conflicts": True,
+                        "conflict_count": len(challenge_result.conflicts),
+                        "overall_confidence": challenge_result.overall_confidence,
+                        "conflicts": [c.to_dict() for c in challenge_result.conflicts[:3]],  # Limit stored
                     }
                     logger.info(
-                        f"Auto-challenge found {len(challenge_result.conflicts)} conflicts "
-                        f"for: {content[:50]}..."
+                        f"Auto-challenge found {len(challenge_result.conflicts)} conflicts for: {content[:50]}..."
                     )
         except Exception as e:
             logger.debug(f"Auto-challenge failed (non-fatal): {e}")
 
         # Check for explicit versioning via original_id
         # This supports the temporal test patterns where add() is used to create new versions
-        if normalized_item.metadata and 'original_id' in normalized_item.metadata:
-            original_id = normalized_item.metadata['original_id']
+        if normalized_item.metadata and "original_id" in normalized_item.metadata:
+            original_id = normalized_item.metadata["original_id"]
             try:
                 version = self.version_tracker.create_version(
                     item_id=original_id,
                     content=normalized_item.content,
                     metadata=normalized_item.metadata,
-                    change_reason="updated via add()"
+                    change_reason="updated via add()",
                 )
                 # Return a unique ID for the version node, consistent with the expectation that
                 # add() returns a unique ID for the new "item" (version)
@@ -381,7 +402,7 @@ class SmartMemory(MemoryBase):
                 # Fallback to normal add if versioning fails (e.g. original not found)
 
         # If this is called from internal code that needs basic storage, check for bypass flag
-        if kwargs.pop('_bypass_ingestion', False):
+        if kwargs.pop("_bypass_ingestion", False):
             return self.add(normalized_item, **kwargs)
 
         # Run full ingestion pipeline (v2)
@@ -390,7 +411,7 @@ class SmartMemory(MemoryBase):
 
         pipeline_cfg = self._build_pipeline_config(
             extractor_name=extractor_name,
-            enricher_names=enricher_names if enricher_names is not None else getattr(self, '_enricher_pipeline', []),
+            enricher_names=enricher_names if enricher_names is not None else getattr(self, "_enricher_pipeline", []),
             pipeline_config=pipeline_config,
             sync=True,
         )
@@ -400,9 +421,9 @@ class SmartMemory(MemoryBase):
         if conversation_context is not None:
             try:
                 if isinstance(conversation_context, ConversationContext):
-                    meta['conversation'] = conversation_context.to_dict()
+                    meta["conversation"] = conversation_context.to_dict()
                 elif isinstance(conversation_context, dict):
-                    meta['conversation'] = dict(conversation_context)
+                    meta["conversation"] = dict(conversation_context)
             except Exception as e:
                 logger.debug(f"Failed to merge conversation_context into metadata: {e}")
 
@@ -425,7 +446,7 @@ class SmartMemory(MemoryBase):
                         item_id=item_id,
                         content=normalized_item.content,
                         metadata=normalized_item.metadata,
-                        change_reason="initial creation"
+                        change_reason="initial creation",
                     )
             except Exception as e:
                 logger.debug(f"Failed to create initial version for {item_id}: {e}")
@@ -451,7 +472,7 @@ class SmartMemory(MemoryBase):
             str: The item_id of the stored memory item
         """
         # Convert to MemoryItem if needed
-        if hasattr(item, 'to_memory_item'):
+        if hasattr(item, "to_memory_item"):
             item = item.to_memory_item()
         elif not isinstance(item, MemoryItem):
             # Convert dict or other types to MemoryItem
@@ -461,14 +482,15 @@ class SmartMemory(MemoryBase):
                 item = MemoryItem(content=str(item))
 
         # Route to appropriate memory store based on memory_type
-        memory_type = getattr(item, 'memory_type', 'semantic')
-        if memory_type == 'working':
+        memory_type = getattr(item, "memory_type", "semantic")
+        if memory_type == "working":
             # Determine persistence behavior from config (default: persist working memory)
             persist_enabled = False
             try:
                 from smartmemory.utils import get_config
-                wm_cfg = (get_config('working_memory') or {})
-                persist_enabled = bool(wm_cfg.get('persist', True))
+
+                wm_cfg = get_config("working_memory") or {}
+                persist_enabled = bool(wm_cfg.get("persist", True))
             except Exception as e:
                 logger.debug(f"Failed to read working_memory.persist from config; defaulting to True. Error: {e}")
                 persist_enabled = True
@@ -480,17 +502,18 @@ class SmartMemory(MemoryBase):
                     if not isinstance(item.metadata, dict):
                         logger.warning("MemoryItem.metadata was not a dict for working item; normalizing to empty dict")
                         item.metadata = {}
-                    item.metadata.setdefault('memory_type', 'working')
-                    item.metadata.setdefault('provenance', {})
-                    if isinstance(item.metadata.get('provenance'), dict):
-                        item.metadata['provenance'].setdefault('source', 'working_memory')
+                    item.metadata.setdefault("memory_type", "working")
+                    item.metadata.setdefault("provenance", {})
+                    if isinstance(item.metadata.get("provenance"), dict):
+                        item.metadata["provenance"].setdefault("source", "working_memory")
                 except Exception as e:
                     logger.warning(f"Failed to set default working memory metadata: {e}")
                 return self._crud.add(item, **kwargs)
             else:
                 # Fallback: in-memory buffer with NO hard max length
-                if not hasattr(self, '_working_buffer'):
+                if not hasattr(self, "_working_buffer"):
                     from collections import deque
+
                     self._working_buffer = deque()  # unbounded
                 self._working_buffer.append(item)
                 return item.item_id
@@ -500,12 +523,16 @@ class SmartMemory(MemoryBase):
             result = self._crud.add(item, **kwargs)
             # Emit memory_store event for observability
             # noinspection PyArgumentList
-            SmartMemory._MEM_EMIT("memory_store", "add", {
-                "item_id": result,
-                "memory_type": memory_type,
-                "content_length": len(getattr(item, 'content', '') or ''),
-                "duration_ms": (perf_counter() - t0) * 1000.0
-            })
+            SmartMemory._MEM_EMIT(
+                "memory_store",
+                "add",
+                {
+                    "item_id": result,
+                    "memory_type": memory_type,
+                    "content_length": len(getattr(item, "content", "") or ""),
+                    "duration_ms": (perf_counter() - t0) * 1000.0,
+                },
+            )
             return result
 
     def _add_impl(self, item, **kwargs) -> str:
@@ -524,22 +551,26 @@ class SmartMemory(MemoryBase):
         result = self._crud.get(item_id)
         # Emit memory_retrieve event for observability
         # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT("memory_retrieve", "get", {
-            "item_id": item_id,
-            "found": result is not None,
-            "duration_ms": (perf_counter() - t0) * 1000.0
-        })
+        SmartMemory._MEM_EMIT(
+            "memory_retrieve",
+            "get",
+            {"item_id": item_id, "found": result is not None, "duration_ms": (perf_counter() - t0) * 1000.0},
+        )
         return result
 
     # Archive facades (provider hidden behind SmartMemory interface)
-    def archive_put(self, conversation_id: str, payload: Union[bytes, Dict[str, Any]], metadata: Dict[str, Any]) -> Dict[str, str]:
+    def archive_put(
+        self, conversation_id: str, payload: Union[bytes, Dict[str, Any]], metadata: Dict[str, Any]
+    ) -> Dict[str, str]:
         """Persist a raw conversation artifact durably and return { archive_uri, content_hash }."""
         try:
             if metadata is None:
                 metadata = {}
             result = get_archive_provider().put(conversation_id, payload, metadata)
-            if not isinstance(result, dict) or 'archive_uri' not in result or 'content_hash' not in result:
-                raise RuntimeError("ArchiveProvider.put returned invalid result; expected keys 'archive_uri' and 'content_hash'")
+            if not isinstance(result, dict) or "archive_uri" not in result or "content_hash" not in result:
+                raise RuntimeError(
+                    "ArchiveProvider.put returned invalid result; expected keys 'archive_uri' and 'content_hash'"
+                )
             return result
         except Exception as e:
             logger.error(f"archive_put failed for conversation_id={conversation_id}: {e}")
@@ -565,7 +596,9 @@ class SmartMemory(MemoryBase):
     def add_edge(self, source_id: str, target_id: str, relation_type: str, properties: dict | None = None):
         """Public wrapper to add an edge between two nodes."""
         properties = properties or {}
-        return self._graph.add_edge(source_id=source_id, target_id=target_id, edge_type=relation_type, properties=properties)
+        return self._graph.add_edge(
+            source_id=source_id, target_id=target_id, edge_type=relation_type, properties=properties
+        )
 
     def create_or_merge_node(self, item_id: str, properties: dict, memory_type: str | None = None):
         """Public wrapper to upsert a raw node with properties. Returns item_id."""
@@ -577,34 +610,42 @@ class SmartMemory(MemoryBase):
         result = self._crud.delete(item_id)
         # Emit memory_delete event for observability
         # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT("memory_delete", "delete", {
-            "item_id": item_id,
-            "success": result,
-            "duration_ms": (perf_counter() - t0) * 1000.0
-        })
+        SmartMemory._MEM_EMIT(
+            "memory_delete",
+            "delete",
+            {"item_id": item_id, "success": result, "duration_ms": (perf_counter() - t0) * 1000.0},
+        )
         return result
 
-    def search(self, query: str, top_k: int = 5, memory_type: str = None, conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None, **kwargs):
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        memory_type: str = None,
+        conversation_context: Optional[Union[ConversationContext, Dict[str, Any]]] = None,
+        **kwargs,
+    ):
         """
         Search using canonical search component with automatic scope filtering.
 
         Filtering by tenant/workspace/user is handled automatically by ScopeProvider.
         This ensures consistent isolation across all search operations.
         """
-        if memory_type == 'working':
+        if memory_type == "working":
             # Check if persistence is enabled; if so, use canonical search on persisted working items
             persist_enabled = False
             try:
                 from smartmemory.utils import get_config
-                wm_cfg = (get_config('working_memory') or {})
-                persist_enabled = bool(wm_cfg.get('persist', True))
+
+                wm_cfg = get_config("working_memory") or {}
+                persist_enabled = bool(wm_cfg.get("persist", True))
             except Exception:
                 persist_enabled = True
 
             if persist_enabled:
                 # Use canonical search for working memory stored in graph
                 # ScopeProvider handles tenant/user filtering automatically
-                results = self._search.search(query, top_k=top_k, memory_type='working', **kwargs)
+                results = self._search.search(query, top_k=top_k, memory_type="working", **kwargs)
 
                 # Optional: filter by conversation_id when provided
                 conv_id = None
@@ -612,17 +653,17 @@ class SmartMemory(MemoryBase):
                     if isinstance(conversation_context, ConversationContext):
                         conv_id = conversation_context.conversation_id
                     elif isinstance(conversation_context, dict):
-                        conv_id = conversation_context.get('conversation_id')
+                        conv_id = conversation_context.get("conversation_id")
                 except Exception as e:
                     logger.debug(f"Failed to extract conversation_id from conversation_context: {e}")
                     conv_id = None
                 if conv_id and results:
-                    results = [r for r in results if getattr(r, 'metadata', {}).get('conversation_id') == conv_id]
+                    results = [r for r in results if getattr(r, "metadata", {}).get("conversation_id") == conv_id]
 
                 return results[:top_k]
             else:
                 # Fallback to in-memory buffer behavior
-                if hasattr(self, '_working_buffer') and self._working_buffer:
+                if hasattr(self, "_working_buffer") and self._working_buffer:
                     results = []
                     # If a conversation context is provided, bias towards that conversation_id
                     conv_id = None
@@ -630,22 +671,22 @@ class SmartMemory(MemoryBase):
                         if isinstance(conversation_context, ConversationContext):
                             conv_id = conversation_context.conversation_id
                         elif isinstance(conversation_context, dict):
-                            conv_id = conversation_context.get('conversation_id')
+                            conv_id = conversation_context.get("conversation_id")
                     except Exception as e:
                         logger.debug(f"Failed to extract conversation_id from conversation_context (buffer path): {e}")
                         conv_id = None
 
                     for item in self._working_buffer:
                         # Prefer items from the same conversation when available
-                        if conv_id and hasattr(item, 'metadata') and isinstance(item.metadata, dict):
-                            if item.metadata.get('conversation_id') == conv_id:
+                        if conv_id and hasattr(item, "metadata") and isinstance(item.metadata, dict):
+                            if item.metadata.get("conversation_id") == conv_id:
                                 if query == "*" or query == "" or len(query.strip()) == 0:
                                     results.append(item)
                                     continue
                                 if query.lower() in str(item.content).lower():
                                     results.append(item)
                                     continue
-                                if hasattr(item, 'metadata') and item.metadata:
+                                if hasattr(item, "metadata") and item.metadata:
                                     metadata_str = str(item.metadata).lower()
                                     if query.lower() in metadata_str:
                                         results.append(item)
@@ -654,7 +695,7 @@ class SmartMemory(MemoryBase):
                             results.append(item)
                         elif query.lower() in str(item.content).lower():
                             results.append(item)
-                        elif hasattr(item, 'metadata') and item.metadata:
+                        elif hasattr(item, "metadata") and item.metadata:
                             metadata_str = str(item.metadata).lower()
                             if query.lower() in metadata_str:
                                 results.append(item)
@@ -670,20 +711,24 @@ class SmartMemory(MemoryBase):
 
         # Emit memory_retrieve event for observability
         # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT("memory_retrieve", "search", {
-            "query_length": len(query) if query else 0,
-            "top_k": top_k,
-            "memory_type": memory_type,
-            "results_count": len(results) if results else 0,
-            "duration_ms": (perf_counter() - t0) * 1000.0
-        })
+        SmartMemory._MEM_EMIT(
+            "memory_retrieve",
+            "search",
+            {
+                "query_length": len(query) if query else 0,
+                "top_k": top_k,
+                "memory_type": memory_type,
+                "results_count": len(results) if results else 0,
+                "duration_ms": (perf_counter() - t0) * 1000.0,
+            },
+        )
 
         return results[:top_k]
 
     # Linking
     def link(self, source_id: str, target_id: str, link_type: Union[str, "LinkType"] = "RELATED") -> str:
         """Link two memory items."""
-        if hasattr(link_type, 'value'):
+        if hasattr(link_type, "value"):
             link_type = link_type.value
         return self._linking.link(source_id, target_id, link_type)
 
@@ -711,14 +756,10 @@ class SmartMemory(MemoryBase):
         """Delegate add_tags to CRUD submodule."""
         return self._crud.add_tags(item_id, tags)
 
-    def challenge(
-        self,
-        assertion: str,
-        memory_type: str = "semantic",
-        use_llm: bool = True
-    ):
+    def challenge(self, assertion: str, memory_type: str = "semantic", use_llm: bool = True):
         """Challenge an assertion against existing knowledge to detect contradictions."""
         from smartmemory.reasoning.challenger import AssertionChallenger
+
         challenger = AssertionChallenger(self, use_llm=use_llm)
         return challenger.challenge(assertion, memory_type=memory_type)
 
@@ -799,27 +840,27 @@ class SmartMemory(MemoryBase):
         result = self._debug_mgr.clear()
 
         # Clear working memory buffer
-        if hasattr(self, '_working_buffer'):
+        if hasattr(self, "_working_buffer"):
             self._working_buffer.clear()
 
         # Clear canonical memory store
-        if hasattr(self, '_canonical_store'):
+        if hasattr(self, "_canonical_store"):
             self._canonical_store.clear()
 
         # Clear in-memory caches and mixins
-        if hasattr(self, '_cache'):
+        if hasattr(self, "_cache"):
             self._cache.clear()
 
-        if hasattr(self, '_operation_stats'):
+        if hasattr(self, "_operation_stats"):
             for key in self._operation_stats:
                 self._operation_stats[key] = 0
 
         # Clear any remaining memory type stores
-        memory_types = ['semantic', 'episodic', 'procedural', 'zettelkasten']
+        memory_types = ["semantic", "episodic", "procedural", "zettelkasten"]
         for memory_type in memory_types:
-            if hasattr(self, f'_{memory_type}_store'):
-                store = getattr(self, f'_{memory_type}_store')
-                if hasattr(store, 'clear'):
+            if hasattr(self, f"_{memory_type}_store"):
+                store = getattr(self, f"_{memory_type}_store")
+                if hasattr(store, "clear"):
                     store.clear()
 
         return result
@@ -848,4 +889,5 @@ class SmartMemory(MemoryBase):
                 user = memory.get("user123")
         """
         from smartmemory.temporal.context import time_travel
+
         return time_travel(self, to)

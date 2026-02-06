@@ -142,6 +142,282 @@ class OntologyGraph:
             return False
 
     # ------------------------------------------------------------------ #
+    # Frequency tracking & entity patterns (Phase 4)
+    # ------------------------------------------------------------------ #
+
+    def increment_frequency(self, name: str, confidence: float) -> None:
+        """Atomically increment type frequency and update running avg confidence."""
+        backend = self._get_backend()
+        try:
+            backend.query(
+                "MERGE (t:EntityType {name: $name}) "
+                "SET t.frequency = COALESCE(t.frequency, 0) + 1, "
+                "t.avg_confidence = (COALESCE(t.avg_confidence, 0) * COALESCE(t.frequency, 0) + $conf) "
+                "/ (COALESCE(t.frequency, 0) + 1)",
+                params={"name": name, "conf": confidence},
+                graph_name=self._graph_name,
+            )
+        except Exception as e:
+            logger.warning("Failed to increment frequency for '%s': %s", name, e)
+
+    def get_frequency(self, name: str) -> int:
+        """Return the frequency count for a type, or 0 if not found."""
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (t:EntityType {name: $name}) RETURN COALESCE(t.frequency, 0)",
+                params={"name": name},
+                graph_name=self._graph_name,
+            )
+            if result and result[0]:
+                return int(result[0][0])
+        except Exception as e:
+            logger.warning("Failed to get frequency for '%s': %s", name, e)
+        return 0
+
+    def get_type_assignments(self, entity_name: str) -> List[Dict]:
+        """Query EntityPattern nodes for this entity name, return [{type, count}]."""
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (p:EntityPattern {name: $name})-[:IS_INSTANCE_OF]->(t:EntityType) "
+                "RETURN t.name AS type, COALESCE(p.count, 1) AS count",
+                params={"name": entity_name},
+                graph_name=self._graph_name,
+            )
+            return [{"type": row[0], "count": int(row[1])} for row in (result or [])]
+        except Exception as e:
+            logger.warning("Failed to get type assignments for '%s': %s", entity_name, e)
+            return []
+
+    def add_entity_pattern(
+        self,
+        name: str,
+        label: str,
+        confidence: float,
+        workspace_id: str | None = None,
+        is_global: bool = False,
+        source: str = "llm_discovery",
+    ) -> bool:
+        """Create an EntityPattern node linked to its EntityType via :IS_INSTANCE_OF.
+
+        Returns:
+            True if created, False on error.
+        """
+        backend = self._get_backend()
+        try:
+            backend.query(
+                "MERGE (t:EntityType {name: $label}) "
+                "MERGE (p:EntityPattern {name: $name, label: $label}) "
+                "ON CREATE SET p.confidence = $conf, p.workspace_id = $ws, "
+                "p.is_global = $glob, p.source = $source, p.discovered_at = timestamp(), p.count = 1 "
+                "ON MATCH SET p.count = COALESCE(p.count, 1) + 1, "
+                "p.confidence = (COALESCE(p.confidence, 0) + $conf) / 2 "
+                "MERGE (p)-[:IS_INSTANCE_OF]->(t)",
+                params={
+                    "name": name.lower(),
+                    "label": label,
+                    "conf": confidence,
+                    "ws": workspace_id or self.workspace_id,
+                    "glob": is_global,
+                    "source": source,
+                },
+                graph_name=self._graph_name,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to add entity pattern '%s' -> '%s': %s", name, label, e)
+            return False
+
+    def get_entity_patterns(self, workspace_id: str | None = None) -> List[Dict]:
+        """Load all patterns for a workspace (including global patterns)."""
+        backend = self._get_backend()
+        ws = workspace_id or self.workspace_id
+        try:
+            result = backend.query(
+                "MATCH (p:EntityPattern) "
+                "WHERE p.is_global = true OR p.workspace_id = $ws "
+                "RETURN p.name, p.label, COALESCE(p.confidence, 0.5), p.source",
+                params={"ws": ws},
+                graph_name=self._graph_name,
+            )
+            return [
+                {"name": row[0], "label": row[1], "confidence": float(row[2]), "source": row[3]}
+                for row in (result or [])
+            ]
+        except Exception as e:
+            logger.warning("Failed to get entity patterns for workspace '%s': %s", ws, e)
+            return []
+
+    def seed_entity_patterns(self, patterns: Dict[str, str] | None = None) -> int:
+        """Seed common entity patterns for seed types. Idempotent.
+
+        Args:
+            patterns: Optional dict of {entity_name: entity_type}. Defaults to common entities.
+
+        Returns:
+            Number of patterns created.
+        """
+        defaults: Dict[str, str] = {
+            "python": "Technology",
+            "javascript": "Technology",
+            "typescript": "Technology",
+            "react": "Technology",
+            "docker": "Technology",
+            "kubernetes": "Technology",
+            "aws": "Organization",
+            "google": "Organization",
+            "microsoft": "Organization",
+            "github": "Organization",
+            "openai": "Organization",
+        }
+        to_seed = patterns or defaults
+        created = 0
+        for name, label in to_seed.items():
+            if self.add_entity_pattern(name, label, 0.95, is_global=True, source="seed"):
+                created += 1
+        return created
+
+    def get_pattern_stats(self) -> Dict[str, int]:
+        """Return counts of patterns by source layer: {seed, promoted, llm_discovery}."""
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (p:EntityPattern) RETURN p.source, count(p) ORDER BY p.source",
+                graph_name=self._graph_name,
+            )
+            stats: Dict[str, int] = {"seed": 0, "promoted": 0, "llm_discovery": 0}
+            for row in result or []:
+                source = row[0] or "llm_discovery"
+                stats[source] = int(row[1])
+            return stats
+        except Exception as e:
+            logger.warning("Failed to get pattern stats: %s", e)
+            return {"seed": 0, "promoted": 0, "llm_discovery": 0}
+
+    # ------------------------------------------------------------------ #
+    # Pipeline config storage (Phase 5)
+    # ------------------------------------------------------------------ #
+
+    def save_pipeline_config(self, name: str, config_json: str, workspace_id: str, description: str = "") -> bool:
+        """Save or update a named pipeline config as a PipelineConfig node.
+
+        Returns:
+            True if saved successfully.
+        """
+        backend = self._get_backend()
+        try:
+            backend.query(
+                "MERGE (c:PipelineConfig {name: $name, workspace_id: $ws}) "
+                "ON CREATE SET c.config_json = $cfg, c.description = $desc, "
+                "c.created_at = timestamp(), c.updated_at = timestamp() "
+                "ON MATCH SET c.config_json = $cfg, c.description = $desc, "
+                "c.updated_at = timestamp()",
+                params={"name": name, "ws": workspace_id, "cfg": config_json, "desc": description},
+                graph_name=self._graph_name,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to save pipeline config '%s': %s", name, e)
+            return False
+
+    def get_pipeline_config(self, name: str, workspace_id: str) -> Dict[str, Any] | None:
+        """Load a named pipeline config by name and workspace.
+
+        Returns:
+            Config dict with name, description, config_json, workspace_id, created_at, updated_at.
+            None if not found.
+        """
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (c:PipelineConfig {name: $name, workspace_id: $ws}) "
+                "RETURN c.name, c.description, c.config_json, c.workspace_id, "
+                "c.created_at, c.updated_at",
+                params={"name": name, "ws": workspace_id},
+                graph_name=self._graph_name,
+            )
+            if not result:
+                return None
+            row = result[0]
+            return {
+                "name": row[0],
+                "description": row[1] or "",
+                "config_json": row[2],
+                "workspace_id": row[3],
+                "created_at": str(row[4]) if row[4] else "",
+                "updated_at": str(row[5]) if row[5] else "",
+            }
+        except Exception as e:
+            logger.warning("Failed to get pipeline config '%s': %s", name, e)
+            return None
+
+    def list_pipeline_configs(self, workspace_id: str) -> List[Dict[str, Any]]:
+        """List all pipeline configs for a workspace."""
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (c:PipelineConfig {workspace_id: $ws}) "
+                "RETURN c.name, c.description, c.config_json, c.workspace_id, "
+                "c.created_at, c.updated_at ORDER BY c.name",
+                params={"ws": workspace_id},
+                graph_name=self._graph_name,
+            )
+            return [
+                {
+                    "name": row[0],
+                    "description": row[1] or "",
+                    "config_json": row[2],
+                    "workspace_id": row[3],
+                    "created_at": str(row[4]) if row[4] else "",
+                    "updated_at": str(row[5]) if row[5] else "",
+                }
+                for row in (result or [])
+            ]
+        except Exception as e:
+            logger.warning("Failed to list pipeline configs for workspace '%s': %s", workspace_id, e)
+            return []
+
+    def delete_pipeline_config(self, name: str, workspace_id: str) -> bool:
+        """Delete a named pipeline config. Returns True if deleted."""
+        backend = self._get_backend()
+        try:
+            backend.query(
+                "MATCH (c:PipelineConfig {name: $name, workspace_id: $ws}) DELETE c",
+                params={"name": name, "ws": workspace_id},
+                graph_name=self._graph_name,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to delete pipeline config '%s': %s", name, e)
+            return False
+
+    # ------------------------------------------------------------------ #
+    # Entity pattern deletion (Phase 5)
+    # ------------------------------------------------------------------ #
+
+    def delete_entity_pattern(self, name: str, label: str, workspace_id: str | None = None) -> bool:
+        """Delete an EntityPattern node by name and label.
+
+        Returns:
+            True if deleted successfully.
+        """
+        backend = self._get_backend()
+        ws = workspace_id or self.workspace_id
+        try:
+            backend.query(
+                "MATCH (p:EntityPattern {name: $name, label: $label}) "
+                "WHERE p.workspace_id = $ws OR p.is_global = true "
+                "DETACH DELETE p",
+                params={"name": name.lower(), "label": label, "ws": ws},
+                graph_name=self._graph_name,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to delete entity pattern '%s' -> '%s': %s", name, label, e)
+            return False
+
+    # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
 
