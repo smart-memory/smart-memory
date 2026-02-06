@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Studio Pipeline UI (Phase 7)
+- **Learning Page backend** (`smart-memory-studio/server/memory_studio/api/routes/learning.py`): 8 API endpoints — stats, convergence, promotions (with approve/reject), patterns, types, activity feed — all proxying to core OntologyGraph with tenant isolation
+- **Learning Page frontend** (`smart-memory-studio/web/src/pages/Learning.jsx`): Full dashboard with stats cards, promotion queue (approve/reject actions), type registry (searchable/sortable), pattern browser (layer filtering), activity feed (auto-refresh 30s)
+- **Learning hooks** (`smart-memory-studio/web/src/hooks/learning/`): 5 data hooks — useLearningStats, useLearningPromotions, useLearningPatterns, useLearningTypes, useLearningActivity
+- **LearningService** (`smart-memory-studio/web/src/services/LearningService.js`): API client for all learning endpoints
+- **PipelineConfigEditor** (`smart-memory-studio/web/src/components/pipeline/PipelineConfigEditor.jsx`): Accordion-based config editor matching PipelineConfig dataclass, save/load named profiles via Profiles API
+- **ConfigField** + **StageConfigSection**: Smart form field renderer (switch/number/text/select by type) and collapsible per-stage sections with reset-to-default
+- **BreakpointRunner** (`smart-memory-studio/web/src/components/pipeline/BreakpointRunner.jsx`): Debug pipeline runner — set breakpoints on any of 11 stages, run-to/resume/undo with intermediate state inspection
+- **PipelineStepper** + **StateInspector**: Visual step indicator with status icons and tabbed state viewer (entities, relations, text, timings)
+- **PromptsPanel polish**: Character count, copy-to-clipboard button, last-modified timestamp, improved empty state messaging
+- **Navigation**: Learning page with TrendingUp icon added to Studio nav
+
 #### Insights + Observability & Decision Memory UI (Phase 6)
 - **`MetricsConsumer`** (`smartmemory/pipeline/metrics_consumer.py`): Reads pipeline metric events from Redis Streams, aggregates into 5-min time buckets, writes pre-aggregated metrics to Redis Hashes for fast dashboard reads
 - **Pipeline Metrics API** (`smart-memory-insights/server/observability/api.py`): `GET /api/pipeline/metrics`, `/api/pipeline/bottlenecks` — per-stage latency, throughput, error rates from MetricsConsumer aggregated data

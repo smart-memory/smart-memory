@@ -29,7 +29,7 @@ SEED_TYPES: List[str] = [
     "Process",
 ]
 
-VALID_STATUSES = {"seed", "provisional", "confirmed"}
+VALID_STATUSES = {"seed", "provisional", "confirmed", "rejected"}
 
 
 class OntologyGraph:
@@ -141,6 +141,20 @@ class OntologyGraph:
             logger.warning("Failed to promote type '%s': %s", name, e)
             return False
 
+    def reject(self, name: str) -> bool:
+        """Reject a type — sets status to 'rejected'. Returns False if type not found."""
+        backend = self._get_backend()
+        try:
+            backend.query(
+                "MATCH (t:EntityType {name: $name}) SET t.status = 'rejected'",
+                params={"name": name},
+                graph_name=self._graph_name,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to reject type '%s': %s", name, e)
+            return False
+
     # ------------------------------------------------------------------ #
     # Frequency tracking & entity patterns (Phase 4)
     # ------------------------------------------------------------------ #
@@ -174,6 +188,19 @@ class OntologyGraph:
         except Exception as e:
             logger.warning("Failed to get frequency for '%s': %s", name, e)
         return 0
+
+    def get_all_frequencies(self) -> Dict[str, int]:
+        """Return frequency counts for all types in a single query."""
+        backend = self._get_backend()
+        try:
+            result = backend.query(
+                "MATCH (t:EntityType) RETURN t.name, COALESCE(t.frequency, 0)",
+                graph_name=self._graph_name,
+            )
+            return {row[0]: int(row[1]) for row in (result or [])}
+        except Exception as e:
+            logger.warning("Failed to get all frequencies: %s", e)
+            return {}
 
     def get_type_assignments(self, entity_name: str) -> List[Dict]:
         """Query EntityPattern nodes for this entity name, return [{type, count}]."""

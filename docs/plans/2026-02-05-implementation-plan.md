@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-05
 **Version:** 1.0 (restructured from strategic plan v5)
-**Status:** IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE, Phase 3 COMPLETE, Phase 4 COMPLETE, Phase 5 COMPLETE
+**Status:** IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE, Phase 3 COMPLETE, Phase 4 COMPLETE, Phase 5 COMPLETE, Phase 6 COMPLETE, Phase 7 COMPLETE
 **Predecessor docs:** See [Evidence Base](design/evidence-base.md) for benchmark data and research findings.
 
 ---
@@ -481,26 +481,20 @@ PipelineConfig
 
 ### Phase 7: Studio Pipeline UI
 
-**MAJOR — Requires own design session before implementation.**
+**Status:** COMPLETE. Learning dashboard, PipelineConfig editor, breakpoint debug runner, prompt UI polish. 7.5/7.6 (benchmarking) deferred to Phase 8. See `docs/plans/reports/phase-7-studio-pipeline-ui-report.md`.
 
 **Goal:** Rebuild Studio's pipeline configuration around PipelineConfig. This is not a refactor of the existing 1336-line `MemoryConfigurationPanel.jsx` — it is a new design driven by the PipelineConfig shape.
 
 **Scope:**
 
-| # | Component | Description |
-|---|-----------|-------------|
-| 7.1 | PipelineConfig editor | One section per stage (~10 stages), each independently editable |
-| 7.2 | Breakpoint execution UI | Run-to, inspect intermediate state, modify params, resume |
-| 7.3 | Ontology viewer | Type registry, convergence dashboard, pattern browser, import/export, pruning, graph analytics |
-| 7.4 | Prompt editing UI | Complete existing API integration (endpoints exist, React components not built) |
-| 7.5 | Benchmarking workflow | Batch execution + comparison across parameter sets |
-| 7.6 | Grid search / parameter tuning | Automated parameter sweep using breakpoint + replay |
-
-**Design notes:**
-- Ontology parameters scattered into stage configs for tuning (entity_ruler, ontology_constrain, llm_extract)
-- Dedicated ontology view combines these for inspection/management when someone cares about "ontology"
-- The existing panel is a **reference for what configs exist**, not a starting point
-- Do not attempt to refactor the existing panel. Design the new one from PipelineConfig shape.
+| # | Component | Description | Status |
+|---|-----------|-------------|--------|
+| 7.1 | PipelineConfig editor | One section per stage (~10 stages), each independently editable | Done |
+| 7.2 | Breakpoint execution UI | Run-to, inspect intermediate state, modify params, resume | Done |
+| 7.3 | Learning page (ontology viewer) | Type registry, convergence dashboard, pattern browser, promotion queue, activity feed | Done |
+| 7.4 | Prompt editing UI | Polish: copy-to-clipboard, character count, timestamp | Done |
+| 7.5 | Benchmarking workflow | Batch execution + comparison across parameter sets | Deferred to Phase 8 |
+| 7.6 | Grid search / parameter tuning | Automated parameter sweep using breakpoint + replay | Deferred to Phase 8 |
 
 **Dependencies:** Phase 5 (needs API routes).
 
