@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+#### Pipeline v2 Foundation (Phase 1)
+- **New unified pipeline architecture** (`smartmemory/pipeline/`): Replaces three separate orchestrators with a single composable pipeline built on the StageCommand protocol
+  - `StageCommand` protocol (structural subtyping) with `execute()` and `undo()` methods
+  - `PipelineState` immutable-by-convention dataclass with full serialization (`to_dict()`/`from_dict()`)
+  - `PipelineConfig` nested dataclass hierarchy with named factories (`default()`, `preview()`)
+  - `Transport` protocol with `InProcessTransport` for in-process execution
+  - `PipelineRunner` with `run()`, `run_to()`, `run_from()`, `undo_to()` — supports breakpoints, resumption, rollback, and per-stage retry with exponential backoff
+- **8 stage wrappers** (`smartmemory/pipeline/stages/`): classify, coreference, extract, store, link, enrich, ground, evolve — each wraps existing pipeline components as StageCommands
+- **OntologyGraph** (`smartmemory/graph/ontology_graph.py`): Dedicated FalkorDB graph for entity type definitions with three-tier status (seed → provisional → confirmed) and 14 seed types
+
+### Changed
+- `SmartMemory.ingest()` now delegates to `PipelineRunner.run()` instead of `MemoryIngestionFlow.run()` — identical output, new internal architecture
+
+### Removed
+- `FastIngestionFlow` (`smartmemory/memory/fast_ingestion_flow.py`, 502 LOC) — async ingestion is now a config flag (`mode="async"`) on the unified pipeline
+
+---
+
 ## [0.3.2] - 2026-02-05
 
 ### Changed

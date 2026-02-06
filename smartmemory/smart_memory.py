@@ -102,6 +102,7 @@ class SmartMemory(MemoryBase):
 
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
+        self._pipeline_runner = None
 
         # Set self on graph search module for SSG traversal
         self._graph.search.set_smart_memory(self)
@@ -116,6 +117,88 @@ class SmartMemory(MemoryBase):
     def graph(self):
         """Access to underlying graph storage."""
         return self._graph
+
+    # =========================================================================
+    # Pipeline v2 assembly
+    # =========================================================================
+
+    def _create_pipeline_runner(self):
+        """Assemble the v2 pipeline runner from stage wrappers."""
+        from smartmemory.pipeline.runner import PipelineRunner
+        from smartmemory.pipeline.transport import InProcessTransport
+        from smartmemory.pipeline.stages.classify import ClassifyStage
+        from smartmemory.pipeline.stages.coreference import CoreferenceStageCommand
+        from smartmemory.pipeline.stages.extract import ExtractStage
+        from smartmemory.pipeline.stages.store import StoreStage
+        from smartmemory.pipeline.stages.link import LinkStage
+        from smartmemory.pipeline.stages.enrich import EnrichStage
+        from smartmemory.pipeline.stages.ground import GroundStage
+        from smartmemory.pipeline.stages.evolve import EvolveStage
+        from smartmemory.memory.ingestion.flow import MemoryIngestionFlow
+        from smartmemory.memory.ingestion.extraction import ExtractionPipeline
+        from smartmemory.memory.ingestion.enrichment import EnrichmentPipeline
+        from smartmemory.memory.ingestion.registry import IngestionRegistry
+        from smartmemory.memory.ingestion.observer import IngestionObserver
+
+        # Reuse the existing ingestion flow for classify (it has the logic)
+        if self._ingestion_flow is None:
+            self._ingestion_flow = MemoryIngestionFlow(
+                self, linking=self._linking, enrichment=self._enrichment
+            )
+
+        # Build extraction and enrichment pipelines
+        registry = IngestionRegistry()
+        observer = IngestionObserver()
+        extraction_pipeline = ExtractionPipeline(registry, observer)
+        enrichment_pipeline = EnrichmentPipeline(self, self._enrichment, observer)
+
+        stages = [
+            ClassifyStage(self._ingestion_flow),
+            CoreferenceStageCommand(),
+            ExtractStage(extraction_pipeline),
+            StoreStage(self),
+            LinkStage(self._linking),
+            EnrichStage(enrichment_pipeline),
+            GroundStage(self),
+            EvolveStage(self),
+        ]
+
+        return PipelineRunner(stages, InProcessTransport())
+
+    def _build_pipeline_config(
+        self,
+        extractor_name=None,
+        enricher_names=None,
+        pipeline_config=None,
+        sync=True,
+    ):
+        """Map legacy ingest() parameters to a v2 PipelineConfig."""
+        from smartmemory.pipeline.config import PipelineConfig, ExtractionConfig, LLMExtractConfig, EnrichConfig
+
+        config = PipelineConfig()
+
+        if pipeline_config is not None:
+            # Merge legacy PipelineConfigBundle fields into v2 config
+            if pipeline_config.extraction and pipeline_config.extraction.extractor_name:
+                config.extraction.extractor_name = pipeline_config.extraction.extractor_name
+            if pipeline_config.extraction and pipeline_config.extraction.model:
+                config.extraction.llm_extract.model = pipeline_config.extraction.model
+
+        if extractor_name:
+            config.extraction.extractor_name = extractor_name
+        if enricher_names:
+            config.enrich.enricher_names = list(enricher_names)
+        if not sync:
+            config.mode = "async"
+
+        # Pull workspace from scope provider
+        try:
+            scope = self.scope_provider.get_scope()
+            config.workspace_id = getattr(scope, "workspace_id", None)
+        except Exception:
+            pass
+
+        return config
 
     # =========================================================================
     # Core operations (ingest, add, get, search, update, delete, link)
@@ -277,56 +360,35 @@ class SmartMemory(MemoryBase):
         if kwargs.pop('_bypass_ingestion', False):
             return self.add(normalized_item, **kwargs)
 
-        # Run full ingestion pipeline for public API
-        pipeline = enricher_names if enricher_names is not None else getattr(self, '_enricher_pipeline', [])
-        if self._ingestion_flow is None:
-            self._ingestion_flow = MemoryIngestionFlow(
-                self,
-                linking=self._linking,
-                enrichment=self._enrichment
-            )
-        # Merge conversation context into pipeline context if provided
-        if conversation_context is not None:
-            try:
-                if context is None:
-                    context = {}
-                if isinstance(conversation_context, ConversationContext):
-                    context['conversation'] = conversation_context.to_dict()
-                elif isinstance(conversation_context, dict):
-                    context['conversation'] = dict(conversation_context)
-            except Exception as e:
-                logger.debug(f"Failed to merge conversation_context into context: {e}")
+        # Run full ingestion pipeline (v2)
+        if self._pipeline_runner is None:
+            self._pipeline_runner = self._create_pipeline_runner()
 
-        result = self._ingestion_flow.run(
-            normalized_item,
-            context=context,
-            adapter_name=adapter_name,
-            converter_name=converter_name,
+        pipeline_cfg = self._build_pipeline_config(
             extractor_name=extractor_name,
-            enricher_names=pipeline,
+            enricher_names=enricher_names if enricher_names is not None else getattr(self, '_enricher_pipeline', []),
             pipeline_config=pipeline_config,
+            sync=True,
         )
 
-        # Delegate evolution to EvolutionOrchestrator (fail fast)
-        self._evolution.run_evolution_cycle()
+        # Build metadata dict for the pipeline
+        meta = dict(normalized_item.metadata or {})
+        if conversation_context is not None:
+            try:
+                if isinstance(conversation_context, ConversationContext):
+                    meta['conversation'] = conversation_context.to_dict()
+                elif isinstance(conversation_context, dict):
+                    meta['conversation'] = dict(conversation_context)
+            except Exception as e:
+                logger.debug(f"Failed to merge conversation_context into metadata: {e}")
 
-        # Run clustering to deduplicate entities (can be optimized later with thresholds)
-        try:
-            self._clustering.run(use_semhash=True)
-        except Exception as e:
-            logger.debug(f"Clustering during ingestion failed (non-fatal): {e}")
+        state = self._pipeline_runner.run(
+            text=normalized_item.content or "",
+            config=pipeline_cfg,
+            metadata=meta,
+        )
 
-        # Extract item_id from result
-        item_id = None
-        if isinstance(result, dict) and 'item' in result:
-            item = result['item']
-            item_id = item.item_id if hasattr(item, 'item_id') else str(item)
-        elif isinstance(result, dict) and 'item_id' in result:
-            item_id = result['item_id']
-        elif hasattr(result, 'item_id'):
-            item_id = result.item_id
-        else:
-            item_id = str(result) if result else None
+        item_id = state.item_id
 
         # Auto-version initial creation
         if item_id and self.version_tracker:
