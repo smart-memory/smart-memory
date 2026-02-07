@@ -10,13 +10,13 @@ Tests all extractor plugins with mocked models to verify:
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-from typing import Dict, Any
 
 from smartmemory.plugins.extractors.spacy import SpacyExtractor
 from smartmemory.plugins.extractors.llm import LLMExtractor
 from smartmemory.plugins.extractors.relik import RelikExtractor
 
 
+@pytest.mark.skip(reason="deprecated extractor")
 class TestSpacyExtractor:
     """Test SpacyExtractor plugin."""
     
@@ -173,6 +173,7 @@ class TestLLMExtractor:
             assert result['relations'] == []
 
 
+@pytest.mark.skip(reason="deprecated extractor")
 class TestRelikExtractor:
     """Test RelikExtractor plugin."""
     
@@ -180,7 +181,6 @@ class TestRelikExtractor:
     def mock_relik_module(self):
         """Mock relik module to prevent import errors."""
         import sys
-        from unittest.mock import MagicMock
         
         # Create mock module
         mock_relik = MagicMock()

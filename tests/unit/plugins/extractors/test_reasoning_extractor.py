@@ -2,7 +2,6 @@
 Unit tests for ReasoningExtractor.
 """
 
-import pytest
 from smartmemory.plugins.extractors.reasoning import ReasoningExtractor, ReasoningExtractorConfig
 from smartmemory.models.reasoning import ReasoningTrace, ReasoningStep
 

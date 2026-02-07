@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Test Suite Sweep
+- **Removed dead code**: Deleted 4 debug/benchmark scripts from `tests/` (zero test functions), removed empty `tests/e2e/` scaffold (11 dirs with only `__init__.py`)
+- **Trimmed conftest**: Removed ~150 lines of unused fixtures from `tests/conftest.py` (sample_memory_items, sample_entities, sample_relations, sample_embeddings, conversation_context, conversation_manager, mock_smartmemory_dependencies, clean_memory, TestDataFactory)
+- **Relocated orphaned tests**: Moved `tests/plugins/evolvers/test_opinion_synthesis.py` and `tests/plugins/extractors/test_reasoning.py` to proper `tests/unit/plugins/` locations
+- **Marked deprecated extractors**: SpacyExtractor and RelikExtractor test classes marked `@pytest.mark.skip(reason="deprecated extractor")`
+- **Coverage config**: Added `--cov=smartmemory --cov-report=term-missing` and marker registration to `pyproject.toml`
+
+### Added
+- **Model tests**: `test_memory_item.py`, `test_entity.py`, `test_opinion.py`, `test_reasoning.py` — 82 tests covering creation, validation, serialization, and key behaviors
+- **Observability tests**: `test_events.py`, `test_json_formatter.py`, `test_logging_filter.py` — 27 tests covering EventSpooler, JsonFormatter, LogContextFilter (all mocked, no Docker)
+- **Evolver tests**: `test_episodic_to_semantic.py`, `test_working_to_episodic.py`, `test_episodic_decay.py`, `test_decision_confidence.py` — 71 tests covering metadata, config, and evolution logic
+
 ### Security
 
 - **Ontology tenant isolation**: Added `validate_registry_ownership()` to 5 registry endpoints that were missing tenant checks (`apply_changeset`, `list_registry_snapshots`, `get_registry_changelog`, `rollback_registry`, `import_registry_snapshot`). Fixed `export_registry_snapshot` which had no authentication at all.
