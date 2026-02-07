@@ -22,8 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`UserModel.default_team_id`** (`service_common/models/auth.py`): New optional field storing the user's default team assignment
 - **Team persistence on signup** (`service_common/services/auth_service.py`): Default team is now created and persisted in MongoDB during user registration
 - **Team context in JWT auth** (`service_common/auth/jwt_provider.py`): `ServiceUser` is now populated with `team_memberships`, `current_team_id`, and `current_team_role` at token authentication time (previously only patched in by `get_service_user()`)
-- **Workspace-team linking** (`service_common/repositories/workspace_repo.py`): `ensure_personal_workspace()` now accepts `default_team_id` and grants team admin access to the personal workspace; backfills existing workspaces missing team access
+- **Workspace-team linking** (`service_common/repositories/workspace_repo.py`): `ensure_personal_workspace()` now accepts `default_team_id` and grants team admin access to the personal workspace
+- **API key auth includes team context** (`service_common/auth/jwt_provider.py`): `_authenticate_api_key` now populates team memberships on ServiceUser (consistent with JWT flow)
 - **`/auth/me` returns `default_team_id`** (`memory_service/api/routes/auth.py`): UserResponse now always includes the user's default team ID
+
+#### Team/Workspace Roadmap (WS-9)
+- **WS-9 workstream** (`docs/plans/2026-02-04-reasoning-system-roadmap.md`): Added Team & Workspace Management roadmap entry — auto-assignment done, remaining CRUD APIs, invitation flow, multi-team, admin UI
+
+### Removed
+- **Backward compatibility fallbacks**: Removed all deterministic `team_{tenant_suffix}` fallback computations from `jwt_provider.py`, `auth_service.py`, `middleware.py`, `auth.py` (service + maya), and `core.py` — no users exist, clean slate
+- **Workspace backfill logic**: Removed `elif` branch in `ensure_personal_workspace()` that backfilled team access on existing workspaces
+- **In-memory team patching in `get_service_user()`**: Removed fallback that computed team membership when `ServiceUser.team_memberships` was empty — now handled at authentication time by `JWTAuthProvider`
 
 ### Changed
 
