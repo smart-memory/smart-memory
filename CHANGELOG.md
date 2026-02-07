@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed redundant conftest markers**: Marker assignments now handled by `pyproject.toml`
 
 ### Added
+- **Archive API endpoints**: `POST /api/archive/store` and `GET /api/archive/{uri}` for durable conversation artifact storage
+- **Graph path endpoint**: `GET /api/graph/path` for shortest-path queries between knowledge graph nodes
+- **`SmartMemory.find_shortest_path()`**: Public method for graph path traversal using FalkorDB `shortestPath()` Cypher
+- **`SecureSmartMemory` proxy methods**: `archive_put`, `archive_get`, `find_shortest_path` delegate to core with tenant scoping
+
 - **Model tests**: `test_memory_item.py`, `test_entity.py`, `test_opinion.py`, `test_reasoning.py` — 82 tests covering creation, validation, serialization, and key behaviors
 - **Observability tests**: `test_events.py`, `test_json_formatter.py`, `test_logging_filter.py` — 27 tests covering EventSpooler, JsonFormatter, LogContextFilter (all mocked, no Docker)
 - **Evolver tests**: `test_episodic_to_semantic.py`, `test_working_to_episodic.py`, `test_episodic_decay.py`, `test_decision_confidence.py` — 71 tests covering metadata, config, and evolution logic

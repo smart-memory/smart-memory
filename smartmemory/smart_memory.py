@@ -584,6 +584,52 @@ class SmartMemory(MemoryBase):
             logger.error(f"archive_get failed for uri={archive_uri}: {e}")
             raise
 
+    def find_shortest_path(self, start_id: str, end_id: str, max_hops: int = 5) -> Optional["MemoryPath"]:
+        """Find the shortest path between two nodes in the knowledge graph.
+
+        Args:
+            start_id: Item ID of the start node.
+            end_id: Item ID of the end node.
+            max_hops: Maximum number of hops to traverse (capped at 10).
+
+        Returns:
+            MemoryPath with populated Triple objects, or None if no path found.
+        """
+        from smartmemory.graph.core.memory_path import MemoryPath, Triple
+
+        max_hops = min(max_hops, 10)
+        query = (
+            "MATCH (start), (end) "
+            "WHERE start.item_id = $start_id AND end.item_id = $end_id "
+            f"MATCH path = shortestPath((start)-[*..{max_hops}]-(end)) "
+            "RETURN nodes(path) as nodes, relationships(path) as rels"
+        )
+        try:
+            results = self._graph.execute_query(query, {"start_id": start_id, "end_id": end_id})
+        except Exception as e:
+            logger.error(f"find_shortest_path failed: {e}")
+            return None
+
+        if not results:
+            return None
+
+        row = results[0]
+        nodes_data = row[0] if isinstance(row, (list, tuple)) else row.get("nodes", [])
+        rels_data = row[1] if isinstance(row, (list, tuple)) else row.get("rels", [])
+
+        triples: list[Triple] = []
+        for i, rel in enumerate(rels_data):
+            src_node = nodes_data[i]
+            tgt_node = nodes_data[i + 1]
+
+            src_id = src_node.properties.get("item_id", str(src_node.id)) if hasattr(src_node, "properties") else str(src_node)
+            tgt_id = tgt_node.properties.get("item_id", str(tgt_node.id)) if hasattr(tgt_node, "properties") else str(tgt_node)
+            rel_type = rel.relation if hasattr(rel, "relation") else str(rel)
+
+            triples.append(Triple(subject=src_id, predicate=rel_type, object=tgt_id))
+
+        return MemoryPath(triples=triples)
+
     def update_properties(self, item_id: str, properties: dict, write_mode: str | None = None):
         """Public wrapper to update memory node properties with merge/replace semantics."""
         return self._crud.update_memory_node(item_id, properties, write_mode)
