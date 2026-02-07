@@ -67,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Workspace access fail-closed** (`service_common/auth/scope.py`): `_can_access_workspace` now returns `False` on exception instead of `True` — prevents tenant isolation bypass when MongoDB is unreachable
+- **Team ID exact match validation** (`service_common/auth/scope.py`): Changed substring `in` check to exact `==` for team ID validation — prevents cross-tenant access via crafted team IDs
+- **OAuth random password** (`memory_service/api/routes/auth.py`, `maya/auth/routes.py`): OAuth users now get `secrets.token_urlsafe(32)` instead of static `"oauth-no-password"` — prevents password-based login to OAuth accounts
+- **Open redirect prevention** (`memory_service/api/routes/auth.py`): `frontend_callback` parameter validated against allowed origins (FRONTEND_URL, MAYA_FRONTEND_URL, CORS_ORIGINS, localhost) — prevents token theft via crafted OAuth login link
+- **Password reset method fix** (`memory_service/api/routes/auth.py`): Fixed `invalidate_all_refresh_tokens` → `revoke_all_user_tokens` (was calling non-existent method)
 - **Ontology tenant isolation**: Added `validate_registry_ownership()` to 5 registry endpoints that were missing tenant checks (`apply_changeset`, `list_registry_snapshots`, `get_registry_changelog`, `rollback_registry`, `import_registry_snapshot`). Fixed `export_registry_snapshot` which had no authentication at all.
 - **WebSocket authentication**: Added JWT auth to `/ws/feedback` endpoint via `?token=<jwt>` query param. Invalid/missing tokens rejected with close code 1008 (Policy Violation).
 - **Ontology access model**: Formalized workspace-shared access model — `created_by` is audit metadata, not an access gate. Removed 6 TODO comments and converted warning logs to informational audit logs.
