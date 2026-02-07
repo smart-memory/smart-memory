@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Ontology tenant isolation**: Added `validate_registry_ownership()` to 5 registry endpoints that were missing tenant checks (`apply_changeset`, `list_registry_snapshots`, `get_registry_changelog`, `rollback_registry`, `import_registry_snapshot`). Fixed `export_registry_snapshot` which had no authentication at all.
+- **WebSocket authentication**: Added JWT auth to `/ws/feedback` endpoint via `?token=<jwt>` query param. Invalid/missing tokens rejected with close code 1008 (Policy Violation).
+- **Ontology access model**: Formalized workspace-shared access model — `created_by` is audit metadata, not an access gate. Removed 6 TODO comments and converted warning logs to informational audit logs.
+
 ### Added
 
 #### Studio Pipeline UI (Phase 7)
