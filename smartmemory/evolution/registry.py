@@ -175,6 +175,14 @@ def register_builtin_evolvers() -> None:
         tags=("enhanced", "decay"),
     )
 
+    # Decision confidence evolution
+    R.register(
+        "decision_confidence",
+        "smartmemory.plugins.evolvers.decision_confidence.DecisionConfidenceEvolver",
+        description="Evidence-based reinforcement, contradiction, decay, and retraction for decisions",
+        tags=("decision", "confidence", "decay", "reinforcement", "builtin"),
+    )
+
 
 # Auto-register builtins on import
 register_builtin_evolvers()

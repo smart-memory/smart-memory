@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Decision Confidence Evolver v2.0
+- **Evidence-based reinforcement/contradiction** (`smartmemory/plugins/evolvers/decision_confidence.py`): Enhanced from decay-only to full evidence matching — keyword (content, domain, tags), semantic (cosine similarity), and contradiction signal detection against recent episodic/semantic/opinion memories
+- **Decision model integration**: Uses `Decision.reinforce()` and `Decision.contradict()` for confidence math with diminishing returns and proportional penalties, persists full `Decision.to_dict()` state
+- **Registry registration** (`smartmemory/evolution/registry.py`): Registered as `decision_confidence` so it runs in the evolution pipeline
+- **Duplicate episodic prevention**: `fetched_episodic` flag skips episodic in standard search loop when the dedicated episodic API succeeds
+- **47 unit tests** (`tests/unit/decisions/test_decision_evolver.py`): Covering reinforcement, contradiction, decay, retraction, evidence matching (keyword/domain/tag/semantic), full cycle, staleness, and registry integration
+
 #### Ontology Templates
 - **Template catalog** (`smartmemory/ontology/template_service.py`): `TemplateService` — browse, preview, clone, save-as-template, delete custom templates. Built-in templates cached in memory, custom templates stored via `OntologyStorage` with `is_template` flag
 - **Built-in templates** (`smartmemory/ontology/templates/`): 3 curated ontology templates — General Purpose (12 entity types, 8 relationships), Software Engineering (15 entity types, 10 relationships), Business & Finance (14 entity types, 9 relationships)
