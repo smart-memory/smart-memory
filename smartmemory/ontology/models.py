@@ -64,6 +64,46 @@ class OntologyRule:
             self.created_at = datetime.now()
 
 
+@dataclass
+class OntologySubscription:
+    """Tracks subscription of an overlay ontology to a base ontology."""
+
+    base_registry_id: str
+    pinned_version: Optional[str] = None  # None = follow latest
+    hidden_types: Set[str] = field(default_factory=set)
+    subscribed_at: datetime = field(default_factory=datetime.now)
+    subscribed_by: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "base_registry_id": self.base_registry_id,
+            "pinned_version": self.pinned_version,
+            "hidden_types": sorted(self.hidden_types),
+            "subscribed_at": self.subscribed_at.isoformat(),
+            "subscribed_by": self.subscribed_by,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OntologySubscription":
+        return cls(
+            base_registry_id=data["base_registry_id"],
+            pinned_version=data.get("pinned_version"),
+            hidden_types=set(data.get("hidden_types", [])),
+            subscribed_at=datetime.fromisoformat(data["subscribed_at"]) if "subscribed_at" in data else datetime.now(),
+            subscribed_by=data.get("subscribed_by", ""),
+        )
+
+
+@dataclass
+class LayerDiff:
+    """Diff between base and overlay ontology layers."""
+
+    base_only: List[str]  # types in base but not overlay
+    overlay_only: List[str]  # types in overlay but not base
+    overridden: List[str]  # types in both (overlay wins)
+    hidden: List[str]  # base types suppressed via subscription
+
+
 class Ontology:
     """Complete ontology definition with entities, relationships, and rules."""
 
@@ -86,6 +126,10 @@ class Ontology:
         self.tenant_id: str = ""  # tenant scope for multi-tenancy filtering
         self.is_template: bool = False
         self.source_template: str = ""
+
+        # Layer support
+        self.subscription: Optional[OntologySubscription] = None
+        self.is_base_layer: bool = False
 
     def add_entity_type(self, entity_type: EntityTypeDefinition) -> None:
         """Add an entity type to the ontology."""
@@ -180,7 +224,7 @@ class Ontology:
             rule_dict["created_at"] = rule.created_at.isoformat()
             rules_dict[rule_id] = rule_dict
 
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "version": self.version,
@@ -196,7 +240,11 @@ class Ontology:
             "entity_types": entity_types_dict,
             "relationship_types": relationship_types_dict,
             "rules": rules_dict,
+            "is_base_layer": self.is_base_layer,
         }
+        if self.subscription is not None:
+            result["subscription"] = self.subscription.to_dict()
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Ontology":
@@ -212,6 +260,9 @@ class Ontology:
         ontology.tenant_id = data.get("tenant_id", "")
         ontology.is_template = data.get("is_template", False)
         ontology.source_template = data.get("source_template", "")
+        ontology.is_base_layer = data.get("is_base_layer", False)
+        if "subscription" in data and data["subscription"] is not None:
+            ontology.subscription = OntologySubscription.from_dict(data["subscription"])
 
         # Load entity types
         for name, entity_data in (data.get("entity_types") or {}).items():

@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed redundant conftest markers**: Marker assignments now handled by `pyproject.toml`
 
 ### Added
+
+#### Ontology Layers: Public Base + Private Overlay
+- **`OntologySubscription` model** (`smartmemory/ontology/models.py`): Tracks base registry subscription with pinned version and hidden types; serializes to/from dict with backward compatibility
+- **`LayerDiff` model** (`smartmemory/ontology/models.py`): Dataclass representing diff between base and overlay layers (base_only, overlay_only, overridden, hidden)
+- **`LayeredOntology` class** (`smartmemory/ontology/layered.py`): Merged read view of base + overlay ontologies — entity-level override (overlay wins), rules not inherited from base, hidden types excluded, provenance tracking (local/base/override/hidden), detach to flatten
+- **`LayeredOntologyService`** (`smartmemory/ontology/layer_service.py`): Subscription lifecycle orchestration — subscribe, unsubscribe (flatten), pin/unpin version, hide/unhide types, diff computation
+- **8 layer API endpoints** (`memory_service/api/routes/ontology_layers.py`): `POST/DELETE /ontology/registry/{id}/subscribe`, `PUT/DELETE /ontology/registry/{id}/subscribe/pin`, `POST /ontology/registry/{id}/subscribe/hidden`, `DELETE /ontology/registry/{id}/subscribe/hidden/{type_name}`, `GET /ontology/registry/{id}/layers`, `GET /ontology/registry/{id}/layer-diff`
+- **75 tests**: 59 unit tests (models, LayeredOntology, LayeredOntologyService) + 16 API endpoint tests
+
 - **Archive API endpoints**: `POST /api/archive/store` and `GET /api/archive/{uri}` for durable conversation artifact storage
 - **Graph path endpoint**: `GET /api/graph/path` for shortest-path queries between knowledge graph nodes
 - **`SmartMemory.find_shortest_path()`**: Public method for graph path traversal using FalkorDB `shortestPath()` Cypher
