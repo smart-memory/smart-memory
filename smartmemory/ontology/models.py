@@ -83,6 +83,7 @@ class Ontology:
         self.domain = ""  # e.g., "general", "medical", "legal", "technical"
         self.language = "en"
         self.created_by = "system"
+        self.tenant_id: str = ""  # tenant scope for multi-tenancy filtering
         self.is_template: bool = False
         self.source_template: str = ""
 
@@ -189,6 +190,7 @@ class Ontology:
             "domain": self.domain,
             "language": self.language,
             "created_by": self.created_by,
+            "tenant_id": self.tenant_id,
             "is_template": self.is_template,
             "source_template": self.source_template,
             "entity_types": entity_types_dict,
@@ -207,6 +209,7 @@ class Ontology:
         ontology.domain = data.get("domain", "")
         ontology.language = data.get("language", "en")
         ontology.created_by = data.get("created_by", "system")
+        ontology.tenant_id = data.get("tenant_id", "")
         ontology.is_template = data.get("is_template", False)
         ontology.source_template = data.get("source_template", "")
 

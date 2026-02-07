@@ -1,9 +1,12 @@
 import json
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, List, Dict
 
 from smartmemory.ontology.models import Ontology
+
+logger = logging.getLogger(__name__)
 
 
 class OntologyStorage(ABC):
@@ -70,14 +73,16 @@ class FileSystemOntologyStorage(OntologyStorage):
                         "description": data.get("description", ""),
                         "created_at": data["created_at"],
                         "created_by": data.get("created_by", "system"),
+                        "tenant_id": data.get("tenant_id", ""),
                         "is_template": data.get("is_template", False),
                         "source_template": data.get("source_template", ""),
                         "entity_count": len(data.get("entity_types", {})),
                         "relationship_count": len(data.get("relationship_types", {})),
                     }
                 )
-            except Exception:
-                continue  # Skip corrupted files
+            except Exception as exc:
+                logger.warning("Skipping corrupted ontology file %s: %s", file_path.name, exc)
+                continue
         return ontologies
 
     def delete_ontology(self, ontology_id: str) -> bool:

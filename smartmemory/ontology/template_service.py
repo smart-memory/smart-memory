@@ -134,6 +134,7 @@ class TemplateService:
         ontology.created_at = datetime.now()
         ontology.updated_at = datetime.now()
         ontology.created_by = user_id
+        ontology.tenant_id = tenant_id
         ontology.is_template = False
         ontology.source_template = template_id
 
@@ -153,34 +154,47 @@ class TemplateService:
         if source is None:
             raise ValueError(f"Ontology not found: {registry_id}")
 
-        template = Ontology(template_name, source.version)
+        # Deep copy via round-trip serialization to avoid shared references
+        source_data = source.to_dict()
+        template = Ontology.from_dict(source_data)
+        template.id = str(uuid.uuid4())
+        template.name = template_name
         template.description = description
-        template.domain = source.domain
         template.created_by = user_id
+        template.tenant_id = tenant_id
         template.is_template = True
-
-        # Deep copy entity types, relationship types, and rules
-        for name, et in source.entity_types.items():
-            template.entity_types[name] = et
-        for name, rt in source.relationship_types.items():
-            template.relationship_types[name] = rt
-        for rule_id, rule in source.rules.items():
-            template.rules[rule_id] = rule
+        template.source_template = ""
+        template.created_at = datetime.now()
+        template.updated_at = datetime.now()
 
         self.storage.save_ontology(template)
         return template.id
 
     def delete_custom_template(self, template_id: str, tenant_id: str) -> bool:
-        """Delete a custom template. Built-in templates cannot be deleted."""
+        """Delete a custom template. Built-in templates cannot be deleted.
+
+        Verifies the template belongs to the requesting tenant before deleting.
+        """
         if template_id.startswith("builtin:"):
             raise ValueError("Cannot delete built-in templates")
 
         ontology_id = template_id.removeprefix("custom:")
+
+        # Verify tenant ownership before deleting
+        all_ontologies = self.storage.list_ontologies()
+        match = next((o for o in all_ontologies if o["id"] == ontology_id), None)
+        if match is None:
+            return False
+        if match.get("tenant_id") and match["tenant_id"] != tenant_id:
+            logger.warning("Tenant %s attempted to delete template owned by %s", tenant_id, match.get("tenant_id"))
+            return False
+
         return self.storage.delete_ontology(ontology_id)
 
     def _load_template_data(self, template_id: str, tenant_id: str) -> Optional[Dict]:
         """Load raw template data from file (builtin) or storage (custom).
 
+        For custom templates, verifies tenant ownership before returning.
         Returns a deep copy so callers can mutate without corrupting the cache.
         """
         if template_id.startswith("builtin:"):
@@ -188,6 +202,14 @@ class TemplateService:
             return copy.deepcopy(data) if data else None
         elif template_id.startswith("custom:"):
             ontology_id = template_id.removeprefix("custom:")
+            # Verify tenant ownership via metadata listing
+            all_ontologies = self.storage.list_ontologies()
+            match = next((o for o in all_ontologies if o["id"] == ontology_id), None)
+            if match is None:
+                return None
+            if match.get("tenant_id") and match["tenant_id"] != tenant_id:
+                logger.warning("Tenant %s attempted to access template owned by %s", tenant_id, match.get("tenant_id"))
+                return None
             ontology = self.storage.load_ontology(ontology_id)
             if ontology is None:
                 return None
