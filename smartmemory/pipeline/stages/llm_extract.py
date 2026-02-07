@@ -29,7 +29,7 @@ class LLMExtractStage:
     def execute(self, state: PipelineState, config: PipelineConfig) -> PipelineState:
         llm_cfg = config.extraction.llm_extract
         if not llm_cfg.enabled:
-            return state
+            return replace(state, extraction_status="ruler_only")
 
         # Build input text from simplified sentences or resolved/raw text
         if state.simplified_sentences:
@@ -38,7 +38,7 @@ class LLMExtractStage:
             text = state.resolved_text or state.text
 
         if not text or not text.strip():
-            return state
+            return replace(state, extraction_status="ruler_only")
 
         try:
             extractor = self._extractor or self._create_extractor(llm_cfg)
@@ -51,10 +51,10 @@ class LLMExtractStage:
             entities = entities[: llm_cfg.max_entities]
             relations = relations[: llm_cfg.max_relations]
 
-            return replace(state, llm_entities=entities, llm_relations=relations)
+            return replace(state, llm_entities=entities, llm_relations=relations, extraction_status="llm_enriched")
         except Exception as e:
             logger.warning("LLM extraction failed: %s", e)
-            return state
+            return replace(state, extraction_status="llm_failed")
 
     def _create_extractor(self, llm_cfg):
         """Build an LLMSingleExtractor from config."""

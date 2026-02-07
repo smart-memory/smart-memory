@@ -85,6 +85,23 @@ class TestStoreStage:
         # Second entity falls back to generated ID
         assert result.entity_ids["Entity2"] == "m1_entity_1"
 
+    def test_store_sets_extraction_status_in_metadata(self):
+        """extraction_status from state appears in MemoryItem metadata passed to _crud.add()."""
+        stage, memory = self._make_stage(add_return="item_456")
+        state = PipelineState(
+            text="Extraction status test.",
+            extraction_status="ruler_only",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        # Inspect the MemoryItem passed to _crud.add
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["extraction_status"] == "ruler_only"
+
     def test_undo_clears_storage(self):
         """Undo resets item_id and entity_ids."""
         stage, _ = self._make_stage()

@@ -109,6 +109,51 @@ class TestLLMExtractStage:
         assert result.llm_entities == []
         assert result.llm_relations == []
 
+    def test_disabled_sets_ruler_only(self):
+        """When disabled, extraction_status is set to ruler_only."""
+        stage = LLMExtractStage()
+        state = PipelineState(text="Claude is an AI.")
+        config = PipelineConfig()
+        config.extraction.llm_extract = LLMExtractConfig(enabled=False)
+
+        result = stage.execute(state, config)
+
+        assert result.extraction_status == "ruler_only"
+
+    def test_success_sets_llm_enriched(self):
+        """When extraction succeeds, extraction_status is llm_enriched."""
+        ext = _mock_extractor(entities=[MagicMock()])
+        stage = LLMExtractStage(extractor=ext)
+        state = PipelineState(text="Claude is an AI assistant.")
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.extraction_status == "llm_enriched"
+
+    def test_failure_sets_llm_failed(self):
+        """When extraction throws, extraction_status is llm_failed."""
+        ext = MagicMock()
+        ext.extract.side_effect = RuntimeError("LLM unavailable")
+        stage = LLMExtractStage(extractor=ext)
+        state = PipelineState(text="Claude is an AI assistant.")
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.extraction_status == "llm_failed"
+
+    def test_empty_text_sets_ruler_only(self):
+        """When text is empty, extraction_status is ruler_only."""
+        ext = _mock_extractor()
+        stage = LLMExtractStage(extractor=ext)
+        state = PipelineState(text="")
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.extraction_status == "ruler_only"
+
     def test_undo_clears_llm_fields(self):
         """Undo resets llm_entities and llm_relations."""
         stage = LLMExtractStage()

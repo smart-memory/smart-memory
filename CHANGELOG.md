@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Batch Ontology Update — Core Metadata (WS-8 Phase 1)
+- **`extraction_status` pipeline field** (`smartmemory/pipeline/state.py`): New `extraction_status` field on `PipelineState` tracking whether LLM extraction ran (`ruler_only`, `llm_enriched`, `llm_failed`)
+- **`LLMExtractStage` sets extraction_status** (`smartmemory/pipeline/stages/llm_extract.py`): Status set on all code paths — disabled, empty text, success, and failure
+- **`StoreStage` injects extraction_status into metadata** (`smartmemory/pipeline/stages/store.py`): `extraction_status` flows through to FalkorDB node properties for batch worker queries
+- **`ensure_extraction_indexes()`** (`smartmemory/graph/indexes.py`): Standalone index utility for creating FalkorDB index on `extraction_status`, callable from service worker or tests
+
 #### Auto-assign Team and Workspace on Signup
 - **`TeamModel`** (`service_common/models/auth.py`): New dataclass for persisting teams in MongoDB `teams` collection
 - **`UserModel.default_team_id`** (`service_common/models/auth.py`): New optional field storing the user's default team assignment

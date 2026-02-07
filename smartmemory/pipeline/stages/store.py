@@ -32,10 +32,13 @@ class StoreStage:
             return replace(state, item_id="preview_item")
 
         content = state.resolved_text or state.text
+        metadata = dict(state.raw_metadata)
+        if state.extraction_status:
+            metadata["extraction_status"] = state.extraction_status
         item = MemoryItem(
             content=content,
             memory_type=state.memory_type or "semantic",
-            metadata=dict(state.raw_metadata),
+            metadata=metadata,
         )
 
         # Build ontology_extraction payload
