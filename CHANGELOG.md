@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Auto-assign Team and Workspace on Signup
+- **`TeamModel`** (`service_common/models/auth.py`): New dataclass for persisting teams in MongoDB `teams` collection
+- **`UserModel.default_team_id`** (`service_common/models/auth.py`): New optional field storing the user's default team assignment
+- **Team persistence on signup** (`service_common/services/auth_service.py`): Default team is now created and persisted in MongoDB during user registration
+- **Team context in JWT auth** (`service_common/auth/jwt_provider.py`): `ServiceUser` is now populated with `team_memberships`, `current_team_id`, and `current_team_role` at token authentication time (previously only patched in by `get_service_user()`)
+- **Workspace-team linking** (`service_common/repositories/workspace_repo.py`): `ensure_personal_workspace()` now accepts `default_team_id` and grants team admin access to the personal workspace; backfills existing workspaces missing team access
+- **`/auth/me` returns `default_team_id`** (`memory_service/api/routes/auth.py`): UserResponse now always includes the user's default team ID
+
 ### Changed
 
 #### Test Suite Sweep
@@ -27,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`OntologySubscription` model** (`smartmemory/ontology/models.py`): Tracks base registry subscription with pinned version and hidden types; serializes to/from dict with backward compatibility
 - **`LayerDiff` model** (`smartmemory/ontology/models.py`): Dataclass representing diff between base and overlay layers (base_only, overlay_only, overridden, hidden)
 - **`LayeredOntology` class** (`smartmemory/ontology/layered.py`): Merged read view of base + overlay ontologies — entity-level override (overlay wins), rules not inherited from base, hidden types excluded, provenance tracking (local/base/override/hidden), detach to flatten
-- **`LayeredOntologyService`** (`smartmemory/ontology/layer_service.py`): Subscription lifecycle orchestration — subscribe, unsubscribe (flatten), pin/unpin version, hide/unhide types, diff computation
+- **`LayeredOntologyService`** (`memory_service/services/layer_service.py`): Subscription lifecycle orchestration — subscribe, unsubscribe (flatten), pin/unpin version, hide/unhide types, diff computation (service layer, not core)
 - **8 layer API endpoints** (`memory_service/api/routes/ontology_layers.py`): `POST/DELETE /ontology/registry/{id}/subscribe`, `PUT/DELETE /ontology/registry/{id}/subscribe/pin`, `POST /ontology/registry/{id}/subscribe/hidden`, `DELETE /ontology/registry/{id}/subscribe/hidden/{type_name}`, `GET /ontology/registry/{id}/layers`, `GET /ontology/registry/{id}/layer-diff`
 - **75 tests**: 59 unit tests (models, LayeredOntology, LayeredOntologyService) + 16 API endpoint tests
 
