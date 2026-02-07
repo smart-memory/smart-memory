@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trimmed conftest**: Removed ~150 lines of unused fixtures from `tests/conftest.py` (sample_memory_items, sample_entities, sample_relations, sample_embeddings, conversation_context, conversation_manager, mock_smartmemory_dependencies, clean_memory, TestDataFactory)
 - **Relocated orphaned tests**: Moved `tests/plugins/evolvers/test_opinion_synthesis.py` and `tests/plugins/extractors/test_reasoning.py` to proper `tests/unit/plugins/` locations
 - **Marked deprecated extractors**: SpacyExtractor and RelikExtractor test classes marked `@pytest.mark.skip(reason="deprecated extractor")`
-- **Coverage config**: Added `--cov=smartmemory --cov-report=term-missing` and marker registration to `pyproject.toml`
+- **Coverage config**: Added `--cov=smartmemory --cov-report=term-missing`, marker registration, and `pytest-cov` dev dependency to `pyproject.toml`
+- **Removed duplicate tests**: Removed TestOpinionMetadata, TestObservationMetadata, TestDisposition from `test_opinion_synthesis.py` (covered by `tests/unit/models/test_opinion.py`)
+- **Removed tautology tests**: Deleted TestExtractorComparison class (3 no-op self-equality assertions)
+- **Removed redundant conftest markers**: Marker assignments now handled by `pyproject.toml`
 
 ### Added
 - **Model tests**: `test_memory_item.py`, `test_entity.py`, `test_opinion.py`, `test_reasoning.py` — 82 tests covering creation, validation, serialization, and key behaviors

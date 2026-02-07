@@ -230,29 +230,3 @@ class TestRelikExtractor:
         assert len(result['relations']) == 1
 
 
-class TestExtractorComparison:
-    """Compare extractors on same input."""
-    
-    def test_output_format_consistency(self):
-        """Test all extractors return consistent format."""
-        # All extractors should return dict with 'entities' and 'relations'
-        required_keys = {'entities', 'relations'}
-        
-        # This would be tested with actual extractors
-        # For now, verify the interface
-        assert required_keys == required_keys
-    
-    def test_entity_format_consistency(self):
-        """Test entity format is consistent across extractors."""
-        # All entities should have: text, type, start, end
-        required_entity_keys = {'text', 'type', 'start', 'end'}
-        
-        # Verify format expectations
-        assert required_entity_keys == required_entity_keys
-    
-    def test_relationship_format_consistency(self):
-        """Test relationship format is consistent."""
-        # All relationships should have: source, target, type
-        required_rel_keys = {'source', 'target', 'type'}
-        
-        assert required_rel_keys == required_rel_keys

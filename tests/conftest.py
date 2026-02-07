@@ -123,11 +123,3 @@ def cleanup_test_data():
                 cache.redis.delete(*test_keys)
     except Exception:
         pass  # Ignore cleanup errors
-
-
-# Test markers for different test categories
-pytest.mark.unit = pytest.mark.unit
-pytest.mark.integration = pytest.mark.integration
-pytest.mark.e2e = pytest.mark.e2e
-pytest.mark.performance = pytest.mark.performance
-pytest.mark.slow = pytest.mark.slow
