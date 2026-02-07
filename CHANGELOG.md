@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Ontology Templates
+- **Template catalog** (`smartmemory/ontology/template_service.py`): `TemplateService` — browse, preview, clone, save-as-template, delete custom templates. Built-in templates cached in memory, custom templates stored via `OntologyStorage` with `is_template` flag
+- **Built-in templates** (`smartmemory/ontology/templates/`): 3 curated ontology templates — General Purpose (12 entity types, 8 relationships), Software Engineering (15 entity types, 10 relationships), Business & Finance (14 entity types, 9 relationships)
+- **Template data models** (`smartmemory/ontology/models.py`): `TemplateInfo` and `TemplatePreview` dataclasses for catalog browsing and preview
+- **Template API endpoints** (`memory_service/api/routes/ontology.py`): 5 endpoints — `GET /templates` (list), `GET /templates/{id}` (preview), `POST /templates/clone` (clone into workspace), `POST /templates` (save as template), `DELETE /templates/{id}` (delete custom)
+- **Ontology model extensions**: `is_template` and `source_template` fields on `Ontology`, serialized via `to_dict`/`from_dict`, included in `FileSystemOntologyStorage.list_ontologies`
+
+### Fixed
+
+- **Ontology deserialization bug**: Fixed operator precedence in `Ontology.from_dict()` — `data.get('x') or {}.items()` was iterating raw dict keys instead of key-value pairs. Added parentheses: `(data.get('x') or {}).items()`
+
 #### Studio Pipeline UI (Phase 7)
 - **Learning Page backend** (`smart-memory-studio/server/memory_studio/api/routes/learning.py`): 8 API endpoints — stats, convergence, promotions (with approve/reject), patterns, types, activity feed — all proxying to core OntologyGraph with tenant isolation
 - **Learning Page frontend** (`smart-memory-studio/web/src/pages/Learning.jsx`): Full dashboard with stats cards, promotion queue (approve/reject actions), type registry (searchable/sortable), pattern browser (layer filtering), activity feed (auto-refresh 30s)

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "builtin:general",
+    "name": "General Purpose",
+    "domain": "general",
+    "description": "Broad ontology for people, organizations, locations, events, and concepts",
+    "version": "1.0.0",
+    "entity_count": 12,
+    "relationship_count": 8
+  },
+  {
+    "id": "builtin:software",
+    "name": "Software Engineering",
+    "domain": "technical",
+    "description": "Entity types for software systems, APIs, deployments, and teams",
+    "version": "1.0.0",
+    "entity_count": 15,
+    "relationship_count": 10
+  },
+  {
+    "id": "builtin:business",
+    "name": "Business & Finance",
+    "domain": "business",
+    "description": "Entity types for companies, products, markets, revenue, and contracts",
+    "version": "1.0.0",
+    "entity_count": 14,
+    "relationship_count": 9
+  }
+]

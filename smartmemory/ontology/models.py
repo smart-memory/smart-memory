@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from typing import Dict, Set, List, Any, Optional
 
@@ -7,6 +7,7 @@ from typing import Dict, Set, List, Any, Optional
 @dataclass
 class EntityTypeDefinition:
     """Definition of an entity type in the ontology."""
+
     name: str
     description: str
     properties: Dict[str, str]  # property_name -> property_type
@@ -22,6 +23,7 @@ class EntityTypeDefinition:
 @dataclass
 class RelationshipTypeDefinition:
     """Definition of a relationship type in the ontology."""
+
     name: str
     description: str
     source_types: Set[str]  # allowed source entity types
@@ -46,6 +48,7 @@ class RelationshipTypeDefinition:
 @dataclass
 class OntologyRule:
     """Validation or enrichment rule for the ontology."""
+
     id: str
     name: str
     description: str
@@ -80,6 +83,8 @@ class Ontology:
         self.domain = ""  # e.g., "general", "medical", "legal", "technical"
         self.language = "en"
         self.created_by = "system"
+        self.is_template: bool = False
+        self.source_template: str = ""
 
     def add_entity_type(self, entity_type: EntityTypeDefinition) -> None:
         """Add an entity type to the ontology."""
@@ -135,11 +140,15 @@ class Ontology:
 
         # Check source type constraints
         if rel_def.source_types and source_type.lower() not in {t.lower() for t in rel_def.source_types}:
-            errors.append(f"Invalid source type '{source_type}' for relationship '{rel_type}'. Allowed: {rel_def.source_types}")
+            errors.append(
+                f"Invalid source type '{source_type}' for relationship '{rel_type}'. Allowed: {rel_def.source_types}"
+            )
 
         # Check target type constraints
         if rel_def.target_types and target_type.lower() not in {t.lower() for t in rel_def.target_types}:
-            errors.append(f"Invalid target type '{target_type}' for relationship '{rel_type}'. Allowed: {rel_def.target_types}")
+            errors.append(
+                f"Invalid target type '{target_type}' for relationship '{rel_type}'. Allowed: {rel_def.target_types}"
+            )
 
         return errors
 
@@ -149,76 +158,107 @@ class Ontology:
         entity_types_dict = {}
         for name, entity_type in self.entity_types.items():
             entity_dict = asdict(entity_type)
-            entity_dict['required_properties'] = list(entity_type.required_properties)
-            entity_dict['parent_types'] = list(entity_type.parent_types)
-            entity_dict['aliases'] = list(entity_type.aliases)
-            entity_dict['created_at'] = entity_type.created_at.isoformat()
+            entity_dict["required_properties"] = list(entity_type.required_properties)
+            entity_dict["parent_types"] = list(entity_type.parent_types)
+            entity_dict["aliases"] = list(entity_type.aliases)
+            entity_dict["created_at"] = entity_type.created_at.isoformat()
             entity_types_dict[name] = entity_dict
 
         relationship_types_dict = {}
         for name, rel_type in self.relationship_types.items():
             rel_dict = asdict(rel_type)
-            rel_dict['source_types'] = list(rel_type.source_types)
-            rel_dict['target_types'] = list(rel_type.target_types)
-            rel_dict['aliases'] = list(rel_type.aliases)
-            rel_dict['created_at'] = rel_type.created_at.isoformat()
+            rel_dict["source_types"] = list(rel_type.source_types)
+            rel_dict["target_types"] = list(rel_type.target_types)
+            rel_dict["aliases"] = list(rel_type.aliases)
+            rel_dict["created_at"] = rel_type.created_at.isoformat()
             relationship_types_dict[name] = rel_dict
 
         rules_dict = {}
         for rule_id, rule in self.rules.items():
             rule_dict = asdict(rule)
-            rule_dict['created_at'] = rule.created_at.isoformat()
+            rule_dict["created_at"] = rule.created_at.isoformat()
             rules_dict[rule_id] = rule_dict
 
         return {
-            'id': self.id,
-            'name': self.name,
-            'version': self.version,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-            'description': self.description,
-            'domain': self.domain,
-            'language': self.language,
-            'created_by': self.created_by,
-            'entity_types': entity_types_dict,
-            'relationship_types': relationship_types_dict,
-            'rules': rules_dict
+            "id": self.id,
+            "name": self.name,
+            "version": self.version,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "description": self.description,
+            "domain": self.domain,
+            "language": self.language,
+            "created_by": self.created_by,
+            "is_template": self.is_template,
+            "source_template": self.source_template,
+            "entity_types": entity_types_dict,
+            "relationship_types": relationship_types_dict,
+            "rules": rules_dict,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Ontology':
+    def from_dict(cls, data: Dict[str, Any]) -> "Ontology":
         """Deserialize ontology from dictionary."""
-        ontology = cls(data['name'], data['version'])
-        ontology.id = data['id']
-        ontology.created_at = datetime.fromisoformat(data['created_at'])
-        ontology.updated_at = datetime.fromisoformat(data['updated_at'])
-        ontology.description = data.get('description', '')
-        ontology.domain = data.get('domain', '')
-        ontology.language = data.get('language', 'en')
-        ontology.created_by = data.get('created_by', 'system')
+        ontology = cls(data["name"], data["version"])
+        ontology.id = data["id"]
+        ontology.created_at = datetime.fromisoformat(data["created_at"])
+        ontology.updated_at = datetime.fromisoformat(data["updated_at"])
+        ontology.description = data.get("description", "")
+        ontology.domain = data.get("domain", "")
+        ontology.language = data.get("language", "en")
+        ontology.created_by = data.get("created_by", "system")
+        ontology.is_template = data.get("is_template", False)
+        ontology.source_template = data.get("source_template", "")
 
         # Load entity types
-        for name, entity_data in data.get('entity_types') or {}.items():
-            entity_data['created_at'] = datetime.fromisoformat(entity_data['created_at'])
-            entity_data['required_properties'] = set(entity_data['required_properties'])
-            entity_data['parent_types'] = set(entity_data['parent_types'])
-            entity_data['aliases'] = set(entity_data['aliases'])
+        for name, entity_data in (data.get("entity_types") or {}).items():
+            entity_data["created_at"] = datetime.fromisoformat(entity_data["created_at"])
+            entity_data["required_properties"] = set(entity_data["required_properties"])
+            entity_data["parent_types"] = set(entity_data["parent_types"])
+            entity_data["aliases"] = set(entity_data["aliases"])
             entity_type = EntityTypeDefinition(**entity_data)
             ontology.entity_types[name] = entity_type
 
         # Load relationship types
-        for name, rel_data in data.get('relationship_types') or {}.items():
-            rel_data['created_at'] = datetime.fromisoformat(rel_data['created_at'])
-            rel_data['source_types'] = set(rel_data.get('source_types', []))
-            rel_data['target_types'] = set(rel_data.get('target_types', []))
-            rel_data['aliases'] = set(rel_data.get('aliases', []))
+        for name, rel_data in (data.get("relationship_types") or {}).items():
+            rel_data["created_at"] = datetime.fromisoformat(rel_data["created_at"])
+            rel_data["source_types"] = set(rel_data.get("source_types", []))
+            rel_data["target_types"] = set(rel_data.get("target_types", []))
+            rel_data["aliases"] = set(rel_data.get("aliases", []))
             rel_type = RelationshipTypeDefinition(**rel_data)
             ontology.relationship_types[name] = rel_type
 
         # Load rules
-        for rule_id, rule_data in data.get('rules') or {}.items():
-            rule_data['created_at'] = datetime.fromisoformat(rule_data['created_at'])
+        for rule_id, rule_data in (data.get("rules") or {}).items():
+            rule_data["created_at"] = datetime.fromisoformat(rule_data["created_at"])
             rule = OntologyRule(**rule_data)
             ontology.rules[rule_id] = rule
 
         return ontology
+
+
+@dataclass
+class TemplateInfo:
+    """Metadata about an ontology template for catalog browsing."""
+
+    id: str
+    name: str
+    domain: str
+    description: str
+    version: str
+    entity_count: int
+    relationship_count: int
+    is_builtin: bool
+    created_by: str = "system"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class TemplatePreview(TemplateInfo):
+    """Extended template info with entity/relationship names for preview."""
+
+    entity_types: List[str] = field(default_factory=list)
+    relationship_types: List[str] = field(default_factory=list)
+    rules_count: int = 0

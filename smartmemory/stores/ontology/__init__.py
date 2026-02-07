@@ -40,7 +40,7 @@ class FileSystemOntologyStorage(OntologyStorage):
     def save_ontology(self, ontology: Ontology) -> None:
         """Save ontology to JSON file."""
         file_path = self.storage_dir / f"{ontology.id}.json"
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             json.dump(ontology.to_dict(), f, indent=2, default=str)
 
     def load_ontology(self, ontology_id: str) -> Optional[Ontology]:
@@ -49,7 +49,7 @@ class FileSystemOntologyStorage(OntologyStorage):
         if not file_path.exists():
             return None
 
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = json.load(f)
 
         return Ontology.from_dict(data)
@@ -59,15 +59,23 @@ class FileSystemOntologyStorage(OntologyStorage):
         ontologies = []
         for file_path in self.storage_dir.glob("*.json"):
             try:
-                with open(file_path, 'r') as f:
+                with open(file_path, "r") as f:
                     data = json.load(f)
-                ontologies.append({
-                    'id': data['id'],
-                    'name': data['name'],
-                    'version': data['version'],
-                    'domain': data.get('domain', ''),
-                    'created_at': data['created_at']
-                })
+                ontologies.append(
+                    {
+                        "id": data["id"],
+                        "name": data["name"],
+                        "version": data["version"],
+                        "domain": data.get("domain", ""),
+                        "description": data.get("description", ""),
+                        "created_at": data["created_at"],
+                        "created_by": data.get("created_by", "system"),
+                        "is_template": data.get("is_template", False),
+                        "source_template": data.get("source_template", ""),
+                        "entity_count": len(data.get("entity_types", {})),
+                        "relationship_count": len(data.get("relationship_types", {})),
+                    }
+                )
             except Exception:
                 continue  # Skip corrupted files
         return ontologies
