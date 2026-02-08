@@ -630,6 +630,18 @@ class SmartMemory(MemoryBase):
 
         return MemoryPath(triples=triples)
 
+    def execute_cypher(self, query: str, params: dict | None = None) -> list:
+        """Execute a raw Cypher query against the graph backend.
+
+        Args:
+            query: Cypher query string with optional $param placeholders.
+            params: Parameter dict for parameterized queries.
+
+        Returns:
+            List of result rows from the backend.
+        """
+        return self._graph.execute_query(query, params)
+
     def update_properties(self, item_id: str, properties: dict, write_mode: str | None = None):
         """Public wrapper to update memory node properties with merge/replace semantics."""
         return self._crud.update_memory_node(item_id, properties, write_mode)
