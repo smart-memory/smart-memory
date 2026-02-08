@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.6] - 2026-02-08
+
+### Changed
+
+#### Corpus → Library Rename (STU-UX-13 V1)
+- **Renamed `Corpus` model to `Library`** (`smartmemory/models/library.py`): New primary model with `retention_policy`, `retention_days` fields
+- **Renamed `corpus_id` to `library_id`** in `Document` model, added `content_hash`, `storage_phase`, `evict_at` fields
+- **Backward-compat shim** (`smartmemory/models/corpus.py`): Re-exports `Library` as `Corpus` for existing imports
+- **Updated `CorpusStore`** (`smartmemory/stores/corpus/store.py`): Now operates on `Library` objects, supports both `library_id` and `corpus_id` filters
+- **Updated `models/__init__.py`**: Exports `Library` and `Document`
+
+---
+
 ## [0.3.5] - 2026-02-07
 
 ### Added

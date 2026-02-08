@@ -21,6 +21,9 @@ from smartmemory.models.opinion import (
 # Decision models (Decision Memory - Phase 4)
 from smartmemory.models.decision import Decision
 
+# Library / Document models (Input Management)
+from smartmemory.models.library import Library, Document
+
 __all__ = [
     'MEMORY_TYPES',
     'MemoryItem',
@@ -35,4 +38,7 @@ __all__ = [
     'Disposition',
     # Phase 4: Decision
     'Decision',
+    # Input Management
+    'Library',
+    'Document',
 ]
