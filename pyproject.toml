@@ -61,7 +61,8 @@ relik = ["relik>=0.1.0"]
 coreference = ["fastcoref>=2.1.0"]
 
 # Optional dependencies for integrations
-claude-cli = ["claude-cli @ git+ssh://git@github.com/regression-io/claude-cli.git"]
+# NOTE: claude-cli is a private git dep — install locally with:
+#   pip install "claude-cli @ git+ssh://git@github.com/regression-io/claude-cli.git"
 slack = ["slack-sdk>=3.0.0"]
 aws = ["boto3>=1.26.0"]
 wikipedia = ["wikipedia-api>=0.6.0"]
