@@ -121,7 +121,27 @@ jobs:
 
     - name: Notify Discord
       if: always()
-      uses: smart-memory/smart-memory-infra/.github/actions/discord-notify@main
-      with:
-        discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
-        status: ${{ job.status }}
+      shell: bash
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        STATUS: ${{ job.status }}
+        RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        if [ -z "$DISCORD_WEBHOOK" ]; then echo "No webhook configured, skipping"; exit 0; fi
+        python3 - << 'PY'
+        import json, os, sys, urllib.request, urllib.error
+        webhook = os.environ["DISCORD_WEBHOOK"]
+        status = os.environ.get("STATUS", "").lower()
+        repo = os.environ["REPO"]
+        run_url = os.environ["RUN_URL"]
+        emoji, color = ("✅", 3066993) if status == "success" else ("⚪", 9807270) if status == "cancelled" else ("❌", 15158332)
+        desc = "" if status == "success" else run_url
+        payload = json.dumps({"embeds": [{"title": f"{emoji} {repo}", "description": desc, "color": color}]}).encode()
+        try:
+            req = urllib.request.Request(webhook, data=payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=10)
+            print("Discord notification sent")
+        except Exception as e:
+            print(f"Discord notification failed (non-fatal): {e}", file=sys.stderr)
+        PY
