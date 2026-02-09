@@ -94,9 +94,56 @@ pip install -e ".[dev]"
 python -m spacy download en_core_web_sm
 ```
 
-### Docker Deployment
+### Required Services
 
-See the [smart-memory-service](https://github.com/smart-memory/smart-memory-service) repository for production-ready Docker deployment with FastAPI, authentication, and multi-tenancy support.
+SmartMemory requires **FalkorDB** (graph + vector storage) and **Redis** (caching) to be running.
+
+#### Option 1: Docker Compose (Recommended)
+
+Use the provided `docker-compose.yml` in the repository root:
+
+```bash
+docker-compose up -d
+```
+
+This starts:
+- **FalkorDB** on port `9010` - graph database with vector storage
+- **Redis** on port `9012` - caching layer
+
+#### Option 2: Manual Installation
+
+**FalkorDB:**
+```bash
+# macOS
+brew tap falkordb/tap
+brew install falkordb
+falkordb-server --port 9010
+
+# Or run via Docker directly
+docker run -d -p 9010:6379 falkordb/falkordb:latest
+```
+
+**Redis:**
+```bash
+# macOS
+brew install redis
+redis-server --port 9012
+
+# Or run via Docker directly
+docker run -d -p 9012:6379 redis:7-alpine
+```
+
+#### Verify Services
+
+```bash
+# Test FalkorDB connection
+redis-cli -p 9010 PING
+
+# Test Redis connection
+redis-cli -p 9012 PING
+```
+
+Both should return `PONG`.
 
 ## 🎯 Quick Start
 

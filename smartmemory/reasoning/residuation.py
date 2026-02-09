@@ -54,11 +54,12 @@ class ResiduationManager:
 
         decision = self.dm.create(
             content=content,
-            status="pending",
             confidence=0.0,
-            pending_requirements=pending_reqs,
             **kwargs,
         )
+        decision.status = "pending"
+        decision.pending_requirements = pending_reqs
+        self._update_decision(decision)
         return decision
 
     def resolve_requirement(self, decision_id: str, requirement_id: str, memory_id: str) -> bool:

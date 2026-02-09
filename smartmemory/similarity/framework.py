@@ -134,7 +134,7 @@ class EnhancedSimilarityFramework:
 
         # Check cache
         cache_key = self._get_cache_key(item1, item2, metrics)
-        if self._similarity_cache and cache_key in self._similarity_cache:
+        if self._similarity_cache is not None and cache_key in self._similarity_cache:
             cached_result = self._similarity_cache[cache_key]
             return cached_result if return_detailed else cached_result.overall_score
 
@@ -180,7 +180,7 @@ class EnhancedSimilarityFramework:
         )
 
         # Cache result
-        if self._similarity_cache:
+        if self._similarity_cache is not None:
             self._manage_cache_size()
             self._similarity_cache[cache_key] = result
 
@@ -374,7 +374,7 @@ class EnhancedSimilarityFramework:
 
     def _manage_cache_size(self):
         """Manage cache size to prevent memory issues."""
-        if not self._similarity_cache:
+        if self._similarity_cache is None:
             return
 
         if len(self._similarity_cache) >= self.config.max_cache_size:
@@ -387,13 +387,13 @@ class EnhancedSimilarityFramework:
 
     def clear_cache(self):
         """Clear similarity cache."""
-        if self._similarity_cache:
+        if self._similarity_cache is not None:
             self._similarity_cache.clear()
             logger.info("Similarity cache cleared")
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
-        if not self._similarity_cache:
+        if self._similarity_cache is None:
             return {"caching_enabled": False}
 
         return {

@@ -1,4 +1,7 @@
 """Unit tests for LinkExpansionEnricher plugin."""
+import pytest
+
+pytestmark = pytest.mark.unit
 
 
 class TestLinkExpansionEnricherConfig:
@@ -80,10 +83,6 @@ class TestLinkExpansionEnricherMetadata:
     def test_enricher_init_rejects_wrong_config_type(self):
         """Test that wrong config type raises TypeError."""
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
-        import pytest
-
-
-pytestmark = pytest.mark.unit
 
         with pytest.raises(TypeError, match="requires typed config"):
             LinkExpansionEnricher(config={"enable_llm": True})

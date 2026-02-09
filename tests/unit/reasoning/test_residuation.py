@@ -23,7 +23,9 @@ def mock_memory():
 def mock_decision_manager():
     dm = MagicMock()
     dm.create.side_effect = lambda **kwargs: Decision(
-        decision_id=Decision.generate_id(), **kwargs
+        decision_id=Decision.generate_id(),
+        content=kwargs.get("content", ""),
+        confidence=kwargs.get("confidence", 0.8),
     )
     dm.get_decision.return_value = None
     return dm
@@ -37,10 +39,14 @@ def residuation(mock_memory, mock_decision_manager):
 class TestCreatePending:
     def test_creates_pending_decision(self, residuation, mock_decision_manager):
         reqs = [{"description": "Need language preference", "requirement_type": "evidence"}]
-        residuation.create_pending("User might prefer Python", reqs)
+        decision = residuation.create_pending("User might prefer Python", reqs)
         mock_decision_manager.create.assert_called_once()
         call_kwargs = mock_decision_manager.create.call_args[1]
-        assert call_kwargs.get("status") == "pending"
+        # create() receives content and confidence, NOT status
+        assert call_kwargs["content"] == "User might prefer Python"
+        assert call_kwargs["confidence"] == 0.0
+        # status is set after create() returns
+        assert decision.status == "pending"
 
     def test_pending_has_requirements(self, residuation):
         reqs = [
