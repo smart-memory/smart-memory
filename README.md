@@ -599,17 +599,17 @@ Explore the [examples](examples/) directory for complete demonstrations and use 
 - ✅ **Layered ontology**: Base + overlay subscription system with hide/unhide, pin/unpin
 - ✅ **Template catalog**: 3 built-in templates (General, Software Engineering, Business & Finance)
 
-### Decision Memory (v0.3.0)
-- ✅ **First-class decisions**: Confidence tracking, provenance chains, lifecycle management
-- ✅ **DecisionConfidenceEvolver**: Evidence-based reinforcement/contradiction with decay
-- ✅ **Conflict detection**: Semantic search + content overlap heuristic
-- ✅ **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, INFLUENCES edges
-
 ### Reasoning & Validation (v0.3.2)
 - ✅ **Graph validation**: `MemoryValidator`, `EdgeValidator` for schema enforcement
 - ✅ **Health metrics**: `GraphHealthChecker` with orphan ratio, provenance coverage
 - ✅ **Inference engine**: Pattern-matching rules for automatic edge creation
 - ✅ **Symbolic reasoning**: Residuation, query routing, proof trees, fuzzy confidence
+
+### Decision Memory (v0.3.0)
+- ✅ **First-class decisions**: Confidence tracking, provenance chains, lifecycle management
+- ✅ **DecisionConfidenceEvolver**: Evidence-based reinforcement/contradiction with decay
+- ✅ **Conflict detection**: Semantic search + content overlap heuristic
+- ✅ **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, INFLUENCES edges
 
 ### Synthesis Memory (v0.2.6+)
 - ✅ **Opinion memory**: Beliefs with confidence scores, reinforced/contradicted over time
