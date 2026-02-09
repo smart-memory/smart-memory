@@ -59,11 +59,10 @@ The memory ingestion flow processes data through several stages:
 - **Graph-Based Storage**: FalkorDB backend for complex relationship modeling
 - **Vector Similarity**: FalkorDB vector storage for semantic search
 - **Extensible Pipeline**: Modular processing stages for ingestion and evolution
-- **Plugin Architecture**: 20 built-in plugins with external plugin support
+- **Plugin Architecture**: 30+ built-in plugins with external plugin support
 - **Plugin Security**: Sandboxing, permissions, and resource limits for safe plugin execution
 - **Flexible Scoping**: Optional `ScopeProvider` for multi-tenancy or unrestricted OSS usage
 - **Zero Configuration**: Works out-of-the-box for single-user applications
-- **Production Ready**: Service layer with JWT auth, tenant isolation, and team management
 - **Caching Layer**: Redis-based performance optimization
 - **Configuration Management**: Flexible configuration with environment variable support
 
@@ -175,55 +174,6 @@ for result in results:
 # Get memory summary
 summary = memory.get_all_items_debug()
 print(f"Total memories: {summary['total_items']}")
-```
-
-### Multi-Tenant Usage (Service Layer)
-
-For production multi-tenant applications, use the [smart-memory-service](https://github.com/smart-memory/smart-memory-service) which provides:
-- Automatic tenant isolation via `MemoryScopeProvider`
-- JWT authentication with `ServiceUser` model
-- Team and workspace management
-- RESTful API with FastAPI
-- Three isolation levels: TENANT, WORKSPACE (default), USER
-
-```python
-# Service layer automatically handles scoping
-from service_common.security import SecureSmartMemory, MemoryScopeProvider
-from service_common.auth.models import ServiceUser
-
-# Create scope provider from authenticated user
-scope_provider = MemoryScopeProvider(
-    user=authenticated_user,  # ServiceUser with tenant_id, user_id
-    request_scope=request_scope,  # RequestScope with workspace_id, team_id
-    isolation_level=IsolationLevel.WORKSPACE
-)
-
-# Create secure memory instance
-memory = SecureSmartMemory(
-    tenant_context=TenantContext.from_user(authenticated_user),
-    user=authenticated_user,
-    scope_provider=scope_provider
-)
-
-# All operations automatically tenant-scoped
-memory.ingest(content)  # Full pipeline, stamped with tenant_id, workspace_id, user_id
-memory.add(item)        # Simple storage, stamped with security metadata
-memory.search("query")  # Filtered by workspace_id (or user_id if USER isolation)
-```
-
-**FastAPI Integration:**
-```python
-from fastapi import Depends
-from service_common.security import get_secure_smart_memory
-
-@router.post("/memories")
-async def add_memory(
-    content: str,
-    memory: SecureSmartMemory = Depends(get_secure_smart_memory)
-):
-    # Automatically scoped to authenticated user's tenant/workspace
-    item_id = memory.ingest(content)
-    return {"item_id": item_id}
 ```
 
 ### Using Different Memory Types
@@ -375,16 +325,16 @@ SmartMemory features a **unified, extensible plugin architecture** that allows y
 
 ### Built-in Plugins
 
-SmartMemory includes **20 built-in plugins** across 4 types:
+SmartMemory includes **30+ built-in plugins** across 4 types:
 
-- **5 Extractors**: Extract entities and relationships
-  - `SpacyExtractor`, `LLMExtractor`, `RebelExtractor`, `RelikExtractor`, `DecisionExtractor`
-- **6 Enrichers**: Add context and metadata to memories
-  - `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `TopicEnricher`, `SkillsToolsEnricher`, `WikipediaEnricher`
+- **9 Extractors**: Extract entities and relationships
+  - `LLMExtractor`, `LLMSingleExtractor`, `ConversationAwareLLMExtractor`, `SpacyExtractor`, `RelikExtractor`, `GLiNER2Extractor`, `HybridExtractor`, `DecisionExtractor`, `ReasoningExtractor`
+- **7 Enrichers**: Add context and metadata to memories
+  - `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `TopicEnricher`, `SkillsToolsEnricher`, `WikipediaEnricher`, `LinkExpansionEnricher`
 - **1 Grounder**: Connect to external knowledge
   - `WikipediaGrounder`
-- **8 Evolvers**: Transform memories based on rules
-  - `WorkingToEpisodicEvolver`, `EpisodicToSemanticEvolver`, `SemanticDecayEvolver`, `DecisionConfidenceEvolver`, etc.
+- **13 Evolvers**: Transform memories based on rules
+  - `WorkingToEpisodicEvolver`, `WorkingToProceduralEvolver`, `EpisodicToSemanticEvolver`, `EpisodicToZettelEvolver`, `EpisodicDecayEvolver`, `SemanticDecayEvolver`, `ZettelPruneEvolver`, `DecisionConfidenceEvolver`, `OpinionSynthesisEvolver`, `ObservationSynthesisEvolver`, `OpinionReinforcementEvolver`, etc.
 
 ### Creating Custom Plugins
 
@@ -518,9 +468,7 @@ class SmartMemory:
 
 **Scoping:**
 - OSS mode: No scoping needed, all data accessible
-- Service mode: All methods automatically use `ScopeProvider` for filtering
-- No `user_id`, `tenant_id`, or `workspace_id` parameters on methods
-- Security metadata automatically injected on writes, filtered on reads
+- For multi-tenant applications, pass a `ScopeProvider` to enable automatic filtering
 - See `docs/SECURITY_AND_AUTH.md` for complete details
 
 ### MemoryItem Class
@@ -543,10 +491,9 @@ class MemoryItem:
 ```
 
 **Security Metadata:**
-- `user_id`, `workspace_id`, `tenant_id`, `team_id` are automatically injected by `MemoryScopeProvider` in service layer
-- For OSS usage, these fields are not needed
-- Never pass these as parameters - use `ScopeProvider` instead
-- See `docs/SECURITY_AND_AUTH.md` for multi-tenancy details
+- For OSS usage, security metadata fields are not needed
+- For multi-tenant applications, use a `ScopeProvider` for automatic metadata injection
+- See `docs/SECURITY_AND_AUTH.md` for details
 
 ## Dependencies
 
@@ -623,7 +570,6 @@ External plugins use the `standard` security profile by default. See `docs/PLUGI
 - **🐛 Issue Tracker**: https://github.com/smart-memory/smart-memory/issues
 - **🔒 Security & Auth**: See `docs/SECURITY_AND_AUTH.md`
 - **🔐 Plugin Security**: See `docs/PLUGIN_SECURITY.md`
-- **🚀 Production Service**: https://github.com/smart-memory/smart-memory-service
 
 ---
 
@@ -637,41 +583,45 @@ Explore the [examples](examples/) directory for complete demonstrations and use 
 
 ---
 
+## ✅ Recently Completed
+
+### Unified Pipeline v2 (v0.3.5)
+- ✅ **11-stage composable pipeline**: classify → coreference → simplify → entity_ruler → llm_extract → ontology_constrain → store → link → enrich → ground → evolve
+- ✅ **Breakpoint execution**: `run_to()`, `run_from()`, `undo_to()` for debugging and resumption
+- ✅ **Per-stage retry**: Configurable retry policies with exponential backoff
+- ✅ **Async mode**: `ingest(sync=False)` with Redis Streams transport
+- ✅ **Pipeline metrics**: Fire-and-forget metrics emission via Redis Streams
+
+### Self-Learning Ontology (v0.3.4)
+- ✅ **OntologyGraph**: Dedicated FalkorDB graph for entity types with three-tier status (seed → provisional → confirmed)
+- ✅ **Promotion pipeline**: Six-gate evaluation (name length, blocklist, confidence, frequency, consistency, LLM validation)
+- ✅ **Pattern manager**: Hot-reloadable learned entity patterns with Redis pub/sub
+- ✅ **Layered ontology**: Base + overlay subscription system with hide/unhide, pin/unpin
+- ✅ **Template catalog**: 3 built-in templates (General, Software Engineering, Business & Finance)
+
+### Decision Memory (v0.3.0)
+- ✅ **First-class decisions**: Confidence tracking, provenance chains, lifecycle management
+- ✅ **DecisionConfidenceEvolver**: Evidence-based reinforcement/contradiction with decay
+- ✅ **Conflict detection**: Semantic search + content overlap heuristic
+- ✅ **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, INFLUENCES edges
+
+### Reasoning & Validation (v0.3.2)
+- ✅ **Graph validation**: `MemoryValidator`, `EdgeValidator` for schema enforcement
+- ✅ **Health metrics**: `GraphHealthChecker` with orphan ratio, provenance coverage
+- ✅ **Inference engine**: Pattern-matching rules for automatic edge creation
+- ✅ **Symbolic reasoning**: Residuation, query routing, proof trees, fuzzy confidence
+
+### Synthesis Memory (v0.2.6+)
+- ✅ **Opinion memory**: Beliefs with confidence scores, reinforced/contradicted over time
+- ✅ **Observation memory**: Synthesized entity summaries from scattered facts
+- ✅ **Reasoning memory**: Chain-of-thought traces capturing "why" decisions were made
+
+**See `CHANGELOG.md` for complete version history.**
+
 ## 🚧 In Progress
-
-The following features are currently under active development:
-
-### Ontology System
-- **Current**: Basic concept and relation extraction
-- **In Progress**: 
-  - Ontology governance and validation
-  - External ontology integration (DBpedia, Schema.org)
-  - Semantic clustering and concept hierarchies
-  - Ontology-driven query expansion
-- **Planned**: Full ontology management with Maya integration
 
 ### Temporal Queries
 - **Current**: Basic bi-temporal support (valid_time, transaction_time)
-- **In Progress**:
-  - Time-travel queries
-  - Version history tracking
-  - Audit trail generation
-- **Planned**: Advanced temporal analytics
-
-## ✅ Recently Completed
-
-### Multi-Tenancy & Security (v0.2.6)
-- ✅ **MemoryScopeProvider**: Single source of truth for all security decisions
-- ✅ **SecureSmartMemory**: Tenant-aware wrapper with automatic metadata injection
-- ✅ **ServiceUser Model**: Rich user model with tenant_id, team memberships, roles
-- ✅ **Three Isolation Levels**: TENANT, WORKSPACE (default), USER
-- ✅ **Auth-Agnostic Core**: Core library works without any auth configuration
-- ✅ **Automatic Filtering**: All reads filtered by workspace/tenant/user
-- ✅ **Metadata Injection**: All writes stamped with security context
-- ✅ **Ownership Validation**: Updates/deletes check ownership via scope provider
-- ✅ **FastAPI Integration**: Dependency injection for automatic scoping
-- ✅ **Zero Manual Parameters**: No `user_id`, `tenant_id`, `workspace_id` on methods
-
-**See `docs/SECURITY_AND_AUTH.md` for complete security documentation.**
+- **In Progress**: Time-travel queries, version history tracking, audit trail generation
 
 Check the [GitHub repository](https://github.com/smart-memory/smart-memory) for the latest updates.
