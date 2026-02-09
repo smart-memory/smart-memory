@@ -11,6 +11,9 @@ Goal: Document architectural patterns before standardization.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from smartmemory.models.memory_item import MemoryItem
 
 

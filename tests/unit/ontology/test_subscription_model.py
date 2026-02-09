@@ -1,5 +1,10 @@
 """Tests for OntologySubscription and Ontology serialization with layer fields."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from datetime import datetime
 
 from smartmemory.ontology.models import Ontology, OntologySubscription

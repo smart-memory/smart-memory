@@ -5,6 +5,9 @@ Tests extractors against known datasets with verified entities and relationships
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, patch
 from typing import List, Dict, Any
 

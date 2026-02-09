@@ -7,6 +7,9 @@ Run with:
 import pytest
 
 
+pytestmark = pytest.mark.integration
+
+
 class TestSemHashDeduplication:
     """Test SemHash-based deduplication."""
     

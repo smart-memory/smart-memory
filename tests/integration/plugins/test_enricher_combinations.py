@@ -3,6 +3,9 @@ Comprehensive integration tests for enricher plugin combinations.
 Tests all 6 enricher types individually and in combinations.
 """
 import pytest
+
+
+pytestmark = pytest.mark.integration
 import os
 from datetime import datetime, timezone
 

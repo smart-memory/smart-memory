@@ -5,6 +5,9 @@ Tests the wikilink parsing functionality for Zettelkasten system.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.memory.types.wikilink_parser import (
     WikilinkParser, WikilinkResolver, ParsedLinks, 
     parse_wikilinks, extract_all_links

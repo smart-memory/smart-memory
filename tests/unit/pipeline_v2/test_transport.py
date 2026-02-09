@@ -5,6 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.pipeline.config import PipelineConfig
 from smartmemory.pipeline.state import PipelineState
 from smartmemory.pipeline.transport import InProcessTransport, Transport

@@ -2,6 +2,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.ontology.promotion import (
     COMMON_WORD_BLOCKLIST,
     PromotionCandidate,

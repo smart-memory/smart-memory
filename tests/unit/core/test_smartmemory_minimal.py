@@ -3,6 +3,9 @@ Minimal unit tests for SmartMemory core functionality.
 Tests only the basic initialization and core methods without complex dependencies.
 """
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, patch, MagicMock
 
 

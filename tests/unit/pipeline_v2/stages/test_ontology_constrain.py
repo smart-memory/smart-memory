@@ -1,5 +1,10 @@
 """Unit tests for OntologyConstrainStage."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock, call
 
 from smartmemory.pipeline.config import PipelineConfig, ConstrainConfig, PromotionConfig, ExtractionConfig

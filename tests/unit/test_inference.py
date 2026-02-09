@@ -4,6 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.inference.engine import InferenceEngine, InferenceResult
 from smartmemory.inference.rules import InferenceRule, get_default_rules
 

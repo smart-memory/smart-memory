@@ -3,6 +3,9 @@ Unit tests for plugin registry.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.plugins.base import PluginMetadata, EnricherPlugin, EvolverPlugin
 from smartmemory.plugins.registry import PluginRegistry, get_plugin_registry, reset_plugin_registry
 

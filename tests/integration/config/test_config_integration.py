@@ -2,6 +2,9 @@
 Integration tests for configuration loading and validation.
 """
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from smartmemory.configuration import get_config
 from smartmemory.configuration.manager import ConfigManager
 

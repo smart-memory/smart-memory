@@ -3,6 +3,9 @@ Unit tests for Similarity Graph Traversal (SSG) algorithms.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, MagicMock, patch
 import numpy as np
 

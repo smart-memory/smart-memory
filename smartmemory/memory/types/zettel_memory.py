@@ -234,22 +234,22 @@ class ZettelMemory(GraphBackedMemory, CRUDMixin, ArchivingMixin, ValidationMixin
 
     # Keep advanced/dynamic methods for compatibility
     def add_dynamic_relation(self, source_id: Any, target_id: Any, relation_type: str, properties: Optional[Dict[str, Any]] = None):
-        return self.store.add_dynamic_relation(source_id, target_id, relation_type, properties)
+        return self.graph.add_dynamic_relation(source_id, target_id, relation_type, properties)
 
     def find_notes_by_tag(self, tag_name: str) -> List[MemoryItem]:
-        return self.store.find_notes_by_tag(tag_name)
+        return self.graph.find_notes_by_tag(tag_name)
 
     def find_notes_by_property(self, key: str, value: Any) -> List[MemoryItem]:
-        return self.store.find_notes_by_property(key, value)
+        return self.graph.find_notes_by_property(key, value)
 
     def notes_linked_to(self, note_id: Any) -> List[MemoryItem]:
-        return self.store.notes_linked_to(note_id)
+        return self.graph.notes_linked_to(note_id)
 
     def notes_mentioning(self, entity_id: Any) -> List[MemoryItem]:
-        return self.store.notes_mentioning(entity_id)
+        return self.graph.notes_mentioning(entity_id)
 
     def query_by_dynamic_relation(self, source_id: Any, relation_type: str) -> List[MemoryItem]:
-        return self.store.query_by_dynamic_relation(source_id, relation_type)
+        return self.graph.query_by_dynamic_relation(source_id, relation_type)
 
     # === COMPLETE ZETTELKASTEN FUNCTIONALITY ===
 

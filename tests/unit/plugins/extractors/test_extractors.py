@@ -9,6 +9,9 @@ Tests all extractor plugins with mocked models to verify:
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, MagicMock, patch
 
 from smartmemory.plugins.extractors.spacy import SpacyExtractor

@@ -8,6 +8,9 @@ from unittest.mock import Mock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.plugins.evolvers.working_to_episodic import (
     WorkingToEpisodicEvolver,
     WorkingToEpisodicConfig,

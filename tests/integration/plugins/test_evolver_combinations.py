@@ -3,6 +3,9 @@ Comprehensive integration tests for evolver plugin combinations.
 Tests all 8+ evolver types individually and in combinations.
 """
 import pytest
+
+
+pytestmark = pytest.mark.integration
 import os
 from datetime import datetime, timezone
 

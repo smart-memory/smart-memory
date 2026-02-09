@@ -4,6 +4,9 @@ Tests cross-component interactions and real backend integrations.
 NO MOCKS - Uses real backends for true integration testing.
 """
 import pytest
+
+
+pytestmark = pytest.mark.integration
 import os
 from datetime import datetime, timezone
 import tempfile

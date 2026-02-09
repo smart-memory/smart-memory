@@ -1,5 +1,10 @@
 """Tests for EventSpooler and module-level constants."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 import uuid
 from unittest.mock import MagicMock, patch
 

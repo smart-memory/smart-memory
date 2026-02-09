@@ -6,6 +6,9 @@ and loaded by the PluginManager.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from smartmemory.plugins.manager import PluginManager
 from smartmemory.plugins.registry import PluginRegistry
 

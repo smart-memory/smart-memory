@@ -4,6 +4,9 @@ import dataclasses
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.pipeline.config import PipelineConfig, RetryConfig
 from smartmemory.pipeline.runner import PipelineRunner
 from smartmemory.pipeline.state import PipelineState

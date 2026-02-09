@@ -10,6 +10,9 @@ Tests all new functionality:
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 import os
 from typing import List, Dict, Any
 

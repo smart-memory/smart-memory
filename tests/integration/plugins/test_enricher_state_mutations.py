@@ -5,6 +5,9 @@ Tests what enrichers actually DO (state changes) rather than what they RETURN.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from smartmemory.plugins.enrichers.basic import BasicEnricher
 from smartmemory.plugins.enrichers.wikipedia import WikipediaEnricher
 from smartmemory.plugins.enrichers.sentiment import SentimentEnricher

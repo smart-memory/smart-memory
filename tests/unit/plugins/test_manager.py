@@ -3,6 +3,9 @@ Unit tests for plugin manager.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.plugins.base import PluginMetadata, EnricherPlugin
 from smartmemory.plugins.manager import PluginManager
 from smartmemory.plugins.registry import PluginRegistry

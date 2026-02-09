@@ -3,6 +3,9 @@ Unit tests for MemoryIngestionFlow.
 Tests the orchestration logic of the ingestion pipeline.
 """
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
 

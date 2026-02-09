@@ -2,6 +2,9 @@
 Tests for deduplication utility.
 """
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.utils.deduplication import deduplicate_entities, normalize_text, lemmatize_text
 

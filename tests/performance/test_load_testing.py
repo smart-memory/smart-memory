@@ -3,6 +3,9 @@ Load Testing Utilities and Tests.
 Tests system behavior under various load conditions and stress scenarios.
 """
 import pytest
+
+
+pytestmark = pytest.mark.performance
 from unittest.mock import Mock, patch, MagicMock
 import time
 import threading

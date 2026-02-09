@@ -1,5 +1,10 @@
 """Unit tests for LinkStage."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock
 
 from smartmemory.pipeline.config import PipelineConfig

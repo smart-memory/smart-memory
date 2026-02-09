@@ -3,6 +3,9 @@ Performance and Load Tests.
 Tests system performance, benchmarks, and load handling capabilities.
 """
 import pytest
+
+
+pytestmark = pytest.mark.performance
 from unittest.mock import Mock, patch, MagicMock
 import time
 from datetime import datetime, timezone, timedelta

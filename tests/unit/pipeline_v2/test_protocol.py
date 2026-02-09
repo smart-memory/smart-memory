@@ -1,5 +1,10 @@
 """Unit tests for StageCommand protocol (structural subtyping)."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 import dataclasses
 
 from smartmemory.pipeline.protocol import StageCommand

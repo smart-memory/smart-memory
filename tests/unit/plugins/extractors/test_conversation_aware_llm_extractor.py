@@ -3,6 +3,9 @@ Unit tests for ConversationAwareLLMExtractor.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 

@@ -8,6 +8,9 @@ from unittest.mock import Mock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.plugins.evolvers.episodic_to_semantic import (
     EpisodicToSemanticEvolver,
     EpisodicToSemanticConfig,

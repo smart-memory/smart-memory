@@ -3,6 +3,9 @@ End-to-end test demonstrating the complete plugin system workflow.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.plugins import (
     PluginMetadata,
     EnricherPlugin,

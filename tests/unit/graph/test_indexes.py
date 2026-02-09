@@ -1,5 +1,10 @@
 """Unit tests for graph index utilities."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock
 
 from smartmemory.graph.indexes import ensure_extraction_indexes

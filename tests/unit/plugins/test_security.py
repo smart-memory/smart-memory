@@ -3,6 +3,9 @@ Tests for plugin security and sandboxing.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 import time
 from smartmemory.plugins.security import (
     PluginPermissions, ResourceLimits, PluginSandbox,

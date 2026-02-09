@@ -175,8 +175,8 @@ test_data/
 
 
 .claude/
-!.claude/rules/
-!.claude/commands/
+AGENTS.md
+CLAUDE.md
 
 # Benchmark result artifacts
 benchmark_*.json

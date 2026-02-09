@@ -5,6 +5,9 @@ Tests the time_travel() context manager functionality.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from datetime import datetime, timedelta
 from smartmemory import SmartMemory, MemoryItem
 from smartmemory.temporal.context import time_travel, TemporalContext

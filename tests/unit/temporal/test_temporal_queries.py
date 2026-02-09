@@ -13,6 +13,9 @@ Tests all temporal query methods including:
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from datetime import datetime, timedelta
 from smartmemory import SmartMemory, MemoryItem
 from smartmemory.temporal.queries import TemporalQueries, TemporalVersion, TemporalChange

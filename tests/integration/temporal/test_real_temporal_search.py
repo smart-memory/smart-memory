@@ -3,6 +3,9 @@ Real integration tests for temporal search functionality using the full backend 
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from datetime import datetime, timezone, timedelta
 import time
 from smartmemory.models.memory_item import MemoryItem

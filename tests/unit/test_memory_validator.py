@@ -4,6 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.validation.memory_validator import MemoryValidator, ValidationResult, ValidationIssue
 

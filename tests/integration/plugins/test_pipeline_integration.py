@@ -6,6 +6,9 @@ work correctly with the new plugin system.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from smartmemory.memory.pipeline.stages.enrichment import Enrichment
 from smartmemory.evolution.cycle import run_evolution_cycle
 

@@ -82,6 +82,9 @@ class TestLinkExpansionEnricherMetadata:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
         import pytest
 
+
+pytestmark = pytest.mark.unit
+
         with pytest.raises(TypeError, match="requires typed config"):
             LinkExpansionEnricher(config={"enable_llm": True})
 

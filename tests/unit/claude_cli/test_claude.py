@@ -3,6 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from pydantic import BaseModel
 
 # Skip all tests if claude-cli not installed

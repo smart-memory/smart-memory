@@ -5,6 +5,9 @@ import uuid
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.memory_item import MemoryItem, MEMORY_TYPES
 
 

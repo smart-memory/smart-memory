@@ -2,6 +2,11 @@
 Unit tests for Opinion/Observation synthesis evolvers.
 """
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.models.opinion import OpinionMetadata
 from smartmemory.plugins.evolvers.opinion_synthesis import OpinionSynthesisEvolver, OpinionSynthesisConfig

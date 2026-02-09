@@ -4,6 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.metrics.graph_health import GraphHealthChecker, HealthReport
 
 

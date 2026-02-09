@@ -8,11 +8,6 @@
       ],
       "description": "Browser automation for web scraping and testing"
     },
-    "notebooklm-mcp": {
-      "command": "notebooklm-mcp",
-      "args": [],
-      "description": "Google NotebookLM integration for podcast generation and research"
-    },
     "filesystem": {
       "command": "npx",
       "args": [

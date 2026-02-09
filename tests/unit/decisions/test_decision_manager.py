@@ -4,6 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.decisions.manager import DecisionManager
 from smartmemory.models.decision import Decision
 from smartmemory.models.memory_item import MemoryItem

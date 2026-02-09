@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import pytest
+
+pytestmark = pytest.mark.e2e
+
 """
 Test script to verify all README.md code snippets work in a fresh environment.
 Run this in a new virtual environment after: pip install smartmemory

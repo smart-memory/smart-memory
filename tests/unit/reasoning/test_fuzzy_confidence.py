@@ -5,6 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.decision import Decision
 from smartmemory.reasoning.fuzzy_confidence import ConfidenceScore, FuzzyConfidenceCalculator
 

@@ -3,6 +3,9 @@
 import json
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.ontology.entity_pair_cache import EntityPairCache
 
 

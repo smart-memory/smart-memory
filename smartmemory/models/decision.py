@@ -217,15 +217,43 @@ class Decision(MemoryBaseModel):
             last_contradicted = datetime.fromisoformat(last_contradicted)
 
         pending_reqs_raw = data.get("pending_requirements", [])
-        pending_requirements = [PendingRequirement.from_dict(r) for r in pending_reqs_raw]
+        # FalkorDB may serialize nested structures as JSON strings
+        if isinstance(pending_reqs_raw, str):
+            import json
+            try:
+                pending_reqs_raw = json.loads(pending_reqs_raw)
+            except (json.JSONDecodeError, TypeError):
+                pending_reqs_raw = []
+        pending_requirements = []
+        for r in (pending_reqs_raw or []):
+            if isinstance(r, str):
+                import json
+                try:
+                    r = json.loads(r)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+            if isinstance(r, dict):
+                pending_requirements.append(PendingRequirement.from_dict(r))
+
+        # FalkorDB may serialize list fields as JSON strings
+        def _ensure_list(val, default=None):
+            if default is None:
+                default = []
+            if isinstance(val, str):
+                import json
+                try:
+                    val = json.loads(val)
+                except (json.JSONDecodeError, TypeError):
+                    return default
+            return val if isinstance(val, list) else default
 
         return cls(
             decision_id=data.get("decision_id", ""),
             content=data.get("content", ""),
             decision_type=data.get("decision_type", "inference"),
             confidence=data.get("confidence", 0.8),
-            evidence_ids=data.get("evidence_ids", []),
-            contradicting_ids=data.get("contradicting_ids", []),
+            evidence_ids=_ensure_list(data.get("evidence_ids", [])),
+            contradicting_ids=_ensure_list(data.get("contradicting_ids", [])),
             reinforcement_count=data.get("reinforcement_count", 0),
             contradiction_count=data.get("contradiction_count", 0),
             source_type=data.get("source_type", "inferred"),
@@ -235,7 +263,7 @@ class Decision(MemoryBaseModel):
             status=data.get("status", "active"),
             superseded_by=data.get("superseded_by"),
             domain=data.get("domain"),
-            tags=data.get("tags", []),
+            tags=_ensure_list(data.get("tags", [])),
             pending_requirements=pending_requirements,
             created_at=created_at,
             updated_at=updated_at,

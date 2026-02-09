@@ -1,5 +1,10 @@
 """Unit tests for PipelineState dataclass."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 import dataclasses
 from datetime import datetime, timezone
 

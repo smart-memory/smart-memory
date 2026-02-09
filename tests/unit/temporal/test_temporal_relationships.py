@@ -3,6 +3,9 @@ Unit tests for temporal relationship queries.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, MagicMock
 

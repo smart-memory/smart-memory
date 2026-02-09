@@ -9,6 +9,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.graph.ontology_graph import OntologyGraph
 from smartmemory.ontology.pattern_manager import PatternManager
 

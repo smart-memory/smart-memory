@@ -1,5 +1,10 @@
 """Tests for PipelineMetricsEmitter."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock, patch
 from dataclasses import replace
 

@@ -6,6 +6,9 @@ from unittest.mock import patch
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.ontology.models import Ontology, TemplateInfo, TemplatePreview
 from smartmemory.ontology.template_service import TemplateService, TEMPLATES_DIR
 from smartmemory.stores.ontology import FileSystemOntologyStorage

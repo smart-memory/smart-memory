@@ -3,6 +3,9 @@ Unit tests for plugin base classes and utilities.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.plugins.base import (
     PluginMetadata,
     PluginBase,

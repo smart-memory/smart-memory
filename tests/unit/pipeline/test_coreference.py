@@ -1,5 +1,8 @@
 """Tests for coreference resolution stage."""
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import MagicMock, patch
 
 from smartmemory.memory.pipeline.stages.coreference import (

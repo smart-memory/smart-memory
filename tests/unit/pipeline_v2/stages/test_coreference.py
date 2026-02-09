@@ -1,5 +1,10 @@
 """Unit tests for CoreferenceStageCommand."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock, patch
 
 from smartmemory.pipeline.config import PipelineConfig, CoreferenceConfig

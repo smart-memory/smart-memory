@@ -2,6 +2,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.reasoning import ReasoningStep, ReasoningTrace
 from smartmemory.plugins.extractors.decision import DecisionExtractor, DecisionExtractorConfig
 

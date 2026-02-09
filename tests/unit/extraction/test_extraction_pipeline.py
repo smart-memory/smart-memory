@@ -5,6 +5,9 @@ Tests the complete extraction workflow from text input to stored entities.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, patch
 from datetime import datetime, timezone
 

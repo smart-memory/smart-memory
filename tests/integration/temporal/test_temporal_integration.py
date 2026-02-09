@@ -10,6 +10,9 @@ Tests complete workflows including:
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from datetime import datetime, timedelta
 from smartmemory import SmartMemory, MemoryItem
 import time

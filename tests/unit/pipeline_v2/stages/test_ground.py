@@ -1,5 +1,10 @@
 """Unit tests for GroundStage."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock, patch
 
 from smartmemory.pipeline.config import PipelineConfig, EnrichConfig, WikidataConfig

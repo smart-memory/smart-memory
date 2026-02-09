@@ -3,6 +3,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.decision import Decision
 from smartmemory.models.memory_item import MEMORY_TYPES
 

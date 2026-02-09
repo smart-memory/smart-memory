@@ -5,6 +5,9 @@ These tests exercise the extraction pipeline the way the service layer does,
 ensuring no auth field names leak into the core library.
 """
 import pytest
+
+
+pytestmark = pytest.mark.integration
 from unittest.mock import Mock, patch
 
 from smartmemory.models.memory_item import MemoryItem

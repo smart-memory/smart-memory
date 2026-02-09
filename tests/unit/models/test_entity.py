@@ -1,5 +1,10 @@
 """Unit tests for Entity model."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from smartmemory.models.entity import Entity
 from smartmemory.models.memory_item import MemoryItem
 

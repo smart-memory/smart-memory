@@ -1,5 +1,10 @@
 """Tests for JsonFormatter."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 import json
 import logging
 

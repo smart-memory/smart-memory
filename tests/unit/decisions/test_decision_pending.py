@@ -2,6 +2,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.decision import Decision, PendingRequirement
 
 

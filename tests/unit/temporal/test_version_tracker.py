@@ -3,6 +3,9 @@ Unit tests for version tracking system.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, MagicMock
 

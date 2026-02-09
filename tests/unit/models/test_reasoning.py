@@ -1,5 +1,10 @@
 """Unit tests for Reasoning models."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from smartmemory.models.reasoning import (
     ReasoningStep,
     TaskContext,

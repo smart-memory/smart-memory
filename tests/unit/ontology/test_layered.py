@@ -1,6 +1,9 @@
 """Tests for LayeredOntology merge class."""
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from datetime import datetime
 
 from smartmemory.ontology.layered import LayeredOntology

@@ -1,5 +1,10 @@
 """Tests for Wave 2 edge and node schema registrations."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from smartmemory.graph.models.schema_validator import get_validator
 
 

@@ -1,5 +1,10 @@
 """Tests for LogContextFilter."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 import logging
 from unittest.mock import patch
 

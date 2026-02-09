@@ -2,6 +2,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.graph.ontology_graph import OntologyGraph
 
 

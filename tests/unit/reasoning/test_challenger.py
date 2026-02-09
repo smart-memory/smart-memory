@@ -3,6 +3,9 @@ Unit tests for Assertion Challenger.
 """
 
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from unittest.mock import Mock, patch
 
 from smartmemory.reasoning.challenger import (

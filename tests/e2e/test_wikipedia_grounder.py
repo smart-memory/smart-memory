@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import pytest
+
+pytestmark = pytest.mark.e2e
+
 """Test Wikipedia grounding to debug what's happening."""
 
 import sys

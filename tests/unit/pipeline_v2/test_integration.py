@@ -1,5 +1,10 @@
 """Integration test -- run the full pipeline with mocked dependencies."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from unittest.mock import MagicMock, patch, call
 from dataclasses import replace
 

@@ -6,6 +6,11 @@ The evolve() method is complex (evidence matching, decay, retraction), so
 we test the high-level flow and helper methods rather than deep integration.
 """
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 

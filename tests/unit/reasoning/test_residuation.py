@@ -4,6 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.models.decision import Decision, PendingRequirement
 from smartmemory.reasoning.residuation import ResiduationManager
 

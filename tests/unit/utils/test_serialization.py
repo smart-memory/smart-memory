@@ -3,6 +3,9 @@ Unit tests for serialization utilities.
 Tests MemoryItemSerializer and helper functions for edge cases and correctness.
 """
 import pytest
+
+
+pytestmark = pytest.mark.unit
 from smartmemory.utils.serialization import MemoryItemSerializer, ensure_public_fields
 from smartmemory.models.memory_item import MemoryItem
 

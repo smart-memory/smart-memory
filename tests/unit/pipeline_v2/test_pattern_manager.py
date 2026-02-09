@@ -2,6 +2,9 @@
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 from smartmemory.ontology.pattern_manager import PatternManager
 from smartmemory.graph.ontology_graph import OntologyGraph
 from smartmemory.pipeline.stages.entity_ruler import _ngram_scan
