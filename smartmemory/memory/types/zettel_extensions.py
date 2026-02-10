@@ -134,6 +134,46 @@ class ZettelBacklinkSystem:
             'related_by_concepts': self.get_concept_related_notes(note_id)
         }
 
+    def get_all_connections(self, note_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all connections (backlinks + forward links) as a flat list.
+
+        Each connection includes the note and the connection type.
+        Returns: List of dicts with note data and connection_type.
+        """
+        try:
+            connections = []
+            seen_ids: Set[str] = set()
+
+            # Get bidirectional connections
+            bidir = self.get_bidirectional_connections(note_id)
+
+            # Map connection types to the dict keys
+            type_mapping = {
+                'forward_links': 'forward_link',
+                'backlinks': 'backlink',
+                'related_by_tags': 'tag_related',
+                'related_by_concepts': 'concept_related'
+            }
+
+            for conn_type, notes in bidir.items():
+                for note in notes:
+                    note_id_val = note.item_id if hasattr(note, 'item_id') else str(note)
+                    if note_id_val not in seen_ids:
+                        seen_ids.add(note_id_val)
+                        connections.append({
+                            'note_id': note_id_val,
+                            'connection_type': type_mapping.get(conn_type, conn_type),
+                            'content': note.content[:100] if hasattr(note, 'content') and note.content else '',
+                            'metadata': dict(note.metadata) if hasattr(note, 'metadata') and note.metadata else {}
+                        })
+
+            return connections
+
+        except Exception as e:
+            logger.error(f"Failed to get all connections for {note_id}: {e}")
+            return []
+
     def get_forward_links(self, note_id: str) -> List[MemoryItem]:
         """Get all notes this note links TO (forward links)."""
         try:
