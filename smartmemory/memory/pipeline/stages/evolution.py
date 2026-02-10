@@ -148,10 +148,16 @@ class EvolutionOrchestrator:
         Promote (evolve) working memory buffer to episodic memory.
         """
         try:
-            # Try to import and use the proper evolver
-            from smartmemory.plugins.evolvers.working_to_episodic import WorkingToEpisodicEvolver
-            config = getattr(self.smart_memory, 'config', {}) if hasattr(self.smart_memory, 'config') else {}
-            evolver = WorkingToEpisodicEvolver(config=config)
+            # Try to import and use the proper evolver with typed config
+            from smartmemory.plugins.evolvers.working_to_episodic import (
+                WorkingToEpisodicEvolver,
+                WorkingToEpisodicConfig,
+            )
+            # Extract threshold from smart_memory config or use default
+            raw_config = getattr(self.smart_memory, 'config', {}) if hasattr(self.smart_memory, 'config') else {}
+            threshold = raw_config.get('working_to_episodic_threshold', 40) if isinstance(raw_config, dict) else 40
+            typed_config = WorkingToEpisodicConfig(threshold=threshold)
+            evolver = WorkingToEpisodicEvolver(config=typed_config)
             result = evolver.evolve(self.smart_memory, logger=logger)
             return result
         except ImportError as e:
@@ -164,10 +170,16 @@ class EvolutionOrchestrator:
         Promote (evolve) working memory buffer to procedural memory.
         """
         try:
-            # Try to import and use the proper evolver
-            from smartmemory.plugins.evolvers.working_to_procedural import WorkingToProceduralEvolver
-            config = getattr(self.smart_memory, 'config', {}) if hasattr(self.smart_memory, 'config') else {}
-            evolver = WorkingToProceduralEvolver(config=config)
+            # Try to import and use the proper evolver with typed config
+            from smartmemory.plugins.evolvers.working_to_procedural import (
+                WorkingToProceduralEvolver,
+                WorkingToProceduralConfig,
+            )
+            # Extract k (min pattern count) from smart_memory config or use default
+            raw_config = getattr(self.smart_memory, 'config', {}) if hasattr(self.smart_memory, 'config') else {}
+            k = raw_config.get('working_to_procedural_k', 5) if isinstance(raw_config, dict) else 5
+            typed_config = WorkingToProceduralConfig(k=k)
+            evolver = WorkingToProceduralEvolver(config=typed_config)
             result = evolver.evolve(self.smart_memory, logger=logger)
             return result
         except ImportError as e:

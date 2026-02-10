@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.7] - 2026-02-10
+
+### Fixed
+
+- **Evolution typed config**: Fixed `EvolutionOrchestrator.commit_working_to_episodic()` and `commit_working_to_procedural()` to pass typed config objects (`WorkingToEpisodicConfig`, `WorkingToProceduralConfig`) instead of raw dicts — eliminates TypeError from evolvers expecting typed configs
+
+---
+
 ## [0.3.6] - 2026-02-08
 
 ### Changed
