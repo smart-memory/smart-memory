@@ -1,36 +1,34 @@
-#!/usr/bin/env python3
+"""E2E: WikipediaEnricher direct invocation.
+
+Exercises: plugins/enrichers/WikipediaEnricher with real Wikipedia API.
+"""
+
 import pytest
 
 pytestmark = [pytest.mark.e2e, pytest.mark.golden]
 
-"""Test Wikipedia grounding to debug what's happening."""
 
-import sys
-sys.path.insert(0, '/')
+def test_wikipedia_enricher_direct():
+    """WikipediaEnricher fetches data for known entities."""
+    from smartmemory.plugins.enrichers import WikipediaEnricher
+    from smartmemory.models.memory_item import MemoryItem
 
-from smartmemory.plugins.enrichers import WikipediaEnricher
-from smartmemory.models.memory_item import MemoryItem
+    enricher = WikipediaEnricher()
+    item = MemoryItem(content="The rain in Spain falls in the plain")
+    entities = ["rain", "Spain", "plain"]
 
-# Test the enricher directly
-print("=" * 60)
-print("Testing WikipediaEnricher")
-print("=" * 60)
+    result = enricher.enrich(item, {"semantic_entities": entities})
 
-enricher = WikipediaEnricher()
-item = MemoryItem(content="The rain in Spain falls in the plain")
-entities = ['rain', 'Spain', 'plain']
+    assert isinstance(result, dict)
+    wiki_data = result.get("wikipedia_data", {})
+    assert len(wiki_data) > 0, "Expected at least one Wikipedia entry"
 
-print(f"\nTesting with entities: {entities}")
-result = enricher.enrich(item, {'semantic_entities': entities})
+    # Spain should always resolve
+    spain = wiki_data.get("Spain")
+    assert spain is not None, "Spain should be found in Wikipedia"
+    assert spain.get("exists") is True
+    assert spain.get("url")
+    assert spain.get("summary")
 
-print(f"\nResult keys: {result.keys()}")
-print(f"\nWikipedia data entries: {len(result.get('wikipedia_data', {}))}")
-
-for entity, data in result.get('wikipedia_data', {}).items():
-    print(f"\n--- Entity: {entity} ---")
-    print(f"  exists: {data.get('exists')}")
-    print(f"  url: {data.get('url')}")
-    print(f"  summary: {data.get('summary', '')[:100]}...")
-    print(f"  categories: {len(data.get('categories', []))} categories")
-
-print(f"\nProvenance candidates: {result.get('provenance_candidates', [])}")
+    provenance = result.get("provenance_candidates", [])
+    assert isinstance(provenance, list)

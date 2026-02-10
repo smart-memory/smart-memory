@@ -441,16 +441,21 @@ class TestStudioExtractionFlow:
                     assert item.metadata.get("tenant_id") == "acme_corp"
 
 
+@pytest.mark.skip(
+    reason="Requires service_common lazy init refactor. "
+           "See smart-memory-docs/docs/plans/2026-02-10-test-review-addendum.md 'Tech Debt: Lazy Initialization'"
+)
 class TestScopedPipelineIntegration:
-    """Test that ScopedPipeline from service_common works correctly."""
-    
+    """Test that ScopedPipeline from service_common works correctly.
+
+    SKIPPED: These tests require importing service_common which has eager initialization
+    that connects to MongoDB at import time. Until the lazy initialization refactor is done,
+    these tests cannot run without a configured database.
+    """
+
     def test_scoped_pipeline_injects_scope_to_metadata(self):
         """Test ScopedPipeline._inject_scope adds workspace_id and user_id."""
-        # Import from service_common if available
-        try:
-            from service_common.pipeline.scoped_pipeline import ScopedPipeline
-        except ImportError:
-            pytest.skip("service_common not available")
+        from service_common.pipeline.scoped_pipeline import ScopedPipeline
         
         pipeline = ScopedPipeline(
             workspace_id="test_ws",
@@ -470,12 +475,9 @@ class TestScopedPipelineIntegration:
     
     def test_scoped_pipeline_input_adapter_injects_scope(self):
         """Test ScopedPipeline.run_input_adapter injects scope into metadata."""
-        try:
-            from service_common.pipeline.scoped_pipeline import ScopedPipeline
-            from smartmemory.memory.pipeline.config import InputAdapterConfig
-        except ImportError:
-            pytest.skip("service_common not available")
-        
+        from service_common.pipeline.scoped_pipeline import ScopedPipeline
+        from smartmemory.memory.pipeline.config import InputAdapterConfig
+
         pipeline = ScopedPipeline(
             workspace_id="ws_123",
             user_id="user_456"

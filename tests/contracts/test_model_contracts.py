@@ -76,57 +76,57 @@ class TestMemoryItemContract:
         assert restored.transaction_time is not None
 
 
-class TestDecisionRecordContract:
-    """DecisionRecord round-trip serialization."""
+class TestDecisionContract:
+    """Decision round-trip serialization."""
 
     def test_basic_decision_round_trip(self):
-        from smartmemory.models.decision import DecisionRecord
+        from smartmemory.models.decision import Decision
 
-        decision = DecisionRecord(
+        decision = Decision(
             content="User prefers TypeScript over JavaScript",
             decision_type="preference",
             confidence=0.85,
-            source="explicit",
+            source_type="explicit",
             domain="programming",
         )
         d = decision.to_dict()
-        restored = DecisionRecord.from_dict(d)
+        restored = Decision.from_dict(d)
 
         assert restored.content == decision.content
         assert restored.decision_type == "preference"
         assert restored.confidence == 0.85
-        assert restored.source == "explicit"
+        assert restored.source_type == "explicit"
         assert restored.domain == "programming"
         assert restored.status == "active"
 
     def test_decision_with_evidence_round_trip(self):
-        from smartmemory.models.decision import DecisionRecord
+        from smartmemory.models.decision import Decision
 
-        decision = DecisionRecord(
+        decision = Decision(
             content="Test decision with evidence",
             decision_type="inference",
             confidence=0.7,
-            source="reasoning",
+            source_type="reasoning",
             evidence_ids=["ev1", "ev2", "ev3"],
         )
         d = decision.to_dict()
-        restored = DecisionRecord.from_dict(d)
+        restored = Decision.from_dict(d)
 
         assert restored.evidence_ids == ["ev1", "ev2", "ev3"]
 
     def test_superseded_decision_round_trip(self):
-        from smartmemory.models.decision import DecisionRecord
+        from smartmemory.models.decision import Decision
 
-        decision = DecisionRecord(
+        decision = Decision(
             content="Superseded decision",
             decision_type="classification",
             confidence=0.6,
-            source="inferred",
+            source_type="inferred",
             status="superseded",
             superseded_by="new_decision_id",
         )
         d = decision.to_dict()
-        restored = DecisionRecord.from_dict(d)
+        restored = Decision.from_dict(d)
 
         assert restored.status == "superseded"
         assert restored.superseded_by == "new_decision_id"
@@ -139,8 +139,9 @@ class TestReasoningTraceContract:
         from smartmemory.models.reasoning import ReasoningTrace, ReasoningStep, TaskContext
 
         trace = ReasoningTrace(
-            task=TaskContext(
-                description="Analyze user preferences",
+            trace_id="test-trace-123",
+            task_context=TaskContext(
+                goal="Analyze user preferences",
                 domain="testing",
             ),
             steps=[
@@ -152,7 +153,8 @@ class TestReasoningTraceContract:
         d = trace.to_dict()
         restored = ReasoningTrace.from_dict(d)
 
-        assert restored.task.description == "Analyze user preferences"
+        assert restored.task_context is not None
+        assert restored.task_context.goal == "Analyze user preferences"
         assert len(restored.steps) == 3
         assert restored.steps[0].type == "thought"
         assert restored.steps[2].content == "User prefers TypeScript"

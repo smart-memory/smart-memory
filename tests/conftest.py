@@ -9,6 +9,15 @@ import shutil
 import os
 
 
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line("markers", "harness: marks tests as error harness tests")
+    config.addinivalue_line("markers", "contract: marks tests as contract tests (API stability)")
+    config.addinivalue_line("markers", "invariant: marks tests as invariant tests (logic kernels)")
+    config.addinivalue_line("markers", "golden: marks tests as golden flow tests")
+    config.addinivalue_line("markers", "slow: marks tests as slow (require external services)")
+
+
 @pytest.fixture(scope="session")
 def test_config():
     """Test configuration with isolated backends for unit tests."""
