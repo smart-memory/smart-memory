@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pytest
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.golden]
 
 """
 Test script to verify all README.md code snippets work in a fresh environment.

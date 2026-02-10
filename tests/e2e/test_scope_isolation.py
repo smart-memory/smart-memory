@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.golden]
 
 
 @pytest.fixture(scope="module")

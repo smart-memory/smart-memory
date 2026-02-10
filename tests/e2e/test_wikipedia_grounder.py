@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pytest
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.golden]
 
 """Test Wikipedia grounding to debug what's happening."""
 

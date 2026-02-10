@@ -611,6 +611,7 @@ Explore the [examples](examples/) directory for complete demonstrations and use 
 - ✅ **Conflict detection**: Semantic search + content overlap heuristic
 - ✅ **Causal chains**: Recursive traversal of DERIVED_FROM, CAUSED_BY, INFLUENCES edges
 
+
 ### Synthesis Memory (v0.2.6+)
 - ✅ **Opinion memory**: Beliefs with confidence scores, reinforced/contradicted over time
 - ✅ **Observation memory**: Synthesized entity summaries from scattered facts
