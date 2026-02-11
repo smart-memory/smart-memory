@@ -447,14 +447,19 @@ Main interface for memory operations:
 ```python
 class SmartMemory:
     def __init__(self, scope_provider: Optional[ScopeProvider] = None)
-    
+
     # Primary API
     def ingest(self, item, sync=True, **kwargs) -> str  # Full pipeline
     def add(self, item, **kwargs) -> str                # Simple storage
     def get(self, item_id: str) -> Optional[MemoryItem]
     def search(self, query: str, top_k: int = 5, memory_type: str = None) -> List[MemoryItem]
     def delete(self, item_id: str) -> bool
-    
+
+    # Graph Integrity (v0.3.8+)
+    def delete_run(self, run_id: str) -> int            # Delete entities by pipeline run
+    def rename_entity_type(self, old: str, new: str) -> int  # Ontology evolution
+    def merge_entity_types(self, sources: List[str], target: str) -> int
+
     # Advanced
     def run_clustering(self) -> dict
     def run_evolution_cycle(self) -> None
