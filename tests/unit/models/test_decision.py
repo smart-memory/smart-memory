@@ -1,6 +1,5 @@
 """Unit tests for Decision model."""
 
-
 import pytest
 
 
@@ -271,23 +270,37 @@ class TestDecisionSerialization:
 class TestDecisionTypes:
     """Test all valid type values."""
 
-    @pytest.mark.parametrize("decision_type", [
-        "inference", "preference", "classification", "choice", "belief", "policy",
-    ])
+    @pytest.mark.parametrize(
+        "decision_type",
+        [
+            "inference",
+            "preference",
+            "classification",
+            "choice",
+            "belief",
+            "policy",
+        ],
+    )
     def test_valid_decision_types(self, decision_type):
         d = Decision(decision_type=decision_type)
         assert d.decision_type == decision_type
         data = d.to_dict()
         assert data["decision_type"] == decision_type
 
-    @pytest.mark.parametrize("source_type", [
-        "reasoning", "explicit", "imported", "inferred",
-    ])
+    @pytest.mark.parametrize(
+        "source_type",
+        [
+            "reasoning",
+            "explicit",
+            "imported",
+            "inferred",
+        ],
+    )
     def test_valid_source_types(self, source_type):
         d = Decision(source_type=source_type)
         assert d.source_type == source_type
 
-    @pytest.mark.parametrize("status", ["active", "superseded", "retracted"])
+    @pytest.mark.parametrize("status", ["active", "pending", "superseded", "retracted"])
     def test_valid_statuses(self, status):
         d = Decision(status=status)
         assert d.status == status
@@ -300,6 +313,15 @@ class TestDecisionMemoryType:
         assert "decision" in MEMORY_TYPES
 
     def test_all_expected_types_present(self):
-        expected = {"semantic", "episodic", "procedural", "working", "zettel",
-                    "reasoning", "opinion", "observation", "decision"}
+        expected = {
+            "semantic",
+            "episodic",
+            "procedural",
+            "working",
+            "zettel",
+            "reasoning",
+            "opinion",
+            "observation",
+            "decision",
+        }
         assert expected.issubset(MEMORY_TYPES)

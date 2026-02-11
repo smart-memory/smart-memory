@@ -40,7 +40,7 @@ class TestEntityToMemoryItem:
         )
         item = entity.to_memory_item()
         assert isinstance(item, MemoryItem)
-        assert item.memory_type == "Entity"
+        assert item.memory_type == "semantic"
         assert item.content == "Python"
         assert item.item_id == "ent-py"
         assert item.metadata["entity_type"] == "technology"
