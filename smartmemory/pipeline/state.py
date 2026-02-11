@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from smartmemory.pipeline.token_tracker import PipelineTokenTracker
 
 
 def _now() -> datetime:
@@ -68,6 +71,12 @@ class PipelineState:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
+    # -- Token tracking (CFS-1) --
+    # NOTE: Intentional exception to the immutability convention above.
+    # The tracker is a mutable accumulator shared across all stages in a single
+    # pipeline run.  Stages call record_spent/record_avoided in-place.
+    token_tracker: Optional["PipelineTokenTracker"] = None
+
     # -- Carry-through for IngestionContext compatibility --
     _context: Dict[str, Any] = field(default_factory=dict)
 
@@ -86,6 +95,8 @@ class PipelineState:
             val = getattr(self, f.name)
             if isinstance(val, datetime):
                 val = val.isoformat()
+            elif f.name == "token_tracker" and val is not None:
+                val = val.summary()
             out[f.name] = val
         return out
 
@@ -98,6 +109,10 @@ class PipelineState:
         kwargs: Dict[str, Any] = {}
         for k, v in d.items():
             if k not in known:
+                continue
+            # Skip token_tracker — summary dict cannot be reconstructed
+            # into a live tracker; start fresh on resumed pipelines.
+            if k == "token_tracker":
                 continue
             # Re-parse datetime strings
             if k in ("started_at", "completed_at") and isinstance(v, str):

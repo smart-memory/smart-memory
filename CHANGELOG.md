@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.9] - 2026-02-11
+
+### Added
+
+#### Token Cost Instrumentation (CFS-1)
+
+- **`PipelineTokenTracker`** (`smartmemory/pipeline/token_tracker.py`): Per-request tracker that rides on `PipelineState`, recording tokens spent and avoided per pipeline stage with model attribution and cost estimation
+- **`StageTokenRecord`** dataclass for individual token events with prompt/completion breakdown, model, and reason fields
+- **`token_tracker` field on `PipelineState`**: Automatically created by `PipelineRunner` at pipeline start, populated by stages during execution
+- **LLM extract stage tracking**: Records spent tokens after LLM calls, avoided tokens on cache hits and stage disabled
+- **Ground stage tracking**: Records avoided tokens when Wikipedia entities resolve from graph instead of API
+- **Ontology constrain tracking**: Records avoided tokens on entity-pair cache hits
+- **`get_last_usage()` in DSPy adapter**: Thread-local consume-once accessor for LLM token usage from DSPy calls
+- **`SmartMemory.last_token_summary` property**: Access the most recent pipeline run's token summary
+- **Extended `COST_PER_1K_TOKENS`** in `utils/token_tracking.py`: Added Groq Llama, Gemini Flash, Claude Haiku pricing
+
+---
+
 ## [0.3.8] - 2026-02-11
 
 ### Added

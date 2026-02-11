@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import re
+import threading
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -34,6 +35,20 @@ from smartmemory.utils.deduplication import deduplicate_entities
 
 logger = logging.getLogger(__name__)
 
+# Thread-local flag for cache hit signalling (CFS-1).
+# Set True when extract() returns a cached result; consumed by LLMExtractStage._track_tokens().
+_extract_thread_local = threading.local()
+
+
+def was_last_extract_cached() -> bool:
+    """Return True if the most recent ``extract()`` call on this thread was a cache hit.
+
+    Consume-once: resets to False after reading.
+    """
+    hit = getattr(_extract_thread_local, "cache_hit", False)
+    _extract_thread_local.cache_hit = False
+    return hit
+
 
 def _strip_thinking_tags(text: str) -> str:
     """Strip <think>...</think> blocks from reasoning model responses."""
@@ -46,7 +61,7 @@ def _strip_markdown_fences(text: str) -> str:
     if text.startswith("```"):
         # Remove opening fence (with optional language tag)
         first_newline = text.index("\n") if "\n" in text else len(text)
-        text = text[first_newline + 1:]
+        text = text[first_newline + 1 :]
     if text.endswith("```"):
         text = text[:-3]
     return text.strip()
@@ -136,6 +151,7 @@ EXTRACTION_JSON_SCHEMA = {
 @dataclass
 class LLMSingleExtractorConfig(MemoryBaseModel):
     """Configuration for single-call LLM extractor."""
+
     model_name: str = "gpt-4o-mini"
     api_key_env: str = "OPENAI_API_KEY"
     api_base_url: Optional[str] = None  # For Groq, Gemini, etc.
@@ -163,7 +179,7 @@ class LLMSingleExtractor(ExtractorPlugin):
             plugin_type="extractor",
             dependencies=["openai>=1.0.0"],
             min_smartmemory_version="0.2.7",
-            tags=["ner", "relation-extraction", "llm", "fast"]
+            tags=["ner", "relation-extraction", "llm", "fast"],
         )
 
     def __init__(
@@ -171,7 +187,7 @@ class LLMSingleExtractor(ExtractorPlugin):
         model_name: Optional[str] = None,
         api_key: Optional[str] = None,
         api_base_url: Optional[str] = None,
-        config: Optional[LLMSingleExtractorConfig] = None
+        config: Optional[LLMSingleExtractorConfig] = None,
     ):
         self.cfg = config or LLMSingleExtractorConfig()
         if model_name:
@@ -188,7 +204,7 @@ class LLMSingleExtractor(ExtractorPlugin):
             dict with 'entities' (List[MemoryItem]) and 'relations' (List[dict])
         """
         if not text or not text.strip():
-            return {'entities': [], 'relations': []}
+            return {"entities": [], "relations": []}
 
         # Build cache key upfront
         cache_key = f"single_{self.cfg.model_name}_{text}"
@@ -200,10 +216,14 @@ class LLMSingleExtractor(ExtractorPlugin):
             cached = cache.get_entity_extraction(cache_key)
             if cached:
                 logger.debug(f"Cache hit for: {text[:50]}...")
+                _extract_thread_local.cache_hit = True
                 return cached
         except Exception as e:
             logger.debug(f"Cache unavailable: {e}")
             cache = None
+
+        # Mark as NOT a cache hit before calling LLM
+        _extract_thread_local.cache_hit = False
 
         # Get API key
         api_key = self._get_api_key()
@@ -242,20 +262,20 @@ class LLMSingleExtractor(ExtractorPlugin):
                     data = json.loads(cleaned)
                 except Exception:
                     logger.warning(f"Failed to parse response: {raw[:200]}")
-                    return {'entities': [], 'relations': []}
+                    return {"entities": [], "relations": []}
 
         # Process entities
-        raw_entities = data.get('entities', [])
+        raw_entities = data.get("entities", [])
         entities = self._process_entities(raw_entities)
 
         # Process relations
-        raw_relations = data.get('relations', [])
+        raw_relations = data.get("relations", [])
         relations = self._process_relations(raw_relations, entities)
 
-        result = {'entities': entities, 'relations': relations}
+        result = {"entities": entities, "relations": relations}
 
         # Cache result (only if we got something useful)
-        if cache and (result['entities'] or result['relations']):
+        if cache and (result["entities"] or result["relations"]):
             try:
                 cache.set_entity_extraction(cache_key, result)
             except Exception as e:
@@ -271,8 +291,8 @@ class LLMSingleExtractor(ExtractorPlugin):
         api_key = os.getenv(self.cfg.api_key_env)
         if not api_key:
             try:
-                legacy = get_config('extractor')
-                llm_cfg = legacy.get('llm') or {}
+                legacy = get_config("extractor")
+                llm_cfg = legacy.get("llm") or {}
                 api_key = llm_cfg.get("openai_api_key")
             except Exception:
                 pass
@@ -290,8 +310,8 @@ class LLMSingleExtractor(ExtractorPlugin):
             if not isinstance(e, dict):
                 continue
 
-            name = (e.get('name') or '').strip()
-            etype = (e.get('entity_type') or 'concept').strip().lower()
+            name = (e.get("name") or "").strip()
+            etype = (e.get("entity_type") or "concept").strip().lower()
 
             if not name:
                 continue
@@ -303,33 +323,24 @@ class LLMSingleExtractor(ExtractorPlugin):
 
             ent_id = hashlib.sha256(key.encode()).hexdigest()[:16]
             meta = {
-                'name': name,
-                'entity_type': etype,
-                'confidence': e.get('confidence'),
+                "name": name,
+                "entity_type": etype,
+                "confidence": e.get("confidence"),
             }
 
             # Include any extra attributes
             for k, v in e.items():
-                if k not in ('name', 'entity_type', 'confidence') and v is not None:
+                if k not in ("name", "entity_type", "confidence") and v is not None:
                     meta[k] = v
 
-            memory_items.append(MemoryItem(
-                content=name,
-                item_id=ent_id,
-                memory_type='concept',
-                metadata=meta
-            ))
+            memory_items.append(MemoryItem(content=name, item_id=ent_id, memory_type="concept", metadata=meta))
 
         return deduplicate_entities(memory_items)
 
-    def _process_relations(
-        self,
-        raw_relations: List[dict],
-        entities: List[MemoryItem]
-    ) -> List[Dict[str, Any]]:
+    def _process_relations(self, raw_relations: List[dict], entities: List[MemoryItem]) -> List[Dict[str, Any]]:
         """Convert raw relations to validated relation dicts."""
         # Build name -> ID map
-        name_map = {e.metadata['name'].lower(): e.item_id for e in entities}
+        name_map = {e.metadata["name"].lower(): e.item_id for e in entities}
 
         valid_relations = []
         seen = set()
@@ -338,9 +349,9 @@ class LLMSingleExtractor(ExtractorPlugin):
             if not isinstance(r, dict):
                 continue
 
-            subj = (r.get('subject') or '').strip()
-            pred = _normalize_predicate((r.get('predicate') or '').strip())
-            obj = (r.get('object') or '').strip()
+            subj = (r.get("subject") or "").strip()
+            pred = _normalize_predicate((r.get("predicate") or "").strip())
+            obj = (r.get("object") or "").strip()
 
             if not (subj and pred and obj):
                 continue
@@ -355,11 +366,7 @@ class LLMSingleExtractor(ExtractorPlugin):
                     continue
                 seen.add(key)
 
-                valid_relations.append({
-                    'source_id': sid,
-                    'target_id': oid,
-                    'relation_type': pred
-                })
+                valid_relations.append({"source_id": sid, "target_id": oid, "relation_type": pred})
 
         return valid_relations
 
@@ -369,17 +376,17 @@ def _normalize_predicate(predicate: str) -> str:
     if not predicate:
         return "related_to"
     pred = predicate.lower()
-    pred = re.sub(r'[^a-z0-9]+', '_', pred)
-    pred = re.sub(r'_+', '_', pred)
-    pred = pred.strip('_')
+    pred = re.sub(r"[^a-z0-9]+", "_", pred)
+    pred = re.sub(r"_+", "_", pred)
+    pred = pred.strip("_")
     if pred and pred[0].isdigit():
-        pred = '_' + pred
+        pred = "_" + pred
     if not pred or not pred[0].isalpha():
-        pred = 'rel_' + pred
+        pred = "rel_" + pred
     if len(pred) > 63:
         pred = pred[:63]
-    if not re.match(r'^[a-z][a-z0-9_]{0,62}$', pred):
-        pred = 'related_to'
+    if not re.match(r"^[a-z][a-z0-9_]{0,62}$", pred):
+        pred = "related_to"
     return pred
 
 

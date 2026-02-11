@@ -11,6 +11,7 @@ from smartmemory.pipeline.transport import Transport, InProcessTransport
 from smartmemory.pipeline.runner import PipelineRunner
 from smartmemory.pipeline.metrics import PipelineMetricsEmitter
 from smartmemory.pipeline.metrics_consumer import MetricsConsumer
+from smartmemory.pipeline.token_tracker import PipelineTokenTracker
 
 __all__ = [
     "StageCommand",
@@ -21,4 +22,5 @@ __all__ = [
     "PipelineRunner",
     "PipelineMetricsEmitter",
     "MetricsConsumer",
+    "PipelineTokenTracker",
 ]

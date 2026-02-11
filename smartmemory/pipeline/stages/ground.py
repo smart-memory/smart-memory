@@ -25,11 +25,20 @@ class GroundStage:
     def name(self) -> str:
         return "ground"
 
+    # Estimated tokens for a typical Wikipedia API + LLM grounding call
+    _AVG_GROUND_TOKENS: int = 200
+
     def execute(self, state: PipelineState, config: PipelineConfig) -> PipelineState:
         if config.mode == "preview":
             return state
 
         if not config.enrich.wikidata.enabled:
+            if state.token_tracker:
+                state.token_tracker.record_avoided(
+                    "ground",
+                    self._AVG_GROUND_TOKENS,
+                    reason="stage_disabled",
+                )
             return state
 
         entities = state.entities
@@ -56,7 +65,28 @@ class GroundStage:
                         entity.item_id = entity_ids[ename]
 
             grounder = WikipediaGrounder()
+
+            # Count entities before grounding to detect graph-gated skips
+            entity_count = len(
+                [e for e in entities if hasattr(e, "metadata") and e.metadata and e.metadata.get("name")]
+            )
+
             provenance = grounder.ground(item, entities, self._memory._graph)
+
+            # Record avoided tokens for entities that were graph-gated (not sent to Wikipedia API)
+            # The grounder returns provenance for ALL entities (both cached and fresh).
+            # Graph-gated entities are those where the grounder reused an existing node.
+            if state.token_tracker and entity_count > 0:
+                # provenance_count == entities that got provenance.
+                # If all entities got provenance without any API calls, that's a full graph hit.
+                # We estimate ~200 tokens per API call avoided per entity graph-gated.
+                api_calls_avoided = getattr(grounder, "_graph_hits", 0)
+                if api_calls_avoided > 0:
+                    state.token_tracker.record_avoided(
+                        "ground",
+                        self._AVG_GROUND_TOKENS * api_calls_avoided,
+                        reason="graph_lookup",
+                    )
 
             # Create GROUNDED_IN edges
             if provenance:

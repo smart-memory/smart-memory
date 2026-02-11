@@ -73,6 +73,13 @@ class OntologyConstrainStage:
             cached_relations = self._lookup_cached_relations(accepted, state.workspace_id)
             if cached_relations:
                 state = replace(state, llm_relations=list(state.llm_relations) + cached_relations)
+                # Record avoided tokens — each cached relation pair saves ~100 tokens of LLM work
+                if state.token_tracker:
+                    state.token_tracker.record_avoided(
+                        "ontology_constrain",
+                        100 * len(cached_relations),
+                        reason="cache_hit",
+                    )
 
         # Step 3: Filter relations — keep only those with both endpoints accepted
         valid_relations = self._filter_relations(state.llm_relations, accepted, accepted_names)

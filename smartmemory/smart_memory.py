@@ -104,6 +104,7 @@ class SmartMemory(MemoryBase):
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
         self._pipeline_runner = None
+        self._last_token_summary: dict | None = None
 
         # Set self on graph search module for SSG traversal
         self._graph.search.set_smart_memory(self)
@@ -198,6 +199,11 @@ class SmartMemory(MemoryBase):
 
         emitter = PipelineMetricsEmitter(workspace_id=workspace_id)
         return PipelineRunner(stages, InProcessTransport(), metrics_emitter=emitter)
+
+    @property
+    def last_token_summary(self) -> dict | None:
+        """Token usage summary from the most recent ``ingest()`` call, or None."""
+        return self._last_token_summary
 
     def create_pipeline_runner(self):
         """Create a configured PipelineRunner for breakpoint execution.
@@ -431,6 +437,12 @@ class SmartMemory(MemoryBase):
             config=pipeline_cfg,
             metadata=meta,
         )
+
+        # Save token usage summary for retrieval by service layer (CFS-1)
+        if state.token_tracker:
+            self._last_token_summary = state.token_tracker.summary()
+        else:
+            self._last_token_summary = None
 
         item_id = state.item_id
 

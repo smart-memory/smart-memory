@@ -26,9 +26,19 @@ class LLMExtractStage:
     def name(self) -> str:
         return "llm_extract"
 
+    # Average tokens per extraction call — used to estimate avoided tokens on cache hit.
+    _AVG_EXTRACTION_TOKENS: int = 800
+
     def execute(self, state: PipelineState, config: PipelineConfig) -> PipelineState:
         llm_cfg = config.extraction.llm_extract
         if not llm_cfg.enabled:
+            if state.token_tracker:
+                state.token_tracker.record_avoided(
+                    "llm_extract",
+                    self._AVG_EXTRACTION_TOKENS,
+                    model=llm_cfg.model or "gpt-4o-mini",
+                    reason="stage_disabled",
+                )
             return replace(state, extraction_status="ruler_only")
 
         # Build input text from simplified sentences or resolved/raw text
@@ -44,6 +54,9 @@ class LLMExtractStage:
             extractor = self._extractor or self._create_extractor(llm_cfg)
             result = extractor.extract(text)
 
+            # Track token usage (CFS-1)
+            self._track_tokens(state, llm_cfg)
+
             entities = result.get("entities", [])
             relations = result.get("relations", [])
 
@@ -55,6 +68,45 @@ class LLMExtractStage:
         except Exception as e:
             logger.warning("LLM extraction failed: %s", e)
             return replace(state, extraction_status="llm_failed")
+
+    def _track_tokens(self, state: PipelineState, llm_cfg) -> None:
+        """Record spent or avoided tokens from the extraction call."""
+        tracker = state.token_tracker
+        if not tracker:
+            return
+
+        model = llm_cfg.model or "gpt-4o-mini"
+
+        # Check the positive cache-hit flag from the extractor first.
+        # This avoids false positives from missing DSPy usage data.
+        try:
+            from smartmemory.plugins.extractors.llm_single import was_last_extract_cached
+
+            cache_hit = was_last_extract_cached()
+        except ImportError:
+            cache_hit = False
+
+        if cache_hit:
+            tracker.record_avoided("llm_extract", self._AVG_EXTRACTION_TOKENS, model=model, reason="cache_hit")
+            return
+
+        # Not a cache hit — try to capture actual token usage from DSPy.
+        try:
+            from smartmemory.utils.llm_client.dspy import get_last_usage
+
+            usage = get_last_usage()
+        except ImportError:
+            usage = None
+
+        if usage:
+            tracker.record_spent(
+                "llm_extract",
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                model=model,
+            )
+        # If usage is None and it was NOT a cache hit, we have no data —
+        # don't record anything rather than producing a false "cache_hit".
 
     def _create_extractor(self, llm_cfg):
         """Build an LLMSingleExtractor from config."""

@@ -7,6 +7,7 @@ raw text; parsing/validation is the caller's responsibility.
 
 Includes automatic token usage tracking via smartmemory.utils.token_tracking.
 """
+
 import logging
 import threading
 from typing import Any, Dict, List, Optional
@@ -19,16 +20,19 @@ except Exception:  # pragma: no cover
 # Lazy import for token tracking to avoid circular imports
 _token_tracker = None
 
+
 def _get_token_tracker():
     """Lazy load token tracker."""
     global _token_tracker
     if _token_tracker is None:
         try:
             from smartmemory.utils.token_tracking import get_global_tracker
+
             _token_tracker = get_global_tracker()
         except ImportError:
             _token_tracker = False  # Mark as unavailable
     return _token_tracker if _token_tracker else None
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,92 +40,116 @@ logger = logging.getLogger(__name__)
 _thread_local = threading.local()
 
 
-def _track_dspy_usage(lm: Any, model: str) -> None:
-    """
-    Extract and track token usage from DSPy LM history.
-    """
-    tracker = _get_token_tracker()
-    if not tracker:
-        return
-    
+def _extract_dspy_usage(lm: Any) -> Optional[Dict[str, int]]:
+    """Extract token usage from DSPy LM history. Returns dict or None."""
     try:
-        # DSPy stores call history in lm.history
-        history = getattr(lm, 'history', None)
+        history = getattr(lm, "history", None)
         if not history:
-            return
-        
-        # Get the most recent entry (last call)
+            return None
+
         if isinstance(history, list) and history:
             entry = history[-1]
         else:
-            return
-        
-        # Extract usage from entry
+            return None
+
         usage = None
         if isinstance(entry, dict):
-            usage = entry.get('usage') or entry.get('response', {}).get('usage')
-        elif hasattr(entry, 'usage'):
+            usage = entry.get("usage") or entry.get("response", {}).get("usage")
+        elif hasattr(entry, "usage"):
             usage = entry.usage
-        
-        if usage:
-            prompt_tokens = 0
-            completion_tokens = 0
-            total_tokens = 0
-            
-            if isinstance(usage, dict):
-                prompt_tokens = usage.get('prompt_tokens', 0)
-                completion_tokens = usage.get('completion_tokens', 0)
-                total_tokens = usage.get('total_tokens', 0)
-            elif hasattr(usage, 'prompt_tokens'):
-                prompt_tokens = getattr(usage, 'prompt_tokens', 0)
-                completion_tokens = getattr(usage, 'completion_tokens', 0)
-                total_tokens = getattr(usage, 'total_tokens', 0)
-            
-            if total_tokens > 0 or prompt_tokens > 0:
-                tracker.track(
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    total_tokens=total_tokens,
-                    model=model
-                )
-                logger.debug(f"Tracked {total_tokens} tokens for {model}")
+
+        if not usage:
+            return None
+
+        if isinstance(usage, dict):
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
+        elif hasattr(usage, "prompt_tokens"):
+            prompt_tokens = getattr(usage, "prompt_tokens", 0)
+            completion_tokens = getattr(usage, "completion_tokens", 0)
+            total_tokens = getattr(usage, "total_tokens", 0)
+        else:
+            return None
+
+        if total_tokens > 0 or prompt_tokens > 0:
+            return {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+            }
     except Exception as e:
-        # Don't fail the main call if tracking fails
+        logger.debug(f"Usage extraction failed: {e}")
+    return None
+
+
+def _track_dspy_usage(lm: Any, model: str) -> None:
+    """Extract and track token usage from DSPy LM history."""
+    usage_dict = _extract_dspy_usage(lm)
+
+    # Store in thread-local for per-request retrieval (CFS-1)
+    _thread_local.last_usage = usage_dict
+
+    if not usage_dict:
+        return
+
+    tracker = _get_token_tracker()
+    if not tracker:
+        return
+
+    try:
+        tracker.track(
+            prompt_tokens=usage_dict["prompt_tokens"],
+            completion_tokens=usage_dict["completion_tokens"],
+            total_tokens=usage_dict["total_tokens"],
+            model=model,
+        )
+        logger.debug("Tracked %d tokens for %s", usage_dict["total_tokens"], model)
+    except Exception as e:
         logger.debug(f"Token tracking failed: {e}")
+
+
+def get_last_usage() -> Optional[Dict[str, int]]:
+    """Return token usage from the most recent ``call_dspy()`` on this thread.
+
+    Returns dict with prompt_tokens, completion_tokens, total_tokens or None.
+    Clears the stored value after reading (consume-once).
+    """
+    usage = getattr(_thread_local, "last_usage", None)
+    _thread_local.last_usage = None
+    return usage
 
 
 def _lm_config_changed(current_lm, new_lm) -> bool:
     """Check if the LM configuration has changed and requires reconfiguration."""
     try:
         # Compare basic attributes that would indicate a config change
-        current_model = getattr(current_lm, 'model', None)
-        new_model = getattr(new_lm, 'model', None)
+        current_model = getattr(current_lm, "model", None)
+        new_model = getattr(new_lm, "model", None)
 
-        current_api_key = getattr(current_lm, 'api_key', None)
-        new_api_key = getattr(new_lm, 'api_key', None)
+        current_api_key = getattr(current_lm, "api_key", None)
+        new_api_key = getattr(new_lm, "api_key", None)
 
-        current_temp = getattr(current_lm, 'temperature', None)
-        new_temp = getattr(new_lm, 'temperature', None)
+        current_temp = getattr(current_lm, "temperature", None)
+        new_temp = getattr(new_lm, "temperature", None)
 
-        return (current_model != new_model or
-                current_api_key != new_api_key or
-                current_temp != new_temp)
+        return current_model != new_model or current_api_key != new_api_key or current_temp != new_temp
     except Exception:
         # If we can't compare, assume it changed to be safe
         return True
 
 
 def call_dspy(
-        *,
-        model: str,
-        messages: List[Dict[str, str]],
-        max_output_tokens: int,
-        api_key: Optional[str] = None,
-        api_base: Optional[str] = None,
-        response_format: Optional[Dict[str, Any]] = None,
-        temperature: Optional[float] = None,
-        reasoning_effort: Optional[str] = None,
-        extra_body: Optional[Dict[str, Any]] = None,
+    *,
+    model: str,
+    messages: List[Dict[str, str]],
+    max_output_tokens: int,
+    api_key: Optional[str] = None,
+    api_base: Optional[str] = None,
+    response_format: Optional[Dict[str, Any]] = None,
+    temperature: Optional[float] = None,
+    reasoning_effort: Optional[str] = None,
+    extra_body: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """Invoke the target model via DSPy and return text.
 
@@ -132,10 +160,13 @@ def call_dspy(
     - Raises on failure with structured logging.
     """
     if dspy is None:  # pragma: no cover
-        logger.error("DSPy import missing", extra={
-            "error": "missing_dependency",
-            "module": "dspy",
-        })
+        logger.error(
+            "DSPy import missing",
+            extra={
+                "error": "missing_dependency",
+                "module": "dspy",
+            },
+        )
         raise ImportError("dspy package is required to use the DSPy client")
 
     # Join chat-like messages into one prompt
@@ -167,11 +198,11 @@ def call_dspy(
             provider_model = f"openai/{model}"
     else:
         provider_model = model
-    
+
     # Check if this is a reasoning model (o1/o3/o4/gpt-5.x)
     mn = model.lower().strip()
     is_reasoning_model = mn.startswith("o1") or mn.startswith("o3") or mn.startswith("o4") or mn.startswith("gpt-5")
-    
+
     lm_kwargs: Dict[str, Any] = {}
     if api_key:
         lm_kwargs["api_key"] = api_key
@@ -205,10 +236,10 @@ def call_dspy(
             # DSPy 3.x: Call LM directly with prompt, returns list of strings
             result = lm(joined)  # type: ignore[misc]
             logger.debug(f"DSPy raw result type: {type(result)}, value: {str(result)[:200]}")
-        
+
         # Track token usage from DSPy history
         _track_dspy_usage(lm, model)
-        
+
         # Try common attributes to get the text content
         for attr in ("text", "completion", "output_text"):
             val = getattr(result, attr, None)
@@ -228,19 +259,25 @@ def call_dspy(
         if s.strip():
             return s
         # Empty output is an error
-        logger.error("Empty output from DSPy", extra={
-            "provider_model": provider_model,
-            "max_output_tokens": max_output_tokens,
-            "temperature": temperature,
-            "reasoning_effort": reasoning_effort,
-        })
+        logger.error(
+            "Empty output from DSPy",
+            extra={
+                "provider_model": provider_model,
+                "max_output_tokens": max_output_tokens,
+                "temperature": temperature,
+                "reasoning_effort": reasoning_effort,
+            },
+        )
         raise RuntimeError("Empty output from DSPy")
     except Exception as e:
-        logger.exception("DSPy call failed", extra={
-            "provider_model": provider_model,
-            "max_output_tokens": max_output_tokens,
-            "temperature": temperature,
-            "reasoning_effort": reasoning_effort,
-            "error_type": type(e).__name__,
-        })
+        logger.exception(
+            "DSPy call failed",
+            extra={
+                "provider_model": provider_model,
+                "max_output_tokens": max_output_tokens,
+                "temperature": temperature,
+                "reasoning_effort": reasoning_effort,
+                "error_type": type(e).__name__,
+            },
+        )
         raise

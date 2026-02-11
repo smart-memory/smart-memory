@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from smartmemory.pipeline.config import PipelineConfig
 from smartmemory.pipeline.protocol import StageCommand
 from smartmemory.pipeline.state import PipelineState
+from smartmemory.pipeline.token_tracker import PipelineTokenTracker
 from smartmemory.pipeline.transport import InProcessTransport, Transport
 
 # Avoid circular import — TYPE_CHECKING guard not needed since we use string annotation
@@ -50,12 +51,17 @@ class PipelineRunner:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> PipelineState:
         """Execute the full pipeline."""
+        tracker = PipelineTokenTracker(
+            workspace_id=config.workspace_id,
+            profile_name=metadata.get("profile_name") if metadata else None,
+        )
         state = PipelineState(
             text=text,
             raw_metadata=metadata or {},
             mode=config.mode,
             workspace_id=config.workspace_id,
             started_at=datetime.now(timezone.utc),
+            token_tracker=tracker,
         )
         return self._run_stages(state, config, self.stages)
 
@@ -67,12 +73,17 @@ class PipelineRunner:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> PipelineState:
         """Execute until (and including) the named stage, then stop."""
+        tracker = PipelineTokenTracker(
+            workspace_id=config.workspace_id,
+            profile_name=metadata.get("profile_name") if metadata else None,
+        )
         state = PipelineState(
             text=text,
             raw_metadata=metadata or {},
             mode=config.mode,
             workspace_id=config.workspace_id,
             started_at=datetime.now(timezone.utc),
+            token_tracker=tracker,
         )
         stages = self._stages_up_to(stop_after)
         return self._run_stages(state, config, stages)
@@ -93,6 +104,13 @@ class PipelineRunner:
             start_from = self._next_stage_name(state)
             if start_from is None:
                 return state  # all stages already completed
+
+        # Ensure a live tracker exists (deserialized checkpoints have None).
+        if not isinstance(state.token_tracker, PipelineTokenTracker):
+            tracker = PipelineTokenTracker(
+                workspace_id=config.workspace_id,
+            )
+            state = replace(state, token_tracker=tracker)
 
         stages = self._stages_from(start_from, stop_after)
         return self._run_stages(state, config, stages)
