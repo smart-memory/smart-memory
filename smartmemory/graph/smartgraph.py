@@ -15,7 +15,9 @@ class SmartGraph:
     Backend is selected based on the 'backend_class' key in config.json['graph_db'] (default: FalkorDBBackend).
     """
 
-    def __init__(self, item_cls=None, enable_caching=True, cache_size=1000, scope_provider: Optional[ScopeProvider] = None):
+    def __init__(
+        self, item_cls=None, enable_caching=True, cache_size=1000, scope_provider: Optional[ScopeProvider] = None
+    ):
         if item_cls is None:
             item_cls = MemoryItem
         self.item_cls = item_cls
@@ -37,19 +39,21 @@ class SmartGraph:
         """
         Resolve the backend class from config. Import directly from backends module.
         """
-        graph_cfg = get_config('graph_db')
-        backend_class_name = graph_cfg.get('backend_class', 'FalkorDBBackend')
+        graph_cfg = get_config("graph_db")
+        backend_class_name = graph_cfg.get("backend_class", "FalkorDBBackend")
 
         # Map backend class names to their module paths
         backend_modules = {
-            'FalkorDBBackend': 'smartmemory.graph.backends.falkordb',
-            'Neo4jBackend': 'smartmemory.graph.backends.neo4j',
+            "FalkorDBBackend": "smartmemory.graph.backends.falkordb",
+            "Neo4jBackend": "smartmemory.graph.backends.neo4j",
             # Add other backends as needed
         }
 
         module_path = backend_modules.get(backend_class_name)
         if not module_path:
-            raise ImportError(f"Unknown backend class '{backend_class_name}'. Available: {list(backend_modules.keys())}")
+            raise ImportError(
+                f"Unknown backend class '{backend_class_name}'. Available: {list(backend_modules.keys())}"
+            )
 
         try:
             module = importlib.import_module(module_path)
@@ -57,7 +61,13 @@ class SmartGraph:
         except (ImportError, AttributeError) as e:
             raise ImportError(f"Failed to import backend class '{backend_class_name}' from '{module_path}': {e}")
 
-    def _emit_graph_stats(self, operation: str, details: Dict[str, Any], delta_nodes: Optional[int] = None, delta_edges: Optional[int] = None) -> None:
+    def _emit_graph_stats(
+        self,
+        operation: str,
+        details: Dict[str, Any],
+        delta_nodes: Optional[int] = None,
+        delta_edges: Optional[int] = None,
+    ) -> None:
         """Best-effort emission of graph stats update events."""
         # Delegate to nodes module for consistency
         self.nodes._emit_graph_stats(operation, details, delta_nodes, delta_edges)
@@ -68,18 +78,18 @@ class SmartGraph:
         pre_nodes: Optional[int] = None
         pre_edges: Optional[int] = None
         try:
-            if hasattr(self.backend, 'get_counts'):
+            if hasattr(self.backend, "get_counts"):
                 counts = self.backend.get_counts()  # type: ignore[attr-defined]
                 if isinstance(counts, dict):
-                    pre_nodes = counts.get('node_count')
-                    pre_edges = counts.get('edge_count')
+                    pre_nodes = counts.get("node_count")
+                    pre_edges = counts.get("edge_count")
             else:
-                if hasattr(self.backend, 'get_node_count'):
+                if hasattr(self.backend, "get_node_count"):
                     pre_nodes = self.backend.get_node_count()  # type: ignore[attr-defined]
-                elif hasattr(self.backend, 'get_all_nodes'):
+                elif hasattr(self.backend, "get_all_nodes"):
                     nodes = self.backend.get_all_nodes()  # type: ignore[attr-defined]
                     pre_nodes = len(nodes) if nodes is not None else None
-                if hasattr(self.backend, 'get_edge_count'):
+                if hasattr(self.backend, "get_edge_count"):
                     pre_edges = self.backend.get_edge_count()  # type: ignore[attr-defined]
         except Exception:
             pass
@@ -88,7 +98,7 @@ class SmartGraph:
 
         # Clear all submodule caches
         self.nodes.clear_cache()
-        self.edges.clear_cache() if hasattr(self.edges, 'clear_cache') else None
+        self.edges.clear_cache() if hasattr(self.edges, "clear_cache") else None
         self.search.clear_cache()
 
         try:
@@ -102,17 +112,26 @@ class SmartGraph:
             pass
         return result
 
-    def add_node(self,
-                 item_id: Optional[str],
-                 properties: Dict[str, Any],
-                 valid_time: Optional[Tuple] = None,
-                 transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None,
-                 is_global: bool = False):
+    def add_node(
+        self,
+        item_id: Optional[str],
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        transaction_time: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
+        is_global: bool = False,
+    ):
         """Add a node to the graph."""
         return self.nodes.add_node(item_id, properties, valid_time, transaction_time, memory_type, is_global)
 
-    def add_dual_node(self, item_id: str, memory_properties: Dict[str, Any], memory_type: str, entity_nodes: List[Dict[str, Any]] = None, is_global: bool = False):
+    def add_dual_node(
+        self,
+        item_id: str,
+        memory_properties: Dict[str, Any],
+        memory_type: str,
+        entity_nodes: List[Dict[str, Any]] = None,
+        is_global: bool = False,
+    ):
         """Add a dual-node structure through the backend."""
         return self.nodes.add_dual_node(item_id, memory_properties, memory_type, entity_nodes, is_global)
 
@@ -126,26 +145,28 @@ class SmartGraph:
         """Convert node dictionary to object."""
         return SmartGraphNodes._from_node_dict(item_cls, node)
 
-    def _validate_edge_structural(self,
-                                  source_id: str,
-                                  target_id: str,
-                                  edge_type: str,
-                                  properties: Optional[Dict[str, Any]]) -> bool:
+    def _validate_edge_structural(
+        self, source_id: str, target_id: str, edge_type: str, properties: Optional[Dict[str, Any]]
+    ) -> bool:
         """Lightweight structural validation for edges."""
         return self.edges._validate_edge_structural(source_id, target_id, edge_type, properties)
 
-    def add_edge(self,
-                 source_id: str,
-                 target_id: str,
-                 edge_type: str,
-                 properties: Dict[str, Any],
-                 valid_time: Optional[Tuple] = None,
-                 transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None):
+    def add_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        edge_type: str,
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        transaction_time: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
+    ):
         """Add an edge to the graph."""
-        return self.edges.add_edge(source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type)
+        return self.edges.add_edge(
+            source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
+        )
 
-    def add_triple(self, triple: 'Triple', properties: Dict[str, Any] = None, **kwargs):
+    def add_triple(self, triple: "Triple", properties: Dict[str, Any] = None, **kwargs):
         """Add a triple (Triple models) to the graph."""
         return self.edges.add_triple(triple, properties, **kwargs)
 
@@ -203,7 +224,7 @@ class SmartGraph:
 
     def get_all_nodes(self):
         """Get all nodes in the graph (full node data)."""
-        if hasattr(self.backend, 'get_all_nodes'):
+        if hasattr(self.backend, "get_all_nodes"):
             return self.backend.get_all_nodes()
         else:
             # Fallback: get all node IDs and fetch each node
@@ -221,9 +242,9 @@ class SmartGraph:
         incoming_neighbors = []
         for edge in edges:
             # If this node is the target, add the source as incoming neighbor
-            if edge.get('target') == item_id:
-                if edge_type is None or edge.get('type') == edge_type:
-                    source_node = self.get_node(edge.get('source'))
+            if edge.get("target") == item_id:
+                if edge_type is None or edge.get("type") == edge_type:
+                    source_node = self.get_node(edge.get("source"))
                     if source_node:
                         incoming_neighbors.append(source_node)
         return incoming_neighbors
@@ -255,7 +276,7 @@ class SmartGraph:
 
     def get_all_edges(self):
         """Get all edges in the graph."""
-        if hasattr(self.backend, 'get_all_edges'):
+        if hasattr(self.backend, "get_all_edges"):
             return self.backend.get_all_edges()
         else:
             # Fallback: return empty list if backend doesn't support it
@@ -270,13 +291,106 @@ class SmartGraph:
         node_stats = self.nodes.get_cache_stats()
         search_stats = self.search.get_cache_stats()
 
-        return {
-            "caching_enabled": True,
-            "nodes": node_stats,
-            "search": search_stats,
-            "max_cache_size": self.cache_size
-        }
+        return {"caching_enabled": True, "nodes": node_stats, "search": search_stats, "max_cache_size": self.cache_size}
 
     def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
         """Execute a raw query against the backend."""
         return self.nodes.execute_query(query, params)
+
+    def delete_by_run_id(self, run_id: str, workspace_id: Optional[str] = None) -> int:
+        """Delete all nodes created by a specific pipeline run.
+
+        Args:
+            run_id: Pipeline run identifier
+            workspace_id: Optional workspace scope (uses scope_provider if not set)
+
+        Returns:
+            Number of nodes deleted
+        """
+        params: Dict[str, Any] = {"run_id": run_id}
+        where_clauses = ["n.run_id = $run_id"]
+
+        # Add scope filtering
+        if workspace_id:
+            params["workspace_id"] = workspace_id
+            where_clauses.append("n.workspace_id = $workspace_id")
+        elif self.backend.scope_provider:
+            try:
+                ctx = self.backend.scope_provider.get_read_context()
+                if ctx.get("workspace_id"):
+                    params["workspace_id"] = ctx["workspace_id"]
+                    where_clauses.append("n.workspace_id = $workspace_id")
+            except Exception:
+                pass  # Continue without workspace filter
+
+        query = f"""
+            MATCH (n)
+            WHERE {" AND ".join(where_clauses)}
+            DETACH DELETE n
+            RETURN count(n) as deleted_count
+        """
+        result = self.execute_query(query, params)
+        deleted = result[0]["deleted_count"] if result and isinstance(result[0], dict) else 0
+
+        # Emit observability event
+        self._emit_graph_stats("delete_by_run", {"run_id": run_id, "deleted": deleted}, delta_nodes=-deleted)
+        return deleted
+
+    def rename_entity_type(self, old_type: str, new_type: str, workspace_id: Optional[str] = None) -> int:
+        """Rename an entity type across all matching nodes.
+
+        Args:
+            old_type: Current entity type name
+            new_type: New entity type name
+            workspace_id: Optional workspace scope
+
+        Returns:
+            Number of nodes updated
+        """
+        params: Dict[str, Any] = {"old_type": old_type, "new_type": new_type}
+        where_clauses = ["n.entity_type = $old_type"]
+
+        # Add scope filtering
+        if workspace_id:
+            params["workspace_id"] = workspace_id
+            where_clauses.append("n.workspace_id = $workspace_id")
+        elif self.backend.scope_provider:
+            try:
+                ctx = self.backend.scope_provider.get_read_context()
+                if ctx.get("workspace_id"):
+                    params["workspace_id"] = ctx["workspace_id"]
+                    where_clauses.append("n.workspace_id = $workspace_id")
+            except Exception:
+                pass  # Continue without workspace filter
+
+        query = f"""
+            MATCH (n)
+            WHERE {" AND ".join(where_clauses)}
+            SET n.entity_type = $new_type
+            RETURN count(n) as updated_count
+        """
+        result = self.execute_query(query, params)
+        updated = result[0]["updated_count"] if result and isinstance(result[0], dict) else 0
+
+        self._emit_graph_stats(
+            "rename_entity_type",
+            {"old_type": old_type, "new_type": new_type, "updated": updated},
+        )
+        return updated
+
+    def merge_entity_types(self, source_types: List[str], target_type: str, workspace_id: Optional[str] = None) -> int:
+        """Merge multiple entity types into a single target type.
+
+        Args:
+            source_types: List of entity types to rename
+            target_type: The target entity type
+            workspace_id: Optional workspace scope
+
+        Returns:
+            Total number of nodes updated
+        """
+        total = 0
+        for source_type in source_types:
+            if source_type != target_type:
+                total += self.rename_entity_type(source_type, target_type, workspace_id)
+        return total

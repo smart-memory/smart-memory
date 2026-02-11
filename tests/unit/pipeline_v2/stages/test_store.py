@@ -120,3 +120,75 @@ class TestStoreStage:
 
         assert result.item_id is None
         assert result.entity_ids == {}
+
+
+class TestStoreStageRunIdInjection:
+    """Tests for run_id injection in StoreStage."""
+
+    def _make_stage(self, add_return=None):
+        """Build a StoreStage with a mocked SmartMemory instance."""
+        memory = MagicMock()
+        memory._crud.add.return_value = add_return or "item_123"
+        return StoreStage(memory), memory
+
+    def _patch_storage_imports(self):
+        """Patch the locally-imported StoragePipeline and IngestionObserver."""
+        return patch.dict(
+            "sys.modules",
+            {
+                "smartmemory.memory.ingestion.storage": MagicMock(),
+                "smartmemory.memory.ingestion.observer": MagicMock(),
+            },
+        )
+
+    def test_run_id_injected_into_metadata(self):
+        """run_id from raw_metadata should be injected into MemoryItem metadata."""
+        stage, memory = self._make_stage(add_return="item_789")
+        state = PipelineState(
+            text="Content with run_id.",
+            raw_metadata={"run_id": "test-run-abc-123"},
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        # Inspect the MemoryItem passed to _crud.add
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["run_id"] == "test-run-abc-123"
+
+    def test_run_id_absent_when_not_provided(self):
+        """When run_id is not in raw_metadata, metadata should not have run_id key."""
+        stage, memory = self._make_stage(add_return="item_999")
+        state = PipelineState(
+            text="Content without run_id.",
+            raw_metadata={"some_other_key": "value"},
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        # Inspect the MemoryItem passed to _crud.add
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert "run_id" not in item_arg.metadata
+
+    def test_run_id_coexists_with_extraction_status(self):
+        """Both run_id and extraction_status should appear in metadata when present."""
+        stage, memory = self._make_stage(add_return="item_combo")
+        state = PipelineState(
+            text="Content with both.",
+            raw_metadata={"run_id": "run-xyz"},
+            extraction_status="full",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["run_id"] == "run-xyz"
+        assert item_arg.metadata["extraction_status"] == "full"

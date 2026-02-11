@@ -35,6 +35,9 @@ class StoreStage:
         metadata = dict(state.raw_metadata)
         if state.extraction_status:
             metadata["extraction_status"] = state.extraction_status
+        # Inject run_id if present for run-based cleanup
+        if state.raw_metadata.get("run_id"):
+            metadata["run_id"] = state.raw_metadata["run_id"]
         item = MemoryItem(
             content=content,
             memory_type=state.memory_type or "semantic",

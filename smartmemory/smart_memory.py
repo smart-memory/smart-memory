@@ -138,7 +138,6 @@ class SmartMemory(MemoryBase):
         from smartmemory.pipeline.stages.enrich import EnrichStage
         from smartmemory.pipeline.stages.ground import GroundStage
         from smartmemory.pipeline.stages.evolve import EvolveStage
-        from smartmemory.memory.ingestion.flow import MemoryIngestionFlow
         from smartmemory.memory.ingestion.enrichment import EnrichmentPipeline
         from smartmemory.memory.ingestion.observer import IngestionObserver
         from smartmemory.graph.ontology_graph import OntologyGraph
@@ -218,7 +217,7 @@ class SmartMemory(MemoryBase):
         sync=True,
     ):
         """Map legacy ingest() parameters to a v2 PipelineConfig."""
-        from smartmemory.pipeline.config import PipelineConfig, ExtractionConfig, LLMExtractConfig, EnrichConfig
+        from smartmemory.pipeline.config import PipelineConfig
 
         config = PipelineConfig()
 
@@ -622,8 +621,16 @@ class SmartMemory(MemoryBase):
             src_node = nodes_data[i]
             tgt_node = nodes_data[i + 1]
 
-            src_id = src_node.properties.get("item_id", str(src_node.id)) if hasattr(src_node, "properties") else str(src_node)
-            tgt_id = tgt_node.properties.get("item_id", str(tgt_node.id)) if hasattr(tgt_node, "properties") else str(tgt_node)
+            src_id = (
+                src_node.properties.get("item_id", str(src_node.id))
+                if hasattr(src_node, "properties")
+                else str(src_node)
+            )
+            tgt_id = (
+                tgt_node.properties.get("item_id", str(tgt_node.id))
+                if hasattr(tgt_node, "properties")
+                else str(tgt_node)
+            )
             rel_type = rel.relation if hasattr(rel, "relation") else str(rel)
 
             triples.append(Triple(subject=src_id, predicate=rel_type, object=tgt_id))
@@ -949,3 +956,50 @@ class SmartMemory(MemoryBase):
         from smartmemory.temporal.context import time_travel
 
         return time_travel(self, to)
+
+    # =========================================================================
+    # Graph Integrity Operations
+    # =========================================================================
+
+    def delete_run(self, run_id: str) -> int:
+        """Delete all entities created by a specific pipeline run.
+
+        Use this to clean up entities from a failed or re-run pipeline execution.
+        All nodes with the matching run_id in their metadata will be deleted.
+
+        Args:
+            run_id: The pipeline run identifier (UUID string)
+
+        Returns:
+            Number of entities deleted
+        """
+        return self._graph.delete_by_run_id(run_id)
+
+    def rename_entity_type(self, old_type: str, new_type: str) -> int:
+        """Rename an entity type across all matching entities.
+
+        Use this when the ontology evolves and entity types need to be renamed.
+        All entities with entity_type=old_type will be updated to new_type.
+
+        Args:
+            old_type: Current entity type name
+            new_type: New entity type name
+
+        Returns:
+            Number of entities updated
+        """
+        return self._graph.rename_entity_type(old_type, new_type)
+
+    def merge_entity_types(self, source_types: List[str], target_type: str) -> int:
+        """Merge multiple entity types into a single target type.
+
+        Use this to consolidate fragmented or similar entity types.
+
+        Args:
+            source_types: List of entity types to merge
+            target_type: The target entity type name
+
+        Returns:
+            Total number of entities updated
+        """
+        return self._graph.merge_entity_types(source_types, target_type)

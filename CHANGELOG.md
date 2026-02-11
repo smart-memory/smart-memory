@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.8] - 2026-02-11
+
+### Added
+
+#### Graph Integrity — Run Tracking & Entity Type Migration (CORE-GRAPH-INT-1)
+
+- **`run_id` injection in StoreStage** (`smartmemory/pipeline/stages/store.py`): Pipeline now injects `run_id` from raw_metadata into stored item metadata, enabling run-based entity cleanup
+- **`SmartGraph.delete_by_run_id(run_id)`** (`smartmemory/graph/smartgraph.py`): New method to delete all nodes created by a specific pipeline run, with workspace scope filtering
+- **`SmartGraph.rename_entity_type(old, new)`** (`smartmemory/graph/smartgraph.py`): Bulk-rename entity types across all matching nodes in the graph
+- **`SmartGraph.merge_entity_types(sources, target)`** (`smartmemory/graph/smartgraph.py`): Merge multiple entity types into a single target type
+- **`SmartMemory.delete_run(run_id)`** (`smartmemory/smart_memory.py`): Public API to delete all entities from a specific pipeline run
+- **`SmartMemory.rename_entity_type(old, new)`** (`smartmemory/smart_memory.py`): Public API for ontology evolution — rename entity types in-place
+- **`SmartMemory.merge_entity_types(sources, target)`** (`smartmemory/smart_memory.py`): Public API to consolidate fragmented entity types
+
+---
+
 ## [0.3.7] - 2026-02-10
 
 ### Fixed
