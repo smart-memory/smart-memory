@@ -1,13 +1,20 @@
 """
-Unit tests for version tracking system.
+Integration tests for version tracking system.
+
+Tests VersionTracker interactions with graph backend (FalkorDB).
+Uses mocked graph to simulate FalkorDB query/response patterns.
+
+Relocated from tests/unit/temporal/ because these tests verify behavior
+that depends on FalkorDB graph query patterns (node properties, edge
+creation, Cypher query results).
 """
 
 import pytest
 
 
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.integration]
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from smartmemory.temporal.version_tracker import VersionTracker, Version
 
@@ -179,7 +186,7 @@ class TestVersionTracker:
         assert version.metadata["author"] == "alice"
         assert version.is_current() is True
 
-        # Verify graph calls — code calls graph.add_node and graph.backend.add_edge
+        # Verify graph calls -- code calls graph.add_node and graph.backend.add_edge
         assert mock_graph.add_node.called
         assert mock_graph.backend.add_edge.called
 
