@@ -6,7 +6,7 @@ including creation, updates, and refinements.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from smartmemory.evolution.diff_engine import ProcedureDiffEngine
@@ -18,6 +18,12 @@ from smartmemory.evolution.models import (
     MatchStatsSnapshot,
 )
 from smartmemory.evolution.store import EvolutionEventStore
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
+
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +95,7 @@ class EvolutionTracker:
             workspace_id=workspace_id,
             user_id=user_id,
             event_type="created",
-            timestamp=datetime.utcnow(),
+            timestamp=_utc_now(),
             version=1,
             content_snapshot=snapshot,
             source=event_source,
@@ -182,7 +188,7 @@ class EvolutionTracker:
             workspace_id=workspace_id,
             user_id=user_id,
             event_type=event_type,
-            timestamp=datetime.utcnow(),
+            timestamp=_utc_now(),
             version=new_version,
             content_snapshot=new_snapshot,
             source=event_source,

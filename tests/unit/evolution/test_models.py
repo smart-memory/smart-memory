@@ -1,6 +1,6 @@
 """Unit tests for evolution models."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from smartmemory.evolution.models import (
     ContentSnapshot,
@@ -193,7 +193,7 @@ class TestEvolutionEvent:
 
     def test_with_all_fields(self):
         """Test EvolutionEvent with all fields populated."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         event = EvolutionEvent(
             event_id="evt-123",
             procedure_id="proc-456",

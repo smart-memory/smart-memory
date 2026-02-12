@@ -8,9 +8,15 @@ Provides dataclasses for tracking how procedures evolve over time:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 import uuid
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
+
 
 from smartmemory.models.base import MemoryBaseModel
 
@@ -148,7 +154,7 @@ class EvolutionEvent(MemoryBaseModel):
     workspace_id: str = ""
     user_id: str = ""
     event_type: str = "created"  # created, updated, refined, merged, superseded
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=_utc_now)
     version: int = 1
 
     content_snapshot: ContentSnapshot = field(default_factory=ContentSnapshot)
@@ -181,7 +187,7 @@ class EvolutionEvent(MemoryBaseModel):
         if isinstance(timestamp, str):
             timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         elif timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = _utc_now()
 
         return cls(
             event_id=data.get("event_id", str(uuid.uuid4())),

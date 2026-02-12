@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.12] - 2026-02-12
+
+### Added
+
+#### Evolution Timeline & Recommendation Engine (CORE-CFS-3b)
+
+**Evolution Timeline** (`smartmemory/evolution/`):
+- `EvolutionEvent` model — tracks procedure version history (created, updated, refined, merged, superseded)
+- `ContentSnapshot` — captures procedure content at each version (content, name, description, skills, tools, steps)
+- `EventDiff` — semantic diff engine for detecting changes between versions (added/removed skills, tools, steps)
+- `EvolutionTracker` — orchestrates event creation and retrieval
+- `EvolutionStore` — MongoDB persistence for evolution events
+
+**Recommendation Engine** (`smartmemory/procedures/`):
+- `PatternDetector` — detects repeated patterns in working memory for procedure promotion candidates
+- `CandidateScorer` — multi-metric scoring (frequency 0.40, consistency 0.30, recency 0.20, agent_workflow 0.10)
+- `CandidateNamer` — auto-generates procedure names and descriptions from cluster content
+- `ProcedureCandidate` model with stable cluster IDs (SHA-256 hash of item IDs for promote/dismiss flow)
+
+### Fixed
+
+- **Cluster ID stability**: Changed from random UUIDs to deterministic hashes, enabling reliable promote/dismiss flow
+- **Deprecated datetime.utcnow()**: Updated to timezone-aware `datetime.now(timezone.utc)`
+
+---
+
+## [0.3.11] - 2026-02-12
+
+### Added
+
+#### Self-Healing Procedures (CORE-CFS-4)
+
+**Schema Diff Engine** (`smartmemory/schema_diff.py`):
+- `diff_schemas()` — JSON Schema-level diff detecting added/removed/modified/type-changed properties
+- `diff_tool_schemas()` — Multi-tool diff aggregating per-tool changes with breaking change classification
+- `SchemaChange` and `SchemaDiffResult` dataclasses for structured diff output
+
+**Schema Snapshots & Drift Events** (`smartmemory/models/`):
+- `SchemaSnapshot` model — captures tool signatures with SHA-256 hash for change detection
+- `DriftEvent` model — records detected schema drift with breaking/non-breaking change counts
+
+**Schema Providers** (`smartmemory/schema_providers.py`):
+- `SchemaProvider` protocol — pluggable interface for resolving current tool schemas
+- `StaticSchemaProvider` — dictionary-backed provider for testing and static configurations
+
+**Drift Detector** (`smartmemory/drift_detector.py`):
+- `DriftDetector` — stateless detector comparing snapshots against current schemas
+- `DriftDetectorConfig` — configuration for enable/disable and confidence multiplier
+- Confidence degradation: `apply_confidence()` reduces match confidence when drift detected
+
+**Procedure Match Extensions**:
+- Added `drift_detected`, `drift_event_id`, `effective_confidence` fields to `ProcedureMatchResult`
+- `SmartMemory.drift_detector` property for accessing the detector instance
+
+---
+
 ## [0.3.10] - 2026-02-12
 
 ### Added

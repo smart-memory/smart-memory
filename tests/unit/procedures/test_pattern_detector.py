@@ -409,6 +409,39 @@ class TestPatternDetector:
             assert "recency_score" in scores
             assert "agent_workflow_score" in scores
 
+    def test_cluster_id_stability(self, detector, similar_items):
+        """Test that cluster IDs are stable across multiple detection calls.
+
+        This is critical for the promote/dismiss flow - users need to be able
+        to list candidates and then promote them with the same cluster_id.
+        """
+        # First detection
+        candidates_1 = detector.detect_candidates(
+            items=similar_items,
+            min_cluster_size=3,
+            min_score=0.0,
+        )
+
+        # Second detection with same items
+        candidates_2 = detector.detect_candidates(
+            items=similar_items,
+            min_cluster_size=3,
+            min_score=0.0,
+        )
+
+        assert len(candidates_1) == len(candidates_2)
+
+        # Cluster IDs should be identical
+        ids_1 = sorted([c.cluster_id for c in candidates_1])
+        ids_2 = sorted([c.cluster_id for c in candidates_2])
+
+        assert ids_1 == ids_2, "Cluster IDs should be stable across calls"
+
+        # Also verify the IDs are deterministic hashes (32 hex chars)
+        for candidate in candidates_1:
+            assert len(candidate.cluster_id) == 32
+            assert all(c in "0123456789abcdef" for c in candidate.cluster_id)
+
 
 class TestCandidateScores:
     """Tests for CandidateScores dataclass."""

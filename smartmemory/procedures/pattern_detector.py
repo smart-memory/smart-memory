@@ -5,8 +5,8 @@ Detects repeated patterns in working memory that are candidates
 for procedure promotion using the EnhancedSimilarityFramework.
 """
 
+import hashlib
 import logging
-import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, TYPE_CHECKING
 
@@ -211,8 +211,11 @@ class PatternDetector:
         Returns:
             ProcedureCandidate with scores and metadata
         """
-        # Generate cluster ID
-        cluster_id = str(uuid.uuid4())
+        # Generate stable cluster ID from sorted item IDs
+        # This ensures the same cluster produces the same ID across API calls
+        item_ids = sorted(getattr(item, "item_id", "") for item in cluster if getattr(item, "item_id", ""))
+        hash_input = "|".join(item_ids)
+        cluster_id = hashlib.sha256(hash_input.encode()).hexdigest()[:32]
 
         # Calculate scores
         scores = self.scorer.score_cluster(cluster, total_items)
