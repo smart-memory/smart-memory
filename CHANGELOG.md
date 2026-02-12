@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.9] - 2026-02-11
 
+### Security
+
+#### Temporal Query Tenant Isolation (SEC-TEMPORAL-1)
+
+- **Fixed cross-tenant data leak in `TemporalQueries`** (`smartmemory/temporal/queries.py`): Added `_get_node_scoped()` helper method that enforces workspace isolation when retrieving nodes
+- **`compare_versions()` now respects tenant boundaries**: Uses scoped node retrieval to prevent cross-workspace version comparison
+- **`rollback()` now respects tenant boundaries**: Uses scoped node retrieval to prevent cross-workspace item access and modification
+- **OSS mode backward compatibility**: When no scope provider is configured, temporal queries work as before (no restrictions)
+
 ### Added
 
 #### Token Cost Instrumentation (CFS-1)
