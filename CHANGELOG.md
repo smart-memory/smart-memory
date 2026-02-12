@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.10] - 2026-02-12
+
+### Added
+
+#### Procedure Analytics Dashboard (CORE-CFS-3)
+
+**Backend API:**
+- **`GET /memory/procedures`** (`smart-memory-service/memory_service/api/routes/procedures.py`): Lists all procedural memories with aggregated match statistics (total matches, success rate, avg confidence, tokens saved). Supports pagination (limit, offset) and sorting (by match_count, success_rate, created_at, name)
+- **`GET /memory/procedures/{id}`** (`procedures.py`): Returns procedure detail with recent match history. Query params: `include_matches` (default true), `match_limit` (default 20)
+- **Contract file** (`contracts/procedures.json`): API contract defining Procedure, ProcedureDetail, MatchStats, MatchRecord types
+
+**Python SDK:**
+- **`list_procedures(limit, offset, sort_by, sort_order)`** (`smart-memory-client/smartmemory_client/client.py`): List procedures with pagination and sorting
+- **`get_procedure(procedure_id, include_matches, match_limit)`** (`client.py`): Get procedure detail with optional match history
+
+**Frontend (smart-memory-insights):**
+- **Procedures page** (`web/src/pages/Procedures.jsx`): New analytics page with 30-second auto-refresh
+- **ProcedureStatsCards** (`web/src/components/procedures/ProcedureStatsCards.jsx`): Stats cards showing Total Procedures, Total Matches, Success Rate, Tokens Saved with loading skeletons
+- **ProcedureMatchChart** (`web/src/components/procedures/ProcedureMatchChart.jsx`): Dual-axis time-series chart (matches on left, tokens saved on right) using recharts
+- **ProcedureCatalog** (`web/src/components/procedures/ProcedureCatalog.jsx`): Searchable, sortable table with 300ms debounced search, pagination (Load More), and empty states
+- **ProcedureDetail** (`web/src/components/procedures/ProcedureDetail.jsx`): Slide-out Sheet panel showing procedure content, stats, recent matches with feedback buttons
+- **Navigation item** (`web/src/pages/Layout.jsx`): Added "Procedures" to sidebar with Workflow icon
+
+**JS Client:**
+- **`getProcedures(limit, offset, sortBy, sortOrder)`** (`web/src/api/smartMemoryClient.js`): Fetch procedures list
+- **`getProcedure(procedureId)`** (`smartMemoryClient.js`): Fetch procedure detail
+- **`getProcedureMatchHistory(limit, procedureId)`** (`smartMemoryClient.js`): Fetch match history for chart data
+
+---
+
 ## [0.3.9] - 2026-02-11
 
 ### Security
