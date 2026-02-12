@@ -28,6 +28,8 @@ from smartmemory.managers.debug import DebugManager
 from smartmemory.managers.enrichment import EnrichmentManager
 from smartmemory.managers.evolution import EvolutionManager
 from smartmemory.managers.monitoring import MonitoringManager
+from smartmemory.procedure_matcher import ProcedureMatcher
+from smartmemory.drift_detector import DriftDetector, DriftDetectorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -96,15 +98,21 @@ class SmartMemory(MemoryBase):
         self._clustering = clustering or GlobalClustering(self)
         self._external_resolver = external_resolver or ExternalResolver()
 
-        # Initialize temporal queries
-        self.version_tracker = version_tracker or VersionTracker(self._graph)
-        self.temporal = temporal or TemporalQueries(self)
+        # Initialize temporal queries with scope_provider for tenant isolation
+        self.version_tracker = version_tracker or VersionTracker(self._graph, scope_provider=self.scope_provider)
+        self.temporal = temporal or TemporalQueries(self, scope_provider=self.scope_provider)
         self._temporal_context = None  # For time-travel context manager
 
         # Defer flow construction until needed (lazy)
         self._ingestion_flow = None
         self._pipeline_runner = None
+        # CFS-1/CFS-2: Mutable state from the most recent ingest() call.
+        # NOT thread-safe — each concurrent request must use its own SmartMemory instance.
+        # SecureSmartMemory creates a per-request instance, satisfying this requirement.
         self._last_token_summary: dict | None = None
+        self._procedure_matcher = ProcedureMatcher(self)
+        self._last_procedure_match = None
+        self._drift_detector = DriftDetector(providers=[], config=DriftDetectorConfig())
 
         # Set self on graph search module for SSG traversal
         self._graph.search.set_smart_memory(self)
@@ -204,6 +212,21 @@ class SmartMemory(MemoryBase):
     def last_token_summary(self) -> dict | None:
         """Token usage summary from the most recent ``ingest()`` call, or None."""
         return self._last_token_summary
+
+    @property
+    def last_procedure_match(self):
+        """Procedure match result from the most recent ``ingest()`` call, or None."""
+        return self._last_procedure_match
+
+    @property
+    def procedure_matcher(self) -> ProcedureMatcher:
+        """Access to the procedure matcher for configuration."""
+        return self._procedure_matcher
+
+    @property
+    def drift_detector(self) -> DriftDetector:
+        """Access to the drift detector for configuration."""
+        return self._drift_detector
 
     def create_pipeline_runner(self):
         """Create a configured PipelineRunner for breakpoint execution.
@@ -409,6 +432,24 @@ class SmartMemory(MemoryBase):
         # If this is called from internal code that needs basic storage, check for bypass flag
         if kwargs.pop("_bypass_ingestion", False):
             return self.add(normalized_item, **kwargs)
+
+        # CFS-2: Automatic procedure matching — find a lighter pipeline profile
+        procedure_match = None
+        if self._procedure_matcher.config.enabled and pipeline_config is None:
+            try:
+                procedure_match = self._procedure_matcher.match(normalized_item.content or "")
+                if procedure_match.matched and procedure_match.recommended_profile:
+                    try:
+                        from service_common.pipeline.profiles import get_pipeline_profile_registry
+
+                        pipeline_config = get_pipeline_profile_registry().get_bundle(
+                            procedure_match.recommended_profile
+                        )
+                    except (ImportError, KeyError):
+                        pass  # OSS or unknown profile — fall through to default
+            except Exception as e:
+                logger.debug("CFS-2: Procedure matching failed (non-fatal): %s", e)
+        self._last_procedure_match = procedure_match
 
         # Run full ingestion pipeline (v2)
         if self._pipeline_runner is None:

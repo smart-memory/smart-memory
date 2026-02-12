@@ -24,21 +24,28 @@ from smartmemory.models.decision import Decision
 # Library / Document models (Input Management)
 from smartmemory.models.library import Library, Document
 
+# CFS-4: Self-Healing Procedures
+from smartmemory.models.schema_snapshot import SchemaSnapshot
+from smartmemory.models.drift_event import DriftEvent
+
 __all__ = [
-    'MEMORY_TYPES',
-    'MemoryItem',
+    "MEMORY_TYPES",
+    "MemoryItem",
     # Phase 2: Reasoning
-    'ReasoningStep',
-    'ReasoningTrace',
-    'ReasoningEvaluation',
-    'TaskContext',
+    "ReasoningStep",
+    "ReasoningTrace",
+    "ReasoningEvaluation",
+    "TaskContext",
     # Phase 3: Opinion/Observation
-    'OpinionMetadata',
-    'ObservationMetadata',
-    'Disposition',
+    "OpinionMetadata",
+    "ObservationMetadata",
+    "Disposition",
     # Phase 4: Decision
-    'Decision',
+    "Decision",
     # Input Management
-    'Library',
-    'Document',
+    "Library",
+    "Document",
+    # CFS-4: Self-Healing Procedures
+    "SchemaSnapshot",
+    "DriftEvent",
 ]
