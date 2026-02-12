@@ -1,15 +1,14 @@
 """Unit tests for StoreStage."""
 
-import pytest
-
-pytestmark = pytest.mark.unit
-
-
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from smartmemory.pipeline.config import PipelineConfig
 from smartmemory.pipeline.state import PipelineState
 from smartmemory.pipeline.stages.store import StoreStage
+
+pytestmark = pytest.mark.unit
 
 
 class TestStoreStage:
@@ -192,3 +191,153 @@ class TestStoreStageRunIdInjection:
         item_arg = call_args[0][0]
         assert item_arg.metadata["run_id"] == "run-xyz"
         assert item_arg.metadata["extraction_status"] == "full"
+
+
+class TestStoreStageEmbeddingTokenTracking:
+    """Tests for embedding token tracking in StoreStage (CFS-1a)."""
+
+    def _make_stage(self, add_return=None):
+        """Build a StoreStage with a mocked SmartMemory instance."""
+        memory = MagicMock()
+        memory._crud.add.return_value = add_return or "item_123"
+        return StoreStage(memory), memory
+
+    def _patch_storage_imports(self):
+        """Patch the locally-imported StoragePipeline and IngestionObserver."""
+        return patch.dict(
+            "sys.modules",
+            {
+                "smartmemory.memory.ingestion.storage": MagicMock(),
+                "smartmemory.memory.ingestion.observer": MagicMock(),
+            },
+        )
+
+    def test_track_embedding_spent_on_api_call(self):
+        """When embedding is not cached, tokens are recorded as spent."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        # Mock embedding usage: API call with actual tokens
+        mock_usage = {
+            "prompt_tokens": 150,
+            "total_tokens": 150,
+            "model": "text-embedding-ada-002",
+            "cached": False,
+        }
+
+        with self._patch_storage_imports():
+            with patch(
+                "smartmemory.plugins.embedding.get_last_embedding_usage",
+                return_value=mock_usage,
+            ):
+                stage.execute(state, config)
+
+        summary = tracker.summary()
+        assert "store" in summary["stages"]["spent"]
+        store_spent = summary["stages"]["spent"]["store"]
+        assert store_spent["prompt_tokens"] == 150
+        assert store_spent["completion_tokens"] == 0
+        assert store_spent["models"] == {"text-embedding-ada-002": 1}
+
+    def test_track_embedding_avoided_on_cache_hit(self):
+        """When embedding is cached, tokens are recorded as avoided."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        # Mock embedding usage: cache hit
+        mock_usage = {
+            "prompt_tokens": 0,
+            "total_tokens": 0,
+            "model": "text-embedding-ada-002",
+            "cached": True,
+        }
+
+        with self._patch_storage_imports():
+            with patch(
+                "smartmemory.plugins.embedding.get_last_embedding_usage",
+                return_value=mock_usage,
+            ):
+                stage.execute(state, config)
+
+        summary = tracker.summary()
+        assert "store" in summary["stages"]["avoided"]
+        store_avoided = summary["stages"]["avoided"]["store"]
+        # Should use estimated average tokens
+        assert store_avoided["total_tokens"] == StoreStage._AVG_EMBEDDING_TOKENS
+        assert store_avoided["reasons"] == {"cache_hit": 1}
+
+    def test_track_embedding_no_tracker(self):
+        """When no token tracker, tracking is silently skipped."""
+        stage, _ = self._make_stage()
+        state = PipelineState(text="Test content.", token_tracker=None)
+        config = PipelineConfig.default()
+
+        # Should not raise even with no tracker
+        with self._patch_storage_imports():
+            with patch(
+                "smartmemory.plugins.embedding.get_last_embedding_usage",
+                return_value={"prompt_tokens": 100, "cached": False},
+            ):
+                result = stage.execute(state, config)
+
+        assert result.item_id is not None
+
+    def test_track_embedding_no_usage_data(self):
+        """When no usage data is available, tracking is silently skipped."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            with patch(
+                "smartmemory.plugins.embedding.get_last_embedding_usage",
+                return_value=None,
+            ):
+                stage.execute(state, config)
+
+        summary = tracker.summary()
+        assert summary["total_spent"] == 0
+        assert summary["total_avoided"] == 0
+
+    def test_track_embedding_import_error(self):
+        """When embedding module import fails, tracking is silently skipped."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        # Force ImportError in _track_embedding_usage by making the import fail
+        def mock_track_that_catches_import():
+            # This test verifies that ImportError is handled gracefully
+            # We need to actually trigger the import failure
+            pass
+
+        with self._patch_storage_imports():
+            # Force the embedding module to raise ImportError when accessed
+            import sys
+
+            original = sys.modules.get("smartmemory.plugins.embedding")
+            sys.modules["smartmemory.plugins.embedding"] = None
+            try:
+                stage.execute(state, config)
+            finally:
+                if original is not None:
+                    sys.modules["smartmemory.plugins.embedding"] = original
+                else:
+                    del sys.modules["smartmemory.plugins.embedding"]
+
+        summary = tracker.summary()
+        assert summary["total_spent"] == 0

@@ -11,16 +11,16 @@ from smartmemory.plugins.base import EnricherPlugin, PluginMetadata
 
 @dataclass
 class TemporalEnricherConfig(MemoryBaseModel):
-    model_name: str = 'gpt-3.5-turbo'
+    model_name: str = "gpt-3.5-turbo"
     openai_api_key: Optional[str] = None
-    prompt_template_key: str = 'enrichers.temporal.prompt_template'
+    prompt_template_key: str = "enrichers.temporal.prompt_template"
 
 
 @dataclass
 class TemporalEnricherRequest(StageRequest):
-    model_name: str = 'gpt-3.5-turbo'
+    model_name: str = "gpt-3.5-turbo"
     openai_api_key: Optional[str] = None
-    prompt_template_key: str = 'enrichers.temporal.prompt_template'
+    prompt_template_key: str = "enrichers.temporal.prompt_template"
     context: Dict[str, Any] = field(default_factory=dict)
     run_id: Optional[str] = None
 
@@ -41,7 +41,7 @@ class TemporalEnricher(EnricherPlugin):
             description="LLM-based temporal metadata inference for entities and relations",
             plugin_type="enricher",
             dependencies=["openai>=1.0.0"],
-            min_smartmemory_version="0.1.0"
+            min_smartmemory_version="0.1.0",
         )
 
     def __init__(self, config: Optional[TemporalEnricherConfig] = None):
@@ -53,8 +53,8 @@ class TemporalEnricher(EnricherPlugin):
         self.model = self.config.model_name
 
     def enrich(self, item, node_ids=None, prompt_template=None):
-        content = getattr(item, 'content', str(item))
-        entities = node_ids.get('semantic_entities', []) if isinstance(node_ids, dict) else []
+        content = getattr(item, "content", str(item))
+        entities = node_ids.get("semantic_entities", []) if isinstance(node_ids, dict) else []
         template_key = self.config.prompt_template_key
         template = prompt_template or get_prompt_value(template_key)
         if not template:
@@ -66,11 +66,29 @@ class TemporalEnricher(EnricherPlugin):
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
                 max_tokens=512,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
+            # Track token usage (CFS-1b)
+            self._track_usage(response)
+
             result = response.choices[0].message.content
             temporal = json.loads(result)
         except Exception:
             logging.exception("TemporalEnricher: failed to obtain or parse OpenAI response")
             temporal = {}
-        return {'temporal': temporal}
+        return {"temporal": temporal}
+
+    def _track_usage(self, response) -> None:
+        """Record token usage from OpenAI response (CFS-1b)."""
+        try:
+            from smartmemory.plugins.enrichers.usage_tracking import record_enricher_usage
+
+            if hasattr(response, "usage") and response.usage:
+                record_enricher_usage(
+                    enricher_name="temporal_enricher",
+                    prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                    completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                    model=self.model,
+                )
+        except ImportError:
+            pass

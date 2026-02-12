@@ -1,15 +1,14 @@
 """Unit tests for EnrichStage."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-pytestmark = pytest.mark.unit
-
-
-from unittest.mock import MagicMock
-
-from smartmemory.pipeline.config import PipelineConfig, EnrichConfig
+from smartmemory.pipeline.config import EnrichConfig, PipelineConfig
 from smartmemory.pipeline.state import PipelineState
 from smartmemory.pipeline.stages.enrich import EnrichStage
+
+pytestmark = pytest.mark.unit
 
 
 class TestEnrichStage:
@@ -89,3 +88,165 @@ class TestEnrichStage:
         result = stage.undo(state)
 
         assert result.enrichments == {}
+
+
+class TestEnrichStageTokenTracking:
+    """Tests for enricher LLM token tracking in EnrichStage (CFS-1b)."""
+
+    def _make_stage(self, run_return=None):
+        """Build an EnrichStage with a mocked EnrichmentPipeline."""
+        pipeline = MagicMock()
+        pipeline.run_enrichment.return_value = run_return or {}
+        return EnrichStage(pipeline), pipeline
+
+    def test_track_enricher_usage_single_enricher(self):
+        """Token usage from a single enricher is recorded."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", item_id="item_1", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        # Mock enricher usage
+        mock_usage = {
+            "total_prompt_tokens": 500,
+            "total_completion_tokens": 200,
+            "total_tokens": 700,
+            "records": [
+                {
+                    "enricher_name": "temporal_enricher",
+                    "prompt_tokens": 500,
+                    "completion_tokens": 200,
+                    "total_tokens": 700,
+                    "model": "gpt-4o-mini",
+                }
+            ],
+        }
+
+        with patch(
+            "smartmemory.plugins.enrichers.usage_tracking.get_enricher_usage",
+            return_value=mock_usage,
+        ):
+            stage.execute(state, config)
+
+        summary = tracker.summary()
+        assert "enrich" in summary["stages"]["spent"]
+        enrich_spent = summary["stages"]["spent"]["enrich"]
+        assert enrich_spent["prompt_tokens"] == 500
+        assert enrich_spent["completion_tokens"] == 200
+        assert enrich_spent["total_tokens"] == 700
+
+    def test_track_enricher_usage_multiple_enrichers(self):
+        """Token usage from multiple enrichers is accumulated."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", item_id="item_1", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        # Mock usage from two enrichers
+        mock_usage = {
+            "total_prompt_tokens": 900,
+            "total_completion_tokens": 400,
+            "total_tokens": 1300,
+            "records": [
+                {
+                    "enricher_name": "temporal_enricher",
+                    "prompt_tokens": 400,
+                    "completion_tokens": 150,
+                    "total_tokens": 550,
+                    "model": "gpt-4o-mini",
+                },
+                {
+                    "enricher_name": "link_expansion_enricher",
+                    "prompt_tokens": 500,
+                    "completion_tokens": 250,
+                    "total_tokens": 750,
+                    "model": "gpt-4o-mini",
+                },
+            ],
+        }
+
+        with patch(
+            "smartmemory.plugins.enrichers.usage_tracking.get_enricher_usage",
+            return_value=mock_usage,
+        ):
+            stage.execute(state, config)
+
+        summary = tracker.summary()
+        enrich_spent = summary["stages"]["spent"]["enrich"]
+        # Each record is recorded separately, so call_count should be 2
+        assert enrich_spent["call_count"] == 2
+        assert enrich_spent["prompt_tokens"] == 900
+        assert enrich_spent["completion_tokens"] == 400
+
+    def test_track_enricher_usage_no_tracker(self):
+        """When no token tracker, tracking is silently skipped."""
+        stage, _ = self._make_stage()
+        state = PipelineState(text="Test content.", item_id="item_1", token_tracker=None)
+        config = PipelineConfig.default()
+
+        # Should not raise even with no tracker
+        with patch(
+            "smartmemory.plugins.enrichers.usage_tracking.get_enricher_usage",
+            return_value={"records": [{"prompt_tokens": 100}]},
+        ):
+            result = stage.execute(state, config)
+
+        assert result.enrichments == {}
+
+    def test_track_enricher_usage_no_usage_data(self):
+        """When no usage data, tracking is silently skipped."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, _ = self._make_stage()
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", item_id="item_1", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        with patch(
+            "smartmemory.plugins.enrichers.usage_tracking.get_enricher_usage",
+            return_value=None,
+        ):
+            stage.execute(state, config)
+
+        summary = tracker.summary()
+        assert summary["total_spent"] == 0
+
+    def test_track_enricher_usage_on_failure(self):
+        """Token tracking happens even when enrichment fails."""
+        from smartmemory.pipeline.token_tracker import PipelineTokenTracker
+
+        stage, pipeline = self._make_stage()
+        pipeline.run_enrichment.side_effect = RuntimeError("enrichment failed")
+
+        tracker = PipelineTokenTracker(workspace_id="ws-test")
+        state = PipelineState(text="Test content.", item_id="item_1", token_tracker=tracker)
+        config = PipelineConfig.default()
+
+        mock_usage = {
+            "total_prompt_tokens": 300,
+            "total_completion_tokens": 100,
+            "total_tokens": 400,
+            "records": [
+                {
+                    "enricher_name": "temporal_enricher",
+                    "prompt_tokens": 300,
+                    "completion_tokens": 100,
+                    "total_tokens": 400,
+                    "model": "gpt-4o-mini",
+                }
+            ],
+        }
+
+        with patch(
+            "smartmemory.plugins.enrichers.usage_tracking.get_enricher_usage",
+            return_value=mock_usage,
+        ):
+            stage.execute(state, config)
+
+        # Tracking should still happen via finally block
+        summary = tracker.summary()
+        assert summary["total_spent"] == 400

@@ -54,8 +54,40 @@ class EnrichStage:
         except Exception as e:
             logger.warning("Enrichment failed (non-fatal): %s", e)
             result = {}
+        finally:
+            # Track enricher LLM token usage (CFS-1b)
+            self._track_enricher_usage(state)
 
         return replace(state, enrichments=result or {})
 
     def undo(self, state: PipelineState) -> PipelineState:
         return replace(state, enrichments={})
+
+    def _track_enricher_usage(self, state: PipelineState) -> None:
+        """Track accumulated LLM token usage from enricher plugins (CFS-1b).
+
+        Retrieves accumulated usage from all enricher LLM calls and records
+        to the pipeline token tracker.
+        """
+        tracker = state.token_tracker
+        if not tracker:
+            return
+
+        try:
+            from smartmemory.plugins.enrichers.usage_tracking import get_enricher_usage
+
+            usage = get_enricher_usage()
+        except ImportError:
+            return
+
+        if not usage:
+            return
+
+        # Record each enricher's usage separately for attribution
+        for record in usage.get("records", []):
+            tracker.record_spent(
+                "enrich",
+                prompt_tokens=record.get("prompt_tokens", 0),
+                completion_tokens=record.get("completion_tokens", 0),
+                model=record.get("model", ""),
+            )

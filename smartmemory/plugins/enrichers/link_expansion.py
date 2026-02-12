@@ -396,6 +396,9 @@ class LinkExpansionEnricher(EnricherPlugin):
                 max_tokens=1024,
                 response_format={"type": "json_object"},
             )
+            # Track token usage (CFS-1b)
+            self._track_usage(response)
+
             message_content = response.choices[0].message.content
             if message_content is None:
                 return {}
@@ -404,6 +407,21 @@ class LinkExpansionEnricher(EnricherPlugin):
         except Exception as e:
             logger.warning(f"LLM analysis failed: {e}")
             return {}
+
+    def _track_usage(self, response) -> None:
+        """Record token usage from OpenAI response (CFS-1b)."""
+        try:
+            from smartmemory.plugins.enrichers.usage_tracking import record_enricher_usage
+
+            if hasattr(response, "usage") and response.usage:
+                record_enricher_usage(
+                    enricher_name="link_expansion_enricher",
+                    prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                    completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                    model=self.config.model_name,
+                )
+        except ImportError:
+            pass
 
     def enrich(self, item, node_ids=None) -> dict:
         """Enrich a memory item by expanding URLs into graph structures.

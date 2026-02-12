@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`get_last_usage()` in DSPy adapter**: Thread-local consume-once accessor for LLM token usage from DSPy calls
 - **`SmartMemory.last_token_summary` property**: Access the most recent pipeline run's token summary
 - **Extended `COST_PER_1K_TOKENS`** in `utils/token_tracking.py`: Added Groq Llama, Gemini Flash, Claude Haiku pricing
+- **Embedding token tracking (CFS-1a)**: Added `EmbeddingUsage` dataclass and `get_last_embedding_usage()` thread-local accessor in `plugins/embedding.py`; store stage now tracks embedding tokens as spent (API calls) or avoided (cache hits)
+- **Enricher LLM token tracking (CFS-1b)**: Added `usage_tracking.py` module in `plugins/enrichers/` with thread-local accumulator pattern; `TemporalEnricher` and `LinkExpansionEnricher` now record OpenAI token usage; `EnrichStage` collects accumulated usage in finally block for cost attribution
 
 ---
 

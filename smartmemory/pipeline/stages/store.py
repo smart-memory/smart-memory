@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class StoreStage:
     """Persist the memory item and extracted entities to the graph."""
 
+    # Average tokens per embedding call — used to estimate avoided tokens on cache hit.
+    _AVG_EMBEDDING_TOKENS: int = 250
+
     def __init__(self, memory):
         """Args: memory — a SmartMemory instance."""
         self._memory = memory
@@ -71,7 +74,7 @@ class StoreStage:
         if relations:
             self._process_relations(state, item_id, entities, relations)
 
-        # Save to vector and graph
+        # Save to vector and graph with token tracking (CFS-1a)
         context = {
             "item": item,
             "entity_ids": entity_ids,
@@ -85,6 +88,10 @@ class StoreStage:
             storage.save_to_vector_and_graph(context)
         except Exception as e:
             logger.warning("Vector/graph save failed (non-fatal): %s", e)
+        finally:
+            # Track embedding token usage (CFS-1a) — must happen even on save failure
+            # because the embedding API call may have completed before the error
+            self._track_embedding_usage(state)
 
         return replace(state, item_id=item_id, entity_ids=entity_ids)
 
@@ -129,6 +136,42 @@ class StoreStage:
                 storage.process_extracted_relations(context, item_id, external)
             except Exception as e:
                 logger.warning("Failed to process relations: %s", e)
+
+    def _track_embedding_usage(self, state: PipelineState) -> None:
+        """Track embedding token usage from the last embedding call (CFS-1a).
+
+        Retrieves token usage from the EmbeddingService's thread-local storage
+        and records it to the pipeline token tracker. Cache hits are recorded
+        as avoided tokens with an estimated cost.
+        """
+        tracker = state.token_tracker
+        if not tracker:
+            return
+
+        try:
+            from smartmemory.plugins.embedding import get_last_embedding_usage
+
+            usage = get_last_embedding_usage()
+        except ImportError:
+            return
+
+        if not usage:
+            return
+
+        model = usage.get("model", "text-embedding-ada-002")
+
+        if usage.get("cached"):
+            # Cache hit — record estimated avoided tokens
+            tracker.record_avoided(
+                "store",
+                self._AVG_EMBEDDING_TOKENS,
+                model=model,
+                reason="cache_hit",
+            )
+        else:
+            # API call — record actual tokens spent (embeddings have no completion tokens)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            tracker.record_spent("store", prompt_tokens, 0, model=model)
 
 
 def _entity_name(entity, index: int) -> str:
