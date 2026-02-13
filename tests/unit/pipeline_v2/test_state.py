@@ -166,6 +166,11 @@ class TestPipelineStateToDict:
             "stage_timings",
             "started_at",
             "completed_at",
+            "extraction_status",
+            "ontology_registry_id",
+            "ontology_version",
+            "constraint_violations",
+            "unresolved_entities",
         }
         for field_name in expected_fields:
             assert field_name in d, f"Missing field: {field_name}"
@@ -226,3 +231,73 @@ class TestPipelineStateFromDict:
         assert state.text == ""
         assert state.mode == "sync"
         assert state.stage_history == []
+
+
+class TestPipelineStateOntologyFields:
+    """Tests for OL-2/3/4 ontology fields on PipelineState."""
+
+    def test_default_ontology_fields(self):
+        """New ontology fields have correct defaults."""
+        state = PipelineState()
+        assert state.ontology_registry_id == ""
+        assert state.ontology_version == ""
+        assert state.constraint_violations == []
+        assert state.unresolved_entities == []
+
+    def test_construction_with_ontology_fields(self):
+        """Ontology fields can be set on construction."""
+        state = PipelineState(
+            ontology_registry_id="reg-1",
+            ontology_version="v2.0",
+            constraint_violations=[{"entity_name": "X"}],
+            unresolved_entities=[{"entity_name": "Y"}],
+        )
+        assert state.ontology_registry_id == "reg-1"
+        assert state.ontology_version == "v2.0"
+        assert state.constraint_violations == [{"entity_name": "X"}]
+        assert state.unresolved_entities == [{"entity_name": "Y"}]
+
+    def test_replace_ontology_fields(self):
+        """dataclasses.replace() works for ontology fields."""
+        state = PipelineState(ontology_version="v1.0")
+        new_state = dataclasses.replace(state, ontology_version="v2.0")
+        assert state.ontology_version == "v1.0"
+        assert new_state.ontology_version == "v2.0"
+
+    def test_to_dict_includes_ontology_fields(self):
+        """to_dict() includes ontology fields."""
+        state = PipelineState(
+            ontology_registry_id="test-reg",
+            ontology_version="v1.0",
+            constraint_violations=[{"kind": "soft"}],
+            unresolved_entities=[{"reason": "unknown_type"}],
+        )
+        d = state.to_dict()
+        assert d["ontology_registry_id"] == "test-reg"
+        assert d["ontology_version"] == "v1.0"
+        assert d["constraint_violations"] == [{"kind": "soft"}]
+        assert d["unresolved_entities"] == [{"reason": "unknown_type"}]
+
+    def test_round_trip_ontology_fields(self):
+        """Ontology fields survive to_dict() -> from_dict() round trip."""
+        original = PipelineState(
+            ontology_registry_id="reg-abc",
+            ontology_version="v3.0",
+            constraint_violations=[{"entity_name": "A", "kind": "hard"}],
+            unresolved_entities=[{"entity_name": "B", "reason": "low_confidence"}],
+        )
+        d = original.to_dict()
+        restored = PipelineState.from_dict(d)
+        assert restored.ontology_registry_id == original.ontology_registry_id
+        assert restored.ontology_version == original.ontology_version
+        assert restored.constraint_violations == original.constraint_violations
+        assert restored.unresolved_entities == original.unresolved_entities
+
+    def test_list_defaults_independent(self):
+        """Each instance gets its own lists for ontology list fields."""
+        a = PipelineState()
+        b = PipelineState()
+        a.constraint_violations.append({"test": True})
+        a.unresolved_entities.append({"test": True})
+        assert b.constraint_violations == []
+        assert b.unresolved_entities == []

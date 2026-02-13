@@ -193,6 +193,96 @@ class TestStoreStageRunIdInjection:
         assert item_arg.metadata["extraction_status"] == "full"
 
 
+class TestStoreStageOntologyMetadata:
+    """Tests for ontology metadata injection in StoreStage (OL-2)."""
+
+    def _make_stage(self, add_return=None):
+        """Build a StoreStage with a mocked SmartMemory instance."""
+        memory = MagicMock()
+        memory._crud.add.return_value = add_return or "item_123"
+        return StoreStage(memory), memory
+
+    def _patch_storage_imports(self):
+        """Patch the locally-imported StoragePipeline and IngestionObserver."""
+        return patch.dict(
+            "sys.modules",
+            {
+                "smartmemory.memory.ingestion.storage": MagicMock(),
+                "smartmemory.memory.ingestion.observer": MagicMock(),
+            },
+        )
+
+    def test_ontology_version_injected_into_metadata(self):
+        """ontology_version from state is injected into MemoryItem metadata."""
+        stage, memory = self._make_stage(add_return="item_ol2")
+        state = PipelineState(
+            text="Content with ontology version.",
+            ontology_version="v2.1.0",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["ontology_version"] == "v2.1.0"
+
+    def test_ontology_registry_id_injected_into_metadata(self):
+        """ontology_registry_id from state is injected into MemoryItem metadata."""
+        stage, memory = self._make_stage(add_return="item_ol2b")
+        state = PipelineState(
+            text="Content with registry id.",
+            ontology_registry_id="my-registry",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["ontology_registry_id"] == "my-registry"
+
+    def test_ontology_metadata_absent_when_empty(self):
+        """When ontology fields are empty, they are not added to metadata."""
+        stage, memory = self._make_stage(add_return="item_no_ol")
+        state = PipelineState(
+            text="Content without ontology.",
+            ontology_version="",
+            ontology_registry_id="",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert "ontology_version" not in item_arg.metadata
+        assert "ontology_registry_id" not in item_arg.metadata
+
+    def test_ontology_metadata_coexists_with_run_id(self):
+        """Ontology metadata and run_id can coexist in metadata."""
+        stage, memory = self._make_stage(add_return="item_both")
+        state = PipelineState(
+            text="Content with both.",
+            raw_metadata={"run_id": "run-abc"},
+            ontology_version="v1.0",
+            ontology_registry_id="default",
+        )
+        config = PipelineConfig.default()
+
+        with self._patch_storage_imports():
+            stage.execute(state, config)
+
+        call_args = memory._crud.add.call_args
+        item_arg = call_args[0][0]
+        assert item_arg.metadata["run_id"] == "run-abc"
+        assert item_arg.metadata["ontology_version"] == "v1.0"
+        assert item_arg.metadata["ontology_registry_id"] == "default"
+
+
 class TestStoreStageEmbeddingTokenTracking:
     """Tests for embedding token tracking in StoreStage (CFS-1a)."""
 

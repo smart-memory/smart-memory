@@ -56,6 +56,12 @@ class PipelineState:
     rejected: List[Any] = field(default_factory=list)
     promotion_candidates: List[Any] = field(default_factory=list)
 
+    # -- Ontology (OL-2, OL-3, OL-4) --
+    ontology_registry_id: str = ""
+    ontology_version: str = ""
+    constraint_violations: List[Dict[str, Any]] = field(default_factory=list)
+    unresolved_entities: List[Dict[str, Any]] = field(default_factory=list)
+
     # -- Storage --
     item_id: Optional[str] = None
     entity_ids: Dict[str, str] = field(default_factory=dict)

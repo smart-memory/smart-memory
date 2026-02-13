@@ -41,6 +41,11 @@ class StoreStage:
         # Inject run_id if present for run-based cleanup
         if state.raw_metadata.get("run_id"):
             metadata["run_id"] = state.raw_metadata["run_id"]
+        # OL-2: Inject ontology version metadata
+        if state.ontology_version:
+            metadata["ontology_version"] = state.ontology_version
+        if state.ontology_registry_id:
+            metadata["ontology_registry_id"] = state.ontology_registry_id
         item = MemoryItem(
             content=content,
             memory_type=state.memory_type or "semantic",

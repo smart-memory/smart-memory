@@ -110,6 +110,11 @@ class SmartMemory(MemoryBase):
         # NOT thread-safe — each concurrent request must use its own SmartMemory instance.
         # SecureSmartMemory creates a per-request instance, satisfying this requirement.
         self._last_token_summary: dict | None = None
+        # OL-2/OL-3/OL-4: Ontology pipeline results from the most recent ingest() call.
+        self._last_ontology_version: str = ""
+        self._last_ontology_registry_id: str = ""
+        self._last_unresolved_entities: list = []
+        self._last_constraint_violations: list = []
         self._procedure_matcher = ProcedureMatcher(self)
         self._last_procedure_match = None
         self._drift_detector = DriftDetector(providers=[], config=DriftDetectorConfig())
@@ -168,6 +173,24 @@ class SmartMemory(MemoryBase):
             pass
         ontology_graph = OntologyGraph(workspace_id=workspace_id)
 
+        # OL-2/OL-3: OntologyRegistry for version tracking and constraint validation
+        from smartmemory.ontology.registry import OntologyRegistry
+
+        ontology_registry = None
+        ontology_snapshot = None
+        try:
+            ontology_registry = OntologyRegistry(config=None, scope_provider=self.scope_provider)
+        except Exception:
+            pass
+        if ontology_registry:
+            try:
+                snap = ontology_registry.get_snapshot("default")
+                from smartmemory.ontology.models import Ontology
+
+                ontology_snapshot = Ontology.from_dict(snap.get("snapshot", {}))
+            except Exception:
+                pass
+
         # Phase 4: PatternManager for learned entity pattern dictionary scan
         from smartmemory.ontology.pattern_manager import PatternManager
 
@@ -194,7 +217,11 @@ class SmartMemory(MemoryBase):
             EntityRulerStage(pattern_manager=pattern_manager),
             LLMExtractStage(),
             OntologyConstrainStage(
-                ontology_graph, promotion_queue=promotion_queue, entity_pair_cache=entity_pair_cache
+                ontology_graph,
+                promotion_queue=promotion_queue,
+                entity_pair_cache=entity_pair_cache,
+                ontology_registry=ontology_registry,
+                ontology_model=ontology_snapshot,
             ),
             StoreStage(self),
             LinkStage(self._linking),
@@ -217,6 +244,26 @@ class SmartMemory(MemoryBase):
     def last_procedure_match(self):
         """Procedure match result from the most recent ``ingest()`` call, or None."""
         return self._last_procedure_match
+
+    @property
+    def last_ontology_version(self) -> str:
+        """Ontology version from the most recent ``ingest()`` call."""
+        return self._last_ontology_version
+
+    @property
+    def last_ontology_registry_id(self) -> str:
+        """Ontology registry ID from the most recent ``ingest()`` call."""
+        return self._last_ontology_registry_id
+
+    @property
+    def last_unresolved_entities(self) -> list:
+        """Unresolved entities from the most recent ``ingest()`` call."""
+        return self._last_unresolved_entities
+
+    @property
+    def last_constraint_violations(self) -> list:
+        """Constraint violations from the most recent ``ingest()`` call."""
+        return self._last_constraint_violations
 
     @property
     def procedure_matcher(self) -> ProcedureMatcher:
@@ -484,6 +531,12 @@ class SmartMemory(MemoryBase):
             self._last_token_summary = state.token_tracker.summary()
         else:
             self._last_token_summary = None
+
+        # Save ontology pipeline results for retrieval by service layer (OL-2/3/4)
+        self._last_ontology_version = state.ontology_version
+        self._last_ontology_registry_id = state.ontology_registry_id
+        self._last_unresolved_entities = state.unresolved_entities
+        self._last_constraint_violations = state.constraint_violations
 
         item_id = state.item_id
 

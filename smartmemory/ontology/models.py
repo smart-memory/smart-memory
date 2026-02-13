@@ -5,6 +5,33 @@ from typing import Dict, Set, List, Any, Optional
 
 
 @dataclass
+class PropertyConstraint:
+    """Constraint on an entity type property (OL-3)."""
+
+    required: bool = False
+    type: str = "string"  # string | number | date | boolean | enum
+    cardinality: str = "one"  # one | many
+    kind: str = "soft"  # soft (warn) | hard (reject)
+    enum_values: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "required": self.required,
+            "type": self.type,
+            "cardinality": self.cardinality,
+            "kind": self.kind,
+        }
+        if self.enum_values:
+            d["enum_values"] = self.enum_values
+        return d
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PropertyConstraint":
+        valid_keys = {"required", "type", "cardinality", "kind", "enum_values"}
+        return cls(**{k: v for k, v in data.items() if k in valid_keys})
+
+
+@dataclass
 class EntityTypeDefinition:
     """Definition of an entity type in the ontology."""
 
@@ -18,6 +45,7 @@ class EntityTypeDefinition:
     created_by: str  # "human", "llm", "inferred"
     created_at: datetime
     confidence: float = 1.0
+    property_constraints: Dict[str, "PropertyConstraint"] = field(default_factory=dict)
 
 
 @dataclass
@@ -207,6 +235,10 @@ class Ontology:
             entity_dict["parent_types"] = list(entity_type.parent_types)
             entity_dict["aliases"] = list(entity_type.aliases)
             entity_dict["created_at"] = entity_type.created_at.isoformat()
+            if entity_type.property_constraints:
+                entity_dict["property_constraints"] = {
+                    k: v.to_dict() for k, v in entity_type.property_constraints.items()
+                }
             entity_types_dict[name] = entity_dict
 
         relationship_types_dict = {}
@@ -270,6 +302,10 @@ class Ontology:
             entity_data["required_properties"] = set(entity_data["required_properties"])
             entity_data["parent_types"] = set(entity_data["parent_types"])
             entity_data["aliases"] = set(entity_data["aliases"])
+            raw_constraints = entity_data.pop("property_constraints", None) or {}
+            entity_data["property_constraints"] = {
+                k: PropertyConstraint.from_dict(v) for k, v in raw_constraints.items()
+            }
             entity_type = EntityTypeDefinition(**entity_data)
             ontology.entity_types[name] = entity_type
 

@@ -5,9 +5,9 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-from smartmemory.pipeline.config import PipelineConfig, ConstrainConfig, PromotionConfig, ExtractionConfig
+from smartmemory.pipeline.config import PipelineConfig, ConstrainConfig, PromotionConfig
 from smartmemory.pipeline.state import PipelineState
 from smartmemory.pipeline.stages.ontology_constrain import OntologyConstrainStage
 
@@ -231,3 +231,466 @@ class TestOntologyConstrainStage:
         assert result.relations == []
         assert result.rejected == []
         assert result.promotion_candidates == []
+
+
+class TestOntologyConstrainVersionCapture:
+    """Tests for OL-2: version capture from registry."""
+
+    def test_version_captured_from_registry(self):
+        """When registry is provided, version and registry_id are captured."""
+        og = _mock_ontology({"Person": "seed"})
+        mock_registry = MagicMock()
+        mock_registry.get_registry.return_value = {
+            "id": "my-registry",
+            "current_version": "v2.3.1",
+        }
+        stage = OntologyConstrainStage(og, ontology_registry=mock_registry)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == "my-registry"
+        assert result.ontology_version == "v2.3.1"
+
+    def test_version_empty_without_registry(self):
+        """When no registry is provided, version fields are empty strings."""
+        og = _mock_ontology({"Person": "seed"})
+        stage = OntologyConstrainStage(og)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == ""
+        assert result.ontology_version == ""
+
+    def test_version_graceful_on_registry_error(self):
+        """When registry.get_registry() raises, version fields default to empty."""
+        og = _mock_ontology({"Person": "seed"})
+        mock_registry = MagicMock()
+        mock_registry.get_registry.side_effect = RuntimeError("DB down")
+        stage = OntologyConstrainStage(og, ontology_registry=mock_registry)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == ""
+        assert result.ontology_version == ""
+        # Should still process entities normally
+        assert len(result.entities) == 1
+
+
+class TestOntologyConstrainUnresolved:
+    """Tests for OL-4: structured unresolved entity reporting."""
+
+    def test_unresolved_entity_structure(self):
+        """Rejected entities produce structured unresolved entries."""
+        og = _mock_ontology({})  # No known types
+        stage = OntologyConstrainStage(og)
+        state = PipelineState(
+            text="The quick brown fox jumps.",
+            llm_entities=[{"name": "Fox", "entity_type": "animal", "confidence": 0.3}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.unresolved_entities) == 1
+        unresolved = result.unresolved_entities[0]
+        assert unresolved["entity_name"] == "Fox"
+        assert unresolved["attempted_type"] == "animal"
+        assert unresolved["reason"] in ("unknown_type", "low_confidence")
+        assert unresolved["confidence"] == 0.3
+        assert "quick brown fox" in unresolved["source_content"]
+
+    def test_no_unresolved_when_all_accepted(self):
+        """No unresolved entries when all entities match known types."""
+        og = _mock_ontology({"Person": "seed"})
+        stage = OntologyConstrainStage(og)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.unresolved_entities == []
+
+    def test_source_content_truncated(self):
+        """source_content is truncated to 200 chars max."""
+        og = _mock_ontology({})
+        stage = OntologyConstrainStage(og)
+        long_text = "A" * 500
+        state = PipelineState(
+            text=long_text,
+            llm_entities=[{"name": "Thing", "entity_type": "mystery", "confidence": 0.1}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.unresolved_entities[0]["source_content"]) == 200
+
+    def test_undo_clears_unresolved(self):
+        """Undo resets unresolved_entities and constraint_violations."""
+        og = _mock_ontology()
+        stage = OntologyConstrainStage(og)
+        state = PipelineState(
+            text="Test.",
+            unresolved_entities=[{"entity_name": "X"}],
+            constraint_violations=[{"entity_name": "Y"}],
+        )
+
+        result = stage.undo(state)
+
+        assert result.unresolved_entities == []
+        assert result.constraint_violations == []
+
+
+class TestOntologyConstrainPropertyValidation:
+    """Tests for OL-3: property constraint validation."""
+
+    def _make_ontology_model(self, type_name, constraints):
+        """Build a mock ontology model with property constraints."""
+        from smartmemory.ontology.models import Ontology, EntityTypeDefinition, PropertyConstraint
+        from datetime import datetime
+
+        ontology = Ontology("test", "1.0.0")
+        et = EntityTypeDefinition(
+            name=type_name,
+            description="Test type",
+            properties={},
+            required_properties=set(),
+            parent_types=set(),
+            aliases=set(),
+            examples=[],
+            created_by="human",
+            created_at=datetime.now(),
+            property_constraints={name: PropertyConstraint(**params) for name, params in constraints.items()},
+        )
+        ontology.add_entity_type(et)
+        return ontology
+
+    def test_soft_violation_keeps_entity(self):
+        """Soft constraint violations keep the entity and report violations."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # Entity kept despite missing required field (soft constraint)
+        assert len(result.entities) == 1
+        assert len(result.constraint_violations) == 1
+        violation = result.constraint_violations[0]
+        assert violation["entity_name"] == "Alice"
+        assert violation["property_name"] == "email"
+        assert violation["constraint_type"] == "required"
+        assert violation["kind"] == "soft"
+
+    def test_hard_violation_rejects_entity(self):
+        """Hard constraint violations reject the entity."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "hard"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # Entity rejected due to hard constraint
+        assert len(result.entities) == 0
+        assert len(result.rejected) == 1
+        assert len(result.unresolved_entities) == 1
+        assert result.unresolved_entities[0]["reason"] == "constraint_violation"
+
+    def test_number_type_validation(self):
+        """Number type constraint catches non-numeric values."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "age": {"type": "number", "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9, "age": "not-a-number"}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.constraint_violations) == 1
+        assert result.constraint_violations[0]["constraint_type"] == "type"
+        assert result.constraint_violations[0]["expected"] == "number"
+
+    def test_enum_validation(self):
+        """Enum constraint catches values not in allowed list."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "role": {"type": "enum", "enum_values": ["admin", "user"], "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9, "role": "superadmin"}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.constraint_violations) == 1
+        assert result.constraint_violations[0]["constraint_type"] == "enum"
+
+    def test_cardinality_validation(self):
+        """Cardinality=one constraint catches list values."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"type": "string", "cardinality": "one", "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[
+                {"name": "Alice", "entity_type": "person", "confidence": 0.9, "email": ["a@b.com", "c@d.com"]}
+            ],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.constraint_violations) == 1
+        assert result.constraint_violations[0]["constraint_type"] == "cardinality"
+
+    def test_no_violations_when_no_model(self):
+        """When no ontology_model is provided, no constraint validation occurs."""
+        og = _mock_ontology({"Person": "seed"})
+        stage = OntologyConstrainStage(og)  # No ontology_model
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.constraint_violations == []
+        assert len(result.entities) == 1
+
+    def test_valid_entity_passes_constraints(self):
+        """Entity that satisfies all constraints passes without violations."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "hard"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9, "email": "alice@example.com"}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert len(result.entities) == 1
+        assert result.constraint_violations == []
+
+    def test_required_check_allows_falsy_values(self):
+        """Falsy values like 0 and False satisfy 'required' (only None triggers)."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "count": {"required": True, "type": "number", "kind": "hard"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9, "count": 0}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # count=0 is present — should NOT be flagged as missing
+        assert len(result.entities) == 1
+        assert result.constraint_violations == []
+
+    def test_mixed_hard_and_soft_violations_on_same_entity(self):
+        """Hard violation rejects entity even when soft violations are also present."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "hard"},
+                "phone": {"required": True, "type": "string", "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # Hard violation on email → entity rejected
+        assert len(result.entities) == 0
+        assert len(result.rejected) == 1
+        # Entity also appears as unresolved with constraint_violation reason
+        assert len(result.unresolved_entities) == 1
+        assert result.unresolved_entities[0]["reason"] == "constraint_violation"
+
+    def test_multiple_soft_violations_all_recorded(self):
+        """Multiple soft constraint failures on one entity are all recorded."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "soft"},
+                "age": {"type": "number", "kind": "soft"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9, "age": "not-a-number"}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # Entity kept (soft only) but both violations recorded
+        assert len(result.entities) == 1
+        assert len(result.constraint_violations) == 2
+        types = {v["constraint_type"] for v in result.constraint_violations}
+        assert types == {"required", "type"}
+
+    def test_hard_rejection_removes_from_relation_filtering(self):
+        """Entity rejected by hard constraint is excluded from relation endpoints."""
+        og = _mock_ontology({"Person": "seed"})
+        model = self._make_ontology_model(
+            "person",
+            {
+                "email": {"required": True, "type": "string", "kind": "hard"},
+            },
+        )
+        stage = OntologyConstrainStage(og, ontology_model=model)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[
+                {"name": "Alice", "entity_type": "person", "confidence": 0.9, "item_id": "a1"},
+                {"name": "Bob", "entity_type": "person", "confidence": 0.9, "email": "bob@test.com", "item_id": "b1"},
+            ],
+            llm_relations=[
+                {"source_id": "a1", "target_id": "b1", "relation_type": "knows"},
+            ],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        # Alice rejected (missing email), Bob accepted
+        assert len(result.entities) == 1
+        assert result.entities[0]["name"] == "Bob"
+        # Relation Alice→Bob filtered out because Alice was rejected
+        assert len(result.relations) == 0
+
+
+class TestOntologyConstrainRegistryEdgeCases:
+    """Edge cases for OL-2 registry version capture."""
+
+    def test_registry_partial_response_missing_version(self):
+        """Registry returns id but no current_version."""
+        og = _mock_ontology({"Person": "seed"})
+        mock_registry = MagicMock()
+        mock_registry.get_registry.return_value = {"id": "reg-1"}
+        stage = OntologyConstrainStage(og, ontology_registry=mock_registry)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == "reg-1"
+        assert result.ontology_version == ""
+
+    def test_registry_partial_response_missing_id(self):
+        """Registry returns current_version but no id — falls back to 'default'."""
+        og = _mock_ontology({"Person": "seed"})
+        mock_registry = MagicMock()
+        mock_registry.get_registry.return_value = {"current_version": "v1.0"}
+        stage = OntologyConstrainStage(og, ontology_registry=mock_registry)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == "default"
+        assert result.ontology_version == "v1.0"
+
+    def test_registry_empty_response(self):
+        """Registry returns empty dict."""
+        og = _mock_ontology({"Person": "seed"})
+        mock_registry = MagicMock()
+        mock_registry.get_registry.return_value = {}
+        stage = OntologyConstrainStage(og, ontology_registry=mock_registry)
+        state = PipelineState(
+            text="Test.",
+            llm_entities=[{"name": "Alice", "entity_type": "person", "confidence": 0.9}],
+        )
+        config = PipelineConfig()
+
+        result = stage.execute(state, config)
+
+        assert result.ontology_registry_id == "default"
+        assert result.ontology_version == ""
+        assert len(result.entities) == 1

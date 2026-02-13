@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.13] - 2026-02-13
+
+### Added
+
+#### Ontology Improvements (STU-OL-2, STU-OL-3, STU-OL-4)
+
+**Ontology Version Tracking (OL-2):**
+- `PipelineState` gains `ontology_registry_id` and `ontology_version` fields
+- `OntologyConstrainStage` captures version from `OntologyRegistry` at pipeline execution time
+- `StoreStage` injects ontology version into MemoryItem metadata
+- `SmartMemory` exposes `last_ontology_version` and `last_ontology_registry_id` properties
+
+**Property Constraint Enforcement (OL-3):**
+- `PropertyConstraint` dataclass — required, type (string/number/date/boolean/enum), cardinality (one/many), kind (soft/hard), enum_values
+- `EntityTypeDefinition` gains `property_constraints: Dict[str, PropertyConstraint]`
+- `Ontology.to_dict()`/`from_dict()` serialize and parse constraints (backward-compatible)
+- `OntologyConstrainStage._validate_constraints()` — checks required, type, enum, cardinality; soft violations warn, hard violations reject
+- `SmartMemory` exposes `last_constraint_violations` property
+
+**Unresolved Entity Reporting (OL-4):**
+- Structured rejection dicts: `entity_name`, `attempted_type`, `reason`, `confidence`, `source_content`
+- Reasons: `unknown_type`, `low_confidence`, `constraint_violation`
+- `SmartMemory` exposes `last_unresolved_entities` property
+- Ingest API response includes `unresolved_entities` and `constraint_violations` fields
+
+---
+
 ## [0.3.12] - 2026-02-12
 
 ### Added

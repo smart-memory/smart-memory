@@ -25,10 +25,14 @@ class OntologyConstrainStage:
         ontology_graph: OntologyGraph,
         promotion_queue: RedisStreamQueue | None = None,
         entity_pair_cache: EntityPairCache | None = None,
+        ontology_registry=None,
+        ontology_model=None,
     ):
         self._ontology = ontology_graph
         self._promotion_queue = promotion_queue
         self._entity_pair_cache = entity_pair_cache
+        self._registry = ontology_registry
+        self._ontology_model = ontology_model
 
     @property
     def name(self) -> str:
@@ -38,6 +42,17 @@ class OntologyConstrainStage:
         constrain_cfg = config.extraction.constrain
         promotion_cfg = config.extraction.promotion
 
+        # OL-2: Capture ontology version from registry
+        registry_id = ""
+        version = ""
+        if self._registry:
+            try:
+                reg = self._registry.get_registry("default")
+                registry_id = reg.get("id", "default")
+                version = reg.get("current_version", "")
+            except Exception:
+                pass
+
         # Step 1: Merge ruler + LLM entities
         merged = self._merge_entities(state.ruler_entities, state.llm_entities)
 
@@ -46,6 +61,7 @@ class OntologyConstrainStage:
         rejected: List[Dict[str, Any]] = []
         promotion_candidates: List[Dict[str, Any]] = []
         accepted_names: Set[str] = set()
+        unresolved: List[Dict[str, Any]] = []
 
         for entity in merged:
             entity_type = self._get_entity_type(entity)
@@ -66,7 +82,43 @@ class OntologyConstrainStage:
                 accepted.append(entity)
                 accepted_names.add(name.lower())
             else:
+                # OL-4: Build structured unresolved entity
                 rejected.append(entity)
+                unresolved.append(
+                    {
+                        "entity_name": name,
+                        "attempted_type": entity_type,
+                        "reason": "unknown_type" if status is None else "low_confidence",
+                        "confidence": confidence,
+                        "source_content": (state.text or "")[:200],
+                    }
+                )
+
+        # OL-3: Validate property constraints on accepted entities
+        constraint_violations: List[Dict[str, Any]] = []
+        if self._ontology_model:
+            still_accepted: List[Dict[str, Any]] = []
+            for entity in accepted:
+                et = self._get_entity_type(entity)
+                violations = self._validate_constraints(entity, et)
+                hard = [v for v in violations if v["kind"] == "hard"]
+                if hard:
+                    name = self._get_entity_name(entity)
+                    rejected.append(entity)
+                    accepted_names.discard(name.lower())
+                    unresolved.append(
+                        {
+                            "entity_name": name,
+                            "attempted_type": et,
+                            "reason": "constraint_violation",
+                            "confidence": self._get_confidence(entity),
+                            "source_content": (state.text or "")[:200],
+                        }
+                    )
+                else:
+                    still_accepted.append(entity)
+                    constraint_violations.extend(violations)
+            accepted = still_accepted
 
         # Step 2b: Inject cached entity-pair relations
         if self._entity_pair_cache and len(accepted) >= 2:
@@ -98,6 +150,10 @@ class OntologyConstrainStage:
             relations=valid_relations,
             rejected=rejected,
             promotion_candidates=promotion_candidates,
+            ontology_registry_id=registry_id,
+            ontology_version=version,
+            constraint_violations=constraint_violations,
+            unresolved_entities=unresolved,
         )
 
     def _handle_promotion(self, candidates: List[Dict[str, Any]]) -> None:
@@ -238,5 +294,76 @@ class OntologyConstrainStage:
                 valid.append(rel)
         return valid
 
+    def _validate_constraints(self, entity: Dict, entity_type: str) -> List[Dict[str, Any]]:
+        """Check property constraints for an entity. Returns violation dicts."""
+        if not self._ontology_model:
+            return []
+        type_def = self._ontology_model.get_entity_type(entity_type)
+        if not type_def or not type_def.property_constraints:
+            return []
+        violations: List[Dict[str, Any]] = []
+        entity_name = self._get_entity_name(entity)
+        for prop_name, constraint in type_def.property_constraints.items():
+            val = entity.get(prop_name)
+            if constraint.required and val is None:
+                violations.append(
+                    {
+                        "entity_name": entity_name,
+                        "property_name": prop_name,
+                        "constraint_type": "required",
+                        "expected": "non-empty value",
+                        "actual": str(val),
+                        "kind": constraint.kind,
+                    }
+                )
+            if val is not None and constraint.type == "number":
+                try:
+                    float(val)
+                except (ValueError, TypeError):
+                    violations.append(
+                        {
+                            "entity_name": entity_name,
+                            "property_name": prop_name,
+                            "constraint_type": "type",
+                            "expected": "number",
+                            "actual": str(val),
+                            "kind": constraint.kind,
+                        }
+                    )
+            if val is not None and constraint.type == "enum" and constraint.enum_values:
+                if str(val) not in constraint.enum_values:
+                    violations.append(
+                        {
+                            "entity_name": entity_name,
+                            "property_name": prop_name,
+                            "constraint_type": "enum",
+                            "expected": str(constraint.enum_values),
+                            "actual": str(val),
+                            "kind": constraint.kind,
+                        }
+                    )
+            if val is not None and constraint.cardinality == "one" and isinstance(val, list):
+                violations.append(
+                    {
+                        "entity_name": entity_name,
+                        "property_name": prop_name,
+                        "constraint_type": "cardinality",
+                        "expected": "single value",
+                        "actual": f"list of {len(val)}",
+                        "kind": constraint.kind,
+                    }
+                )
+        return violations
+
     def undo(self, state: PipelineState) -> PipelineState:
-        return replace(state, entities=[], relations=[], rejected=[], promotion_candidates=[])
+        return replace(
+            state,
+            entities=[],
+            relations=[],
+            rejected=[],
+            promotion_candidates=[],
+            ontology_registry_id="",
+            ontology_version="",
+            constraint_violations=[],
+            unresolved_entities=[],
+        )
