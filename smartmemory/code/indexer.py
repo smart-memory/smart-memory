@@ -3,7 +3,7 @@
 import logging
 import os
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from smartmemory.code.models import CodeEntity, CodeRelation, IndexResult
 from smartmemory.code.parser import CodeParser, collect_python_files
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class CodeIndexer:
     """Index a Python codebase into the SmartMemory knowledge graph."""
 
-    def __init__(self, graph, repo: str, repo_root: str, exclude_dirs: Optional[set[str]] = None):
+    def __init__(self, graph: Any, repo: str, repo_root: str, exclude_dirs: Optional[set[str]] = None):
         """Initialize the indexer.
 
         Args:
@@ -44,9 +44,12 @@ class CodeIndexer:
 
         for file_path in py_files:
             parse_result = self.parser.parse_file(file_path)
+            if parse_result.errors and not parse_result.entities:
+                result.files_skipped += 1
+            else:
+                result.files_parsed += 1
             all_entities.extend(parse_result.entities)
             all_relations.extend(parse_result.relations)
-            result.files_parsed += 1
             result.errors.extend(parse_result.errors)
 
         # Build entity ID set for edge validation
@@ -92,10 +95,45 @@ class CodeIndexer:
         return result
 
     def _delete_existing(self, repo: str):
-        """Delete all code nodes for a given repo before re-indexing."""
+        """Delete all code nodes for a given repo before re-indexing.
+
+        Applies workspace_id scoping from the graph's scope_provider
+        to prevent cross-tenant deletion.
+        """
         try:
-            query = "MATCH (n:Code {repo: $repo}) DETACH DELETE n"
-            self.graph.execute_query(query, {"repo": repo})
+            params: dict[str, Any] = {"repo": repo}
+            where_clauses = ["n.repo = $repo"]
+
+            # Inject workspace scope to prevent cross-tenant deletion
+            scope_filters = _get_scope_filters(self.graph)
+            if scope_filters.get("workspace_id"):
+                params["workspace_id"] = scope_filters["workspace_id"]
+                where_clauses.append("n.workspace_id = $workspace_id")
+
+            where = " AND ".join(where_clauses)
+            query = f"MATCH (n:Code) WHERE {where} DETACH DELETE n"
+            self.graph.execute_query(query, params)
             logger.info(f"Deleted existing code nodes for repo: {repo}")
         except Exception as e:
             logger.warning(f"Failed to delete existing code nodes: {e}")
+
+
+def _get_scope_filters(graph: Any) -> dict[str, Any]:
+    """Extract isolation filters from a graph's scope_provider.
+
+    Returns workspace_id (and tenant_id if present) for injecting into
+    raw Cypher WHERE clauses. Returns empty dict in OSS/unscoped mode.
+
+    Note: Duplicated in smartmemory_mcp/tools/code_tools.py — keep in sync.
+    """
+    try:
+        backend = getattr(graph, "backend", None)
+        if backend is None:
+            # SmartGraph wraps backend via nodes manager
+            nodes = getattr(graph, "nodes", None)
+            backend = getattr(nodes, "backend", None) if nodes else None
+        if backend and hasattr(backend, "scope_provider"):
+            return backend.scope_provider.get_isolation_filters()
+    except Exception:
+        pass
+    return {}

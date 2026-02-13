@@ -5,13 +5,10 @@ from a single Python file.
 """
 
 import ast
-import logging
 import os
 from typing import Optional
 
 from smartmemory.code.models import CodeEntity, CodeRelation, ParseResult
-
-logger = logging.getLogger(__name__)
 
 # FastAPI router method names
 ROUTER_METHODS = {"get", "post", "put", "delete", "patch", "head", "options"}
@@ -53,6 +50,8 @@ class CodeParser:
 
         # Module entity (the file itself)
         module_name = rel_path.replace("/", ".").replace("\\", ".").removesuffix(".py")
+        # __init__.py → package name (e.g. smartmemory.code, not smartmemory.code.__init__)
+        module_name = module_name.removesuffix(".__init__")
         module_entity = CodeEntity(
             name=module_name,
             entity_type="module",
@@ -115,20 +114,25 @@ class CodeParser:
                     )
                 )
 
-        # Extract methods
+        # Extract methods — class is the parent (not module)
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                self._extract_function(child, module, rel_path, result, class_name=node.name)
+                self._extract_function(child, entity, rel_path, result, class_name=node.name)
 
     def _extract_function(
         self,
         node: ast.FunctionDef | ast.AsyncFunctionDef,
-        module: CodeEntity,
+        parent: CodeEntity,
         rel_path: str,
         result: ParseResult,
         class_name: Optional[str] = None,
     ):
-        """Extract a function/method definition."""
+        """Extract a function/method definition.
+
+        Args:
+            parent: The owning entity — module for top-level functions,
+                    class entity for methods.
+        """
         full_name = f"{class_name}.{node.name}" if class_name else node.name
         decorators = [self._get_decorator_name(d) for d in node.decorator_list]
 
@@ -156,10 +160,10 @@ class CodeParser:
         )
         result.entities.append(entity)
 
-        # DEFINES edge: module → function
+        # DEFINES edge: parent → function (class→method or module→function)
         result.relations.append(
             CodeRelation(
-                source_id=module.item_id,
+                source_id=parent.item_id,
                 target_id=entity.item_id,
                 relation_type="DEFINES",
             )

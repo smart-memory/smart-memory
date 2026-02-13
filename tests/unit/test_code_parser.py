@@ -306,6 +306,34 @@ class TestCalculator:
         assert len(result.entities) == 1
         assert result.entities[0].entity_type == "module"
 
+    def test_init_py_module_name(self, tmp_path):
+        """__init__.py files should use package name, not include .__init__ suffix."""
+        pkg = tmp_path / "mypkg"
+        pkg.mkdir()
+        init_file = pkg / "__init__.py"
+        init_file.write_text('"""Package docstring."""\n')
+        parser = CodeParser(repo="test-repo", repo_root=str(tmp_path))
+        result = parser.parse_file(str(init_file))
+
+        modules = [e for e in result.entities if e.entity_type == "module"]
+        assert len(modules) == 1
+        assert modules[0].name == "mypkg"  # NOT mypkg.__init__
+
+    def test_defines_edges_class_owns_methods(self, parser, sample_file):
+        """DEFINES edges for methods should source from the class, not the module."""
+        file_path, _ = sample_file
+        result = parser.parse_file(file_path)
+
+        # Find the DEFINES edge for UserService.create_user specifically
+        create_user_defines = [
+            r
+            for r in result.relations
+            if r.relation_type == "DEFINES" and r.target_id.endswith("::UserService.create_user")
+        ]
+        assert len(create_user_defines) == 1
+        # Source should be UserService (class), not the module
+        assert create_user_defines[0].source_id.endswith("::UserService")
+
 
 # -- File Collection Tests --
 
@@ -404,3 +432,28 @@ class TestCodeIndexer:
         assert result.entities_created == 0
         assert len(result.errors) > 0
         assert "Graph unavailable" in result.errors[0]
+
+    def test_delete_includes_workspace_scope(self, tmp_path):
+        """When scope_provider has workspace_id, delete query should include it."""
+        (tmp_path / "app.py").write_text("x = 1\n")
+
+        # Mock graph with scope_provider returning workspace_id
+        scope_provider = MagicMock()
+        scope_provider.get_isolation_filters.return_value = {"workspace_id": "ws-123"}
+        backend = MagicMock()
+        backend.scope_provider = scope_provider
+
+        graph = MagicMock(spec=["execute_query", "add_node", "add_edge", "nodes"])
+        graph.nodes.backend = backend
+        graph.execute_query.return_value = []
+
+        indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))
+        indexer.index()
+
+        # The delete query should contain workspace_id filter
+        delete_call = graph.execute_query.call_args
+        query_str = delete_call[0][0]
+        params = delete_call[0][1]
+        assert "workspace_id" in query_str
+        assert params["workspace_id"] == "ws-123"
+        assert "DETACH DELETE" in query_str
