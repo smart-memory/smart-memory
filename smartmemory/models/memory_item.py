@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 
 from smartmemory.models.base import MemoryBaseModel
-from smartmemory.models.compat.dataclass_model import get_field_names
 from smartmemory.models.status import StatusLoggerMixin
 from smartmemory.utils import flatten_dict, unflatten_dict
 
@@ -13,15 +12,16 @@ from smartmemory.utils import flatten_dict, unflatten_dict
 # --- Memory Types ---
 # Valid memory types for the system
 MEMORY_TYPES = {
-    'semantic',      # Facts, knowledge, concepts
-    'episodic',      # Events, experiences, interactions
-    'procedural',    # Skills, how-to, procedures
-    'working',       # Short-term, active context
-    'zettel',        # Zettelkasten notes
-    'reasoning',     # Chain-of-thought traces (System 2)
-    'opinion',       # Beliefs with confidence scores (Phase 3)
-    'observation',   # Synthesized entity summaries (Phase 3)
-    'decision',      # Conclusions, inferences, choices with provenance (Phase 4)
+    "semantic",  # Facts, knowledge, concepts
+    "episodic",  # Events, experiences, interactions
+    "procedural",  # Skills, how-to, procedures
+    "working",  # Short-term, active context
+    "zettel",  # Zettelkasten notes
+    "reasoning",  # Chain-of-thought traces (System 2)
+    "opinion",  # Beliefs with confidence scores (Phase 3)
+    "observation",  # Synthesized entity summaries (Phase 3)
+    "decision",  # Conclusions, inferences, choices with provenance (Phase 4)
+    "code",  # Source code entities (classes, functions, routes) from code indexing
 }
 
 
@@ -33,86 +33,87 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     Supports multiple external references via metadata['external_refs'] (list of dicts with 'ref' and 'type').
     For backward compatibility, also supports single external_ref/external_type fields.
     """
+
     # Dataclass fields - all public, immutability enforced via __setattr__
-    memory_type: str = 'semantic'  # Default type is now 'semantic'; canonical removed
+    memory_type: str = "semantic"  # Default type is now 'semantic'; canonical removed
     item_id: str = dc_field(default_factory=lambda: str(uuid.uuid4()))
     content: str = ""
     embedding: Optional[List[float]] = None
-    
+
     group_id: Optional[str] = None
     valid_start_time: Optional[datetime] = None
     valid_end_time: Optional[datetime] = None
     transaction_time: datetime = dc_field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
     entities: Optional[list] = None
     relations: Optional[list] = None
     metadata: dict = dc_field(default_factory=dict)  # Arbitrary metadata
-    
+
     # Track which fields are immutable after first set
-    _immutable_fields: set = dc_field(default_factory=lambda: {'content', 'embedding'}, repr=False, init=False)
+    _immutable_fields: set = dc_field(default_factory=lambda: {"content", "embedding"}, repr=False, init=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """
         Enforce immutability for specific fields after initial set.
-        
+
         Fields in _immutable_fields (content, embedding) can only be set once.
         Attempting to modify them after initial set raises ValueError.
         """
         # Allow setting _immutable_fields itself during init
-        if name == '_immutable_fields':
+        if name == "_immutable_fields":
             object.__setattr__(self, name, value)
             return
-        
+
         # Check if field is immutable and already set
-        if hasattr(self, '_immutable_fields') and name in self._immutable_fields:
+        if hasattr(self, "_immutable_fields") and name in self._immutable_fields:
             if hasattr(self, name):
                 current_value = object.__getattribute__(self, name)
                 # Allow setting if current value is None/empty or same value (idempotent)
                 if current_value and current_value != value:
                     raise ValueError(f"{name} has already been set and cannot be modified.")
-        
+
         # Use object.__setattr__ to avoid recursion
         object.__setattr__(self, name, value)
 
     def to_dict(self):
         """Override to_dict to include memory_type property."""
         data = super().to_dict()
-        data['memory_type'] = self.memory_type
+        data["memory_type"] = self.memory_type
         # Explicitly include embedding if present
         if self.embedding is not None:
-            data['embedding'] = self.embedding
+            data["embedding"] = self.embedding
         # Remove internal tracking field
-        data.pop('_immutable_fields', None)
+        data.pop("_immutable_fields", None)
         return data
 
     def __init__(
-            self,
-            *,
-            content: Optional[str] = None,
-            type: Optional[str] = None,
-            memory_type: Optional[str] = None,
-            item_id: Optional[str] = None,
-            group_id: Optional[str] = None,
-            valid_start_time: Optional[datetime] = None,
-            valid_end_time: Optional[datetime] = None,
-            transaction_time: Optional[datetime] = None,
-            embedding: Optional[List[float]] = None,
-            entities: Optional[list] = None,
-            relations: Optional[list] = None,
-            metadata: Optional[Dict[str, Any]] = None,
-            **kwargs: Any,
+        self,
+        *,
+        content: Optional[str] = None,
+        type: Optional[str] = None,
+        memory_type: Optional[str] = None,
+        item_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        valid_start_time: Optional[datetime] = None,
+        valid_end_time: Optional[datetime] = None,
+        transaction_time: Optional[datetime] = None,
+        embedding: Optional[List[float]] = None,
+        entities: Optional[list] = None,
+        relations: Optional[list] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> None:
         # Initialize immutability tracking first
-        object.__setattr__(self, '_immutable_fields', {'content', 'embedding'})
-        
+        object.__setattr__(self, "_immutable_fields", {"content", "embedding"})
+
         # Initialize core fields with defaults
-        self.memory_type = (memory_type or type or 'semantic')
+        self.memory_type = memory_type or type or "semantic"
         self.content = content if content is not None else ""
         self.item_id = item_id or str(uuid.uuid4())
         self.group_id = group_id
         self.valid_start_time = valid_start_time
         self.valid_end_time = valid_end_time
-        
+
         # Normalize transaction_time
         tx = transaction_time
         if isinstance(tx, str):
@@ -125,18 +126,18 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
         elif tx.tzinfo is None:
             tx = tx.replace(tzinfo=timezone.utc)
         self.transaction_time = tx
-        
+
         # Set embedding
         self.embedding = embedding
-        
+
         self.entities = entities
         self.relations = relations
         # Metadata and group_id coherence
         meta: Dict[str, Any] = dict(metadata) if isinstance(metadata, dict) else {}
-        if self.group_id is None and 'group_id' in meta:
-            self.group_id = meta.get('group_id')
+        if self.group_id is None and "group_id" in meta:
+            self.group_id = meta.get("group_id")
         if self.group_id is not None:
-            meta['group_id'] = self.group_id
+            meta["group_id"] = self.group_id
         # Absorb known extras into metadata to avoid constructor errors
         for k, v in kwargs.items():
             if k not in meta:
@@ -148,7 +149,7 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
         """Compute cosine similarity between two vectors."""
         if not vec1 or not vec2 or len(vec1) != len(vec2):
             return 0.0
-        dot = sum(a * b for a, b in zip(vec1, vec2))
+        dot = sum(a * b for a, b in zip(vec1, vec2, strict=False))
         norm1 = sum(a * a for a in vec1) ** 0.5
         norm2 = sum(b * b for b in vec2) ** 0.5
         if norm1 == 0 or norm2 == 0:
@@ -159,6 +160,7 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     def text_to_dummy_embedding(text, dim=32):
         """Generate a simple deterministic embedding from text (demo only)."""
         import hashlib
+
         h = hashlib.sha256(text.encode("utf-8")).digest()
         return [b / 255.0 for b in h[:dim]]
 
@@ -166,13 +168,13 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     def compute_content_hash(content):
         if content is None:
             return None
-        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     @classmethod
     def from_content(cls, content, **kwargs):
-        if 'item_id' not in kwargs or kwargs['item_id'] is None:
-            kwargs['item_id'] = cls.compute_content_hash(content)
-        kwargs['content'] = content
+        if "item_id" not in kwargs or kwargs["item_id"] is None:
+            kwargs["item_id"] = cls.compute_content_hash(content)
+        kwargs["content"] = content
         return MemoryItem(**kwargs)
 
     @classmethod
@@ -197,11 +199,12 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
     def from_node(cls, node: dict) -> "MemoryItem":
         """
         Create a MemoryItem from a node dict (e.g., from the graph or vector store).
-        
+
         Now simplified since field names match public API (no protected fields).
         Separates known fields from metadata, handles type conversion.
         """
         from smartmemory.utils.serialization import MemoryItemSerializer
+
         return MemoryItemSerializer.from_storage(cls, node)
 
     def to_vector_store(self) -> dict:
@@ -232,23 +235,27 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
         metadata = {}
 
         # Add standard fields to metadata
-        if isinstance(self.metadata, dict) and 'name' in self.metadata and self.metadata.get('name') is not None:
-            metadata["name"] = self.metadata.get('name')
+        if isinstance(self.metadata, dict) and "name" in self.metadata and self.metadata.get("name") is not None:
+            metadata["name"] = self.metadata.get("name")
 
         # Canonical memory type
         metadata["memory_type"] = self.memory_type
 
-        if isinstance(self.metadata, dict) and 'links' in self.metadata and self.metadata.get('links') is not None:
-            metadata["links"] = self.metadata.get('links')
+        if isinstance(self.metadata, dict) and "links" in self.metadata and self.metadata.get("links") is not None:
+            metadata["links"] = self.metadata.get("links")
 
-        if isinstance(self.metadata, dict) and 'memory_types' in self.metadata and self.metadata.get('memory_types') is not None:
-            metadata["memory_types"] = self.metadata.get('memory_types')
+        if (
+            isinstance(self.metadata, dict)
+            and "memory_types" in self.metadata
+            and self.metadata.get("memory_types") is not None
+        ):
+            metadata["memory_types"] = self.metadata.get("memory_types")
         else:
             # Default to [memory_type] if memory_types not specified
             metadata["memory_types"] = [self.memory_type]
 
         # Add all other metadata with flattening
-        if hasattr(self, 'metadata') and self.metadata:
+        if hasattr(self, "metadata") and self.metadata:
             # Flatten nested dictionaries using double underscores
             flat_metadata = flatten_dict(self.metadata)
             metadata.update(flat_metadata)
@@ -294,18 +301,14 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
 
         # Merge name/links/memory_types back into metadata for dataclass constructor
         if name is not None:
-            unflattened_metadata['name'] = name
+            unflattened_metadata["name"] = name
         if links is not None:
-            unflattened_metadata['links'] = links
+            unflattened_metadata["links"] = links
         if memory_types is not None:
-            unflattened_metadata['memory_types'] = memory_types
+            unflattened_metadata["memory_types"] = memory_types
         # Create MemoryItem with all fields
         return cls(
-            item_id=item_id,
-            content=content,
-            embedding=embedding,
-            memory_type=mem_type,
-            metadata=unflattened_metadata
+            item_id=item_id, content=content, embedding=embedding, memory_type=mem_type, metadata=unflattened_metadata
         )
 
     def to_node(self) -> dict:
@@ -314,6 +317,7 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
         Delegates to MemoryItemSerializer.to_storage for consistency.
         """
         from smartmemory.utils.serialization import MemoryItemSerializer
+
         return MemoryItemSerializer.to_storage(self)
 
     def to_serializable_dict(self) -> dict:
@@ -322,10 +326,10 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
         Handles numpy array conversion for embeddings.
         """
         d = self.to_dict()
-        if 'embedding' in d and d['embedding'] is not None:
+        if "embedding" in d and d["embedding"] is not None:
             # Handle numpy arrays if present
-            if hasattr(d['embedding'], 'tolist'):
-                d['embedding'] = d['embedding'].tolist()
+            if hasattr(d["embedding"], "tolist"):
+                d["embedding"] = d["embedding"].tolist()
         return d
 
     def __repr__(self) -> str:
@@ -337,5 +341,5 @@ class MemoryItem(MemoryBaseModel, StatusLoggerMixin):
             valid_time_str += f" -> {self.valid_end_time.isoformat()}"
         else:
             valid_time_str += " -> present"
-        tx_time_str = self.transaction_time.isoformat() if getattr(self, 'transaction_time', None) else "None"
+        tx_time_str = self.transaction_time.isoformat() if getattr(self, "transaction_time", None) else "None"
         return f"MemoryItem(id={self.item_id}, valid_time='{valid_time_str}', transaction_time={tx_time_str}, content='{str(self.content)[:30]}...')"

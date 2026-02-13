@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Code Connector Prototype (CORE-CODE-1)
+
+- New `code` memory type added to `MEMORY_TYPES` — source code entities from code indexing
+- New `smartmemory.code` module with AST-based Python parser, code indexer, and data models
+- `CodeParser` — extracts classes, functions, imports, FastAPI routes, pytest tests from Python files using `ast`
+- `CodeIndexer` — orchestrates parsing + graph writes for entire directories with clean-slate re-indexing
+- `CodeEntity` / `CodeRelation` models with deterministic IDs (`code::{repo}::{file}::{name}`)
+- 3 new MCP tools: `code_index` (trigger indexing), `code_search` (find by name/type), `code_dependencies` (trace dependents/dependencies)
+- Updated `contracts/entity-types.json` — added `module`, `class`, `function`, `route`, `test` to `technical_systems` category
+- Validated against `smart-memory-service/`: 1,734 entities (116 classes, 258 functions, 266 routes, 945 tests), 1,874 valid edges
+
 #### Ontology Improvements (STU-OL-2, STU-OL-3, STU-OL-4)
 
 **Ontology Version Tracking (OL-2):**
