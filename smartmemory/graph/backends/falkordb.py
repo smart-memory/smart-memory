@@ -176,8 +176,18 @@ class FalkorDBBackend(SmartGraphBackend):
             )
             for chunk in self._chunked(batch_items, batch_size):
                 res = self.graph.query(query, {"batch": chunk})
+                created = 0
                 if hasattr(res, "result_set") and res.result_set:
-                    total += res.result_set[0][0]
+                    created = res.result_set[0][0]
+                if created < len(chunk):
+                    logger.warning(
+                        "add_edges_bulk: %d/%d %s edges matched — %d dropped (source/target nodes not found)",
+                        created,
+                        len(chunk),
+                        etype,
+                        len(chunk) - created,
+                    )
+                total += created
         return total
 
     # ---------- CRUD ----------
