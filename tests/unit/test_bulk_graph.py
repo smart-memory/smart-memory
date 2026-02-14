@@ -73,7 +73,7 @@ class TestAddNodesBulk:
         assert len(g.calls) == 1
         cypher, params = g.calls[0]
         assert "UNWIND" in cypher
-        assert ":code" in cypher  # sanitize_label("code") -> "code"
+        assert ":Code" in cypher  # capitalize() + sanitize_label() -> "Code"
         assert len(params["batch"]) == 2
 
     def test_multiple_labels_multiple_queries(self):
@@ -109,7 +109,7 @@ class TestAddNodesBulk:
         nodes = [{"item_id": "n1", "memory_type": "my-type"}]
         b.add_nodes_bulk(nodes)
         cypher, _ = g.calls[0]
-        assert ":my_type" in cypher  # hyphens -> underscores
+        assert ":My_type" in cypher  # capitalize + hyphens -> underscores
 
     def test_default_label_when_missing(self):
         b, g = _make_backend()
@@ -117,6 +117,28 @@ class TestAddNodesBulk:
         b.add_nodes_bulk(nodes)
         cypher, _ = g.calls[0]
         assert ":Node" in cypher
+
+    def test_skips_nodes_without_item_id(self):
+        b, g = _make_backend()
+        nodes = [
+            {"item_id": "n1", "memory_type": "code"},
+            {"memory_type": "code"},  # no item_id
+            {"item_id": "", "memory_type": "code"},  # empty item_id
+        ]
+        result = b.add_nodes_bulk(nodes)
+        assert result == 1  # only n1 written
+        _, params = g.calls[0]
+        assert len(params["batch"]) == 1
+
+    def test_filters_invalid_properties(self):
+        b, g = _make_backend()
+        nodes = [{"item_id": "n1", "memory_type": "code", "name": "test", "empty": "", "embedding": [1, 2]}]
+        b.add_nodes_bulk(nodes)
+        _, params = g.calls[0]
+        props = params["batch"][0]["props"]
+        assert "name" in props
+        assert "empty" not in props  # empty strings filtered
+        assert "embedding" not in props  # embedding key filtered
 
 
 # ---------------------------------------------------------------------------

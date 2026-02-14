@@ -107,10 +107,20 @@ class FalkorDBBackend(SmartGraphBackend):
         # Group nodes by sanitized label
         by_label: Dict[str, List[Dict[str, Any]]] = {}
         for n in nodes:
-            label = sanitize_label(n.get("memory_type", "Node"))
-            props = flatten_dict(n)
+            item_id = n.get("item_id")
+            if not item_id:
+                continue
+            # Capitalize to match add_node() behavior (FalkorDB labels are case-sensitive)
+            raw_type = n.get("memory_type", "Node")
+            label = sanitize_label(raw_type.capitalize() if raw_type else "Node")
+            flat = flatten_dict(n)
+            # Filter and serialize properties like add_node() does
+            props: Dict[str, Any] = {}
+            for key, value in flat.items():
+                if self._is_valid_property(key, value):
+                    props[key] = self._serialize_value(value)
             props.update(write_ctx)
-            by_label.setdefault(label, []).append({"item_id": n.get("item_id"), "props": props})
+            by_label.setdefault(label, []).append({"item_id": item_id, "props": props})
 
         total = 0
         for label, batch_items in by_label.items():
@@ -138,11 +148,18 @@ class FalkorDBBackend(SmartGraphBackend):
 
         # Group edges by sanitized type
         by_type: Dict[str, List[Dict[str, Any]]] = {}
-        for src, tgt, etype, props in edges:
+        for src, tgt, etype, raw_props in edges:
             sanitized = re.sub(r"[^A-Z0-9_]", "_", etype.upper().replace("-", "_"))
-            flat_props = flatten_dict(props)
-            flat_props.update(write_ctx)
-            by_type.setdefault(sanitized, []).append({"src": src, "tgt": tgt, "props": flat_props})
+            if not sanitized:
+                sanitized = "RELATED"
+            flat = flatten_dict(raw_props)
+            # Filter and serialize properties like add_edge() does
+            props: Dict[str, Any] = {}
+            for key, value in flat.items():
+                if self._is_valid_property(key, value):
+                    props[key] = self._serialize_value(value)
+            props.update(write_ctx)
+            by_type.setdefault(sanitized, []).append({"src": src, "tgt": tgt, "props": props})
 
         total = 0
         for etype, batch_items in by_type.items():
