@@ -118,13 +118,9 @@
     "unified_keys": true
   },
   "auth": {
-    "provider": "${AUTH_PROVIDER:-dummy}",
-    "dummy": {
-      "mock_users_enabled": "${AUTH_DUMMY_MOCK_USERS:-true}",
-      "default_admin": "${AUTH_DUMMY_DEFAULT_ADMIN:-user_1}"
-    },
+    "provider": "${AUTH_PROVIDER:-jwt}",
     "jwt": {
-      "secret_key": "${AUTH_JWT_SECRET:-}",
+      "secret_key": "${JWT_SECRET_KEY:-}",
       "algorithm": "${AUTH_JWT_ALGORITHM:-HS256}",
       "access_token_expire_minutes": "${AUTH_JWT_EXPIRE_MINUTES:-30}",
       "issuer": "${AUTH_JWT_ISSUER:-smart-memory}"

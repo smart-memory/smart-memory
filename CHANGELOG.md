@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.15] - 2026-02-14
+
+### Security
+
+#### Authentication Hardening (AUTH-HARD-1)
+
+- **Single JWT secret source of truth** — New `jwt_singleton.py` with `get_jwt_manager()` replaces scattered JWTManager instantiation across all services
+- **Fail-loud production guard** — `RuntimeError` if `JWT_SECRET_KEY` is missing or shorter than 32 characters in production
+- **Fixed logout** — `/auth/logout` now actually revokes tokens via `revoke_all_user_tokens()`
+- **Fixed `init_superadmin.py`** — Was writing to `studio` database instead of `smartmemory`
+- **Fixed bare `except:`** — Middleware no longer silently swallows auth errors
+- **Eliminated 3 hardcoded JWT defaults** — Replaced by `DEV_JWT_SECRET` constant for dev/test
+- **Unified `AUTH_JWT_SECRET` → `JWT_SECRET_KEY`** — Single env var name across all config files and docker-compose
+- **Eliminated dead domain `app.smartmemory.ai`** — All references updated to `www.smartmemory.ai`
+- **Fixed `datetime.utcnow()` in auth paths** — Migrated to `datetime.now(timezone.utc)` in jwt.py, jwt_provider.py, scope.py
+- **Removed `dummy` auth provider default** — Core config.json now defaults to `jwt`
+
+### Added
+
+- `service_common/auth/constants.py` — `DEV_JWT_SECRET` constant
+- `service_common/auth/jwt_singleton.py` — Singleton `JWTManager` with env-based resolution
+- `tests/invariants/test_jwt_singleton.py` — 19 invariant tests for singleton lifecycle
+
+---
+
 ## [0.3.14] - 2026-02-14
 
 ### Added
