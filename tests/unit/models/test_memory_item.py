@@ -51,7 +51,7 @@ class TestMemoryItemCreation:
 
 
 class TestMemoryTypes:
-    def test_contains_all_nine_types(self):
+    def test_contains_all_types(self):
         expected = {
             "semantic",
             "episodic",
@@ -62,11 +62,12 @@ class TestMemoryTypes:
             "opinion",
             "observation",
             "decision",
+            "code",
         }
         assert MEMORY_TYPES == expected
 
     def test_count(self):
-        assert len(MEMORY_TYPES) == 9
+        assert len(MEMORY_TYPES) == 10
 
 
 class TestMemoryItemSerialization:

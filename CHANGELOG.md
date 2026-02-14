@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+#### Test Audit Fixes — Batches 1 & 2
+
+- **T1**: Fixed `MEMORY_TYPES` test — added missing "code" type, count 9→10 (`test_memory_item.py`)
+- **T2**: Removed 2 stale `@pytest.mark.skip` decorators on decision lifecycle tests that were already implemented (`test_e2e_workflows.py`)
+- **T3**: Fixed permanent `skipif(True)` in tenant isolation tests — rewired to use `second_tenant` + `AuthTestClient` pattern (`test_procedures.py`)
+
+### Added
+
+- **T4**: Integration tests for Code Connector API — 18 tests covering POST /code/index, GET /code/search, GET /code/dependencies (`test_code.py`)
+- **T5**: Integration tests for Procedure Evolution API (CFS-3b) — 14 tests covering GET /procedures/{id}/evolution, GET /procedures/{id}/evolution/{event_id}, GET /procedures/{id}/confidence-trajectory with contract-validated TrajectoryPoint shape (`test_procedure_evolution.py`)
+
+---
+
+## [0.3.17] - 2026-02-14
+
+### Changed
+
+#### Observability Event Path Unification (CORE-OBS-1)
+
+- **New `trace_span()` API** — Single observability entry point replacing three independent emission paths (`emit_ctx`/`make_emitter`, `IngestionObserver.emit_event`, `PipelineMetricsEmitter`)
+- **OTel-compatible span model** — `SpanContext` dataclass with `trace_id`, `span_id`, `parent_span_id`, automatic parent-child nesting via `contextvars.ContextVar`
+- **New `smartmemory/observability/tracing.py`** — Core module: `trace_span()` context manager, `current_span()`, `current_trace_id()`, `SpanContext`
+- **Migrated primary call sites** — `smart_memory.py` (4 CRUD methods), `graph/core/nodes.py`, `graph/core/edges.py`, `stores/vector/vector_store.py` (5 operations), `memory/ingestion/observer.py`, `pipeline/metrics.py`, `smart-memory-service/service.py`, `smart-memory-service/scripts/run_background_enricher.py` (14 calls)
+- **Deprecated all legacy APIs** — `emit_ctx()`, `make_emitter()`, `emit_after()`, `set_obs_context()`, `get_obs_context()`, `update_obs_context()`, `clear_obs_context()`, `with_obs_context()` now emit `DeprecationWarning` with `stacklevel=2`; will be removed in next minor
+- **Logging filter bridge** — `LogContextFilter` now injects `trace_id`, `span_id`, `parent_span_id` from active span into log records
+- **FastAPI tracing middleware** — Root `trace_span("http.request")` per API request in service.py
+- **29 unit tests** for tracing module (nesting, thread safety, disabled mode, error handling, attribute collision protection)
+
+---
+
+## [0.3.16] - 2026-02-14
+
+### Fixed
+
+#### Pre-Existing Issues Resolution (gaps.md PRE-1 through PRE-12)
+
+- `add_edge()` now sanitizes edge types with `re.sub` (PRE-1)
+- `SmartGraphBackend` ABC rewritten — correct signatures, `add_nodes_bulk`/`add_edges_bulk` fallback methods (PRE-2, PRE-3)
+- `get_scope_filters()` added to `SmartGraph` — eliminates duplication in indexer and MCP tools (PRE-4)
+- `extract_node()`/`extract_rel_type()` moved to shared `graph_utils.py` (PRE-5)
+- `SmartGraphEdges.clear_cache()` added, `hasattr` guards removed (PRE-6)
+- `Triple` forward ref replaced with `Any` in SmartGraph and SmartGraphEdges (PRE-7)
+- Exception re-raises now include `from e`/`from exc` (PRE-8)
+- Unused variables removed from `falkordb.py` (PRE-9)
+- `add_edge()` and `add_edges_bulk()` MATCH clauses now scoped to `workspace_id` in multi-tenant mode (PRE-11)
+- `add_node()` now applies `sanitize_label()` (PRE-12)
+
+---
+
 ## [0.3.15] - 2026-02-14
 
 ### Security
@@ -29,25 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `service_common/auth/constants.py` — `DEV_JWT_SECRET` constant
 - `service_common/auth/jwt_singleton.py` — Singleton `JWTManager` with env-based resolution
 - `tests/invariants/test_jwt_singleton.py` — 19 invariant tests for singleton lifecycle
-
----
-
-## [0.3.16] - 2026-02-14
-
-### Fixed
-
-#### Pre-Existing Issues Resolution (gaps.md PRE-1 through PRE-12)
-
-- `add_edge()` now sanitizes edge types with `re.sub` (PRE-1)
-- `SmartGraphBackend` ABC rewritten — correct signatures, `add_nodes_bulk`/`add_edges_bulk` fallback methods (PRE-2, PRE-3)
-- `get_scope_filters()` added to `SmartGraph` — eliminates duplication in indexer and MCP tools (PRE-4)
-- `extract_node()`/`extract_rel_type()` moved to shared `graph_utils.py` (PRE-5)
-- `SmartGraphEdges.clear_cache()` added, `hasattr` guards removed (PRE-6)
-- `Triple` forward ref replaced with `Any` in SmartGraph and SmartGraphEdges (PRE-7)
-- Exception re-raises now include `from e`/`from exc` (PRE-8)
-- Unused variables removed from `falkordb.py` (PRE-9)
-- `add_edge()` and `add_edges_bulk()` MATCH clauses now scoped to `workspace_id` in multi-tenant mode (PRE-11)
-- `add_node()` now applies `sanitize_label()` (PRE-12)
 
 ---
 
