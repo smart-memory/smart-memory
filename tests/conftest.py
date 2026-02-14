@@ -14,6 +14,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "harness: marks tests as error harness tests")
     config.addinivalue_line("markers", "contract: marks tests as contract tests (API stability)")
     config.addinivalue_line("markers", "invariant: marks tests as invariant tests (logic kernels)")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")
     config.addinivalue_line("markers", "golden: marks tests as golden flow tests")
     config.addinivalue_line("markers", "slow: marks tests as slow (require external services)")
 

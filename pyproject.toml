@@ -165,6 +165,10 @@ markers = [
     "unit: unit tests",
     "integration: integration tests",
     "e2e: end-to-end tests",
+    "golden: golden flow tests — critical user journeys",
+    "contract: schema snapshots, serialization round-trips",
+    "invariant: pure-logic unit tests (justified only)",
+    "harness: table-driven error path tests",
     "performance: performance tests",
     "slow: slow-running tests",
 ]
