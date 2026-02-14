@@ -98,7 +98,7 @@ class SmartGraphEdges:
 
         return result
 
-    def add_triple(self, triple: "Triple", properties: Dict[str, Any] = None, **kwargs):
+    def add_triple(self, triple: Any, properties: Dict[str, Any] = None, **kwargs):
         """Add a triple (Triple models) to the graph. Properties are attached to the edge."""
         if properties is None:
             properties = {}
