@@ -416,12 +416,12 @@ class TestCodeIndexer:
         graph.add_edges_bulk.return_value = 1
 
         indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))
-        result = indexer.index()
+        indexer.index()
 
         # The bulk edge list should only contain edges where both endpoints exist
         bulk_edges = graph.add_edges_bulk.call_args[0][0]
         entity_ids = {n["item_id"] for n in graph.add_nodes_bulk.call_args[0][0]}
-        for source_id, target_id, edge_type, _ in bulk_edges:
+        for source_id, target_id, _edge_type, _ in bulk_edges:
             assert source_id in entity_ids and target_id in entity_ids
 
     def test_handles_graph_write_errors(self, tmp_path):
