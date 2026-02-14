@@ -33,7 +33,7 @@ def memory():
     # Cleanup
     try:
         mem.clear()
-    except:
+    except Exception:
         pass
 
 
@@ -48,19 +48,19 @@ class TestTemporalQueriesBasic:
 
     def test_temporal_queries_exists(self, memory):
         """Test that temporal queries are available on SmartMemory."""
-        assert hasattr(memory, 'temporal')
+        assert hasattr(memory, "temporal")
         assert isinstance(memory.temporal, TemporalQueries)
 
     def test_temporal_queries_has_methods(self, temporal):
         """Test that all expected methods exist."""
-        assert hasattr(temporal, 'get_history')
-        assert hasattr(temporal, 'at_time')
-        assert hasattr(temporal, 'get_changes')
-        assert hasattr(temporal, 'compare_versions')
-        assert hasattr(temporal, 'rollback')
-        assert hasattr(temporal, 'get_audit_trail')
-        assert hasattr(temporal, 'find_memories_changed_since')
-        assert hasattr(temporal, 'get_timeline')
+        assert hasattr(temporal, "get_history")
+        assert hasattr(temporal, "at_time")
+        assert hasattr(temporal, "get_changes")
+        assert hasattr(temporal, "compare_versions")
+        assert hasattr(temporal, "rollback")
+        assert hasattr(temporal, "get_audit_trail")
+        assert hasattr(temporal, "find_memories_changed_since")
+        assert hasattr(temporal, "get_timeline")
 
 
 class TestGetHistory:
@@ -96,10 +96,10 @@ class TestGetHistory:
 
         if history:
             version = history[0]
-            assert hasattr(version, 'item_id')
-            assert hasattr(version, 'content')
-            assert hasattr(version, 'metadata')
-            assert hasattr(version, 'transaction_time_start')
+            assert hasattr(version, "item_id")
+            assert hasattr(version, "content")
+            assert hasattr(version, "metadata")
+            assert hasattr(version, "transaction_time_start")
 
     def test_get_history_ordered_by_time(self, memory, temporal):
         """Test that history is ordered newest first."""
@@ -108,10 +108,7 @@ class TestGetHistory:
 
         time.sleep(0.1)
 
-        item2 = MemoryItem(
-            content="Version 2",
-            metadata={"version": 2, "original_id": item_id}
-        )
+        item2 = MemoryItem(content="Version 2", metadata={"version": 2, "original_id": item_id})
         memory.add(item2)
 
         history = temporal.get_history(item_id)
@@ -140,10 +137,7 @@ class TestAtTime:
 
     def test_at_time_with_filters(self, temporal):
         """Test at_time with additional filters."""
-        result = temporal.at_time(
-            "2024-01-01",
-            filters={"user_id": "test_user"}
-        )
+        result = temporal.at_time("2024-01-01", filters={"user_id": "test_user"})
         assert isinstance(result, list)
 
 
@@ -173,10 +167,7 @@ class TestGetChanges:
 
         time.sleep(0.1)
 
-        item2 = MemoryItem(
-            content="Version 2",
-            metadata={"version": 2, "original_id": item_id}
-        )
+        item2 = MemoryItem(content="Version 2", metadata={"version": 2, "original_id": item_id})
         memory.add(item2)
 
         changes = temporal.get_changes(item_id)
@@ -184,10 +175,10 @@ class TestGetChanges:
         # May or may not detect changes depending on implementation
         for change in changes:
             assert isinstance(change, TemporalChange)
-            assert hasattr(change, 'item_id')
-            assert hasattr(change, 'timestamp')
-            assert hasattr(change, 'change_type')
-            assert hasattr(change, 'changed_fields')
+            assert hasattr(change, "item_id")
+            assert hasattr(change, "timestamp")
+            assert hasattr(change, "change_type")
+            assert hasattr(change, "changed_fields")
 
     def test_get_changes_with_time_range(self, memory, temporal):
         """Test get_changes with time range."""
@@ -226,18 +217,14 @@ class TestCompareVersions:
         result = temporal.compare_versions(item_id, time1, time2)
 
         # Should have changed_fields key
-        assert 'changed_fields' in result or 'error' in result
+        assert "changed_fields" in result or "error" in result
 
     def test_compare_versions_nonexistent_item(self, temporal):
         """Test compare_versions with non-existent item."""
-        result = temporal.compare_versions(
-            "nonexistent",
-            "2024-01-01",
-            "2024-01-02"
-        )
+        result = temporal.compare_versions("nonexistent", "2024-01-01", "2024-01-02")
 
         assert isinstance(result, dict)
-        assert 'error' in result
+        assert "error" in result
 
 
 class TestRollback:
@@ -254,7 +241,7 @@ class TestRollback:
 
         assert isinstance(result, dict)
         # Should be dry run by default
-        assert result.get('dry_run', False) or 'error' in result
+        assert result.get("dry_run", False) or "error" in result
 
     def test_rollback_dry_run_explicit(self, memory, temporal):
         """Test rollback with explicit dry_run=True."""
@@ -266,7 +253,7 @@ class TestRollback:
         result = temporal.rollback(item_id, to_time, dry_run=True)
 
         assert isinstance(result, dict)
-        assert result.get('dry_run', False) or 'error' in result
+        assert result.get("dry_run", False) or "error" in result
 
     def test_rollback_returns_preview_info(self, memory, temporal):
         """Test that dry_run rollback returns preview info."""
@@ -279,7 +266,7 @@ class TestRollback:
 
         assert isinstance(result, dict)
         # Should have either preview info or error
-        assert 'would_change' in result or 'preview' in result or 'error' in result
+        assert "would_change" in result or "preview" in result or "error" in result
 
     def test_rollback_nonexistent_item(self, temporal):
         """Test rollback with non-existent item."""
@@ -287,10 +274,10 @@ class TestRollback:
 
         assert isinstance(result, dict)
         # Must have one of these keys
-        assert 'error' in result or 'dry_run' in result or 'preview' in result
+        assert "error" in result or "dry_run" in result or "preview" in result
         # If it's an error, verify error message exists
-        if 'error' in result:
-            assert result['error'], "Error message should not be empty"
+        if "error" in result:
+            assert result["error"], "Error message should not be empty"
 
 
 class TestGetAuditTrail:
@@ -317,8 +304,8 @@ class TestGetAuditTrail:
         # If trail has events, they must have proper structure
         for event in trail:
             assert isinstance(event, dict)
-            assert 'timestamp' in event
-            assert 'action' in event
+            assert "timestamp" in event
+            assert "action" in event
 
     def test_get_audit_trail_event_structure(self, memory, temporal):
         """Test that audit events have expected structure."""
@@ -330,24 +317,21 @@ class TestGetAuditTrail:
         if trail:
             event = trail[0]
             assert isinstance(event, dict)
-            assert 'timestamp' in event
-            assert 'action' in event
-            assert 'valid_from' in event
-            assert 'valid_to' in event
+            assert "timestamp" in event
+            assert "action" in event
+            assert "valid_from" in event
+            assert "valid_to" in event
 
     def test_get_audit_trail_with_metadata(self, memory, temporal):
         """Test audit trail with metadata included."""
-        item = MemoryItem(
-            content="Test",
-            metadata={"user_id": "test_user"}
-        )
+        item = MemoryItem(content="Test", metadata={"user_id": "test_user"})
         item_id = memory.add(item)
 
         trail = temporal.get_audit_trail(item_id, include_metadata=True)
 
         if trail:
             event = trail[0]
-            assert 'metadata' in event or 'content_preview' in event
+            assert "metadata" in event or "content_preview" in event
 
     def test_get_audit_trail_without_metadata(self, memory, temporal):
         """Test audit trail without metadata."""
@@ -390,10 +374,7 @@ class TestFindMemoriesChangedSince:
         """Test find_memories_changed_since with filters."""
         since = datetime.now().isoformat()
 
-        result = temporal.find_memories_changed_since(
-            since,
-            filters={"user_id": "test"}
-        )
+        result = temporal.find_memories_changed_since(since, filters={"user_id": "test"})
 
         assert isinstance(result, list)
 
@@ -415,7 +396,7 @@ class TestGetTimeline:
         item = MemoryItem(content="Test")
         item_id = memory.add(item)
 
-        timeline = temporal.get_timeline(item_id, granularity='day')
+        timeline = temporal.get_timeline(item_id, granularity="day")
 
         assert isinstance(timeline, dict)
 
@@ -424,7 +405,7 @@ class TestGetTimeline:
         item = MemoryItem(content="Test")
         item_id = memory.add(item)
 
-        timeline = temporal.get_timeline(item_id, granularity='hour')
+        timeline = temporal.get_timeline(item_id, granularity="hour")
 
         assert isinstance(timeline, dict)
 
@@ -433,7 +414,7 @@ class TestGetTimeline:
         item = MemoryItem(content="Test")
         item_id = memory.add(item)
 
-        timeline = temporal.get_timeline(item_id, granularity='week')
+        timeline = temporal.get_timeline(item_id, granularity="week")
 
         assert isinstance(timeline, dict)
 
@@ -442,7 +423,7 @@ class TestGetTimeline:
         item = MemoryItem(content="Test")
         item_id = memory.add(item)
 
-        timeline = temporal.get_timeline(item_id, granularity='month')
+        timeline = temporal.get_timeline(item_id, granularity="month")
 
         assert isinstance(timeline, dict)
 
@@ -459,12 +440,7 @@ class TestTemporalDataTypes:
 
     def test_temporal_version_structure(self):
         """Test TemporalVersion dataclass structure."""
-        version = TemporalVersion(
-            item_id="test-id",
-            content="Test content",
-            metadata={"key": "value"},
-            version=1
-        )
+        version = TemporalVersion(item_id="test-id", content="Test content", metadata={"key": "value"}, version=1)
 
         assert version.item_id == "test-id"
         assert version.content == "Test content"
@@ -474,10 +450,7 @@ class TestTemporalDataTypes:
     def test_temporal_change_structure(self):
         """Test TemporalChange dataclass structure."""
         change = TemporalChange(
-            item_id="test-id",
-            timestamp=datetime.now(),
-            change_type="updated",
-            changed_fields=["content"]
+            item_id="test-id", timestamp=datetime.now(), change_type="updated", changed_fields=["content"]
         )
 
         assert change.item_id == "test-id"
@@ -492,23 +465,13 @@ class TestTemporalIntegration:
     def test_full_temporal_workflow(self, memory, temporal):
         """Test complete temporal workflow (requires real storage backend)."""
         # Create item
-        item = MemoryItem(
-            content="Original content",
-            metadata={"version": 1, "author": "alice"}
-        )
+        item = MemoryItem(content="Original content", metadata={"version": 1, "author": "alice"})
         item_id = memory.add(item)
 
         time.sleep(0.1)
 
         # Create version 2
-        item2 = MemoryItem(
-            content="Updated content",
-            metadata={
-                "version": 2,
-                "author": "bob",
-                "original_id": item_id
-            }
-        )
+        item2 = MemoryItem(content="Updated content", metadata={"version": 2, "author": "bob", "original_id": item_id})
         memory.add(item2)
 
         # Get history - must return list with at least one version
@@ -523,7 +486,7 @@ class TestTemporalIntegration:
         # Verify structure if trail exists
         for event in trail:
             assert isinstance(event, dict)
-            assert 'action' in event
+            assert "action" in event
 
         # Get timeline - must return dict
         timeline = temporal.get_timeline(item_id)
@@ -532,14 +495,7 @@ class TestTemporalIntegration:
     @pytest.mark.skip(reason="Requires real storage backend for add->retrieve round-trip")
     def test_temporal_queries_with_metadata(self, memory, temporal):
         """Test temporal queries preserve metadata (requires real storage backend)."""
-        item = MemoryItem(
-            content="Test",
-            metadata={
-                "user_id": "user123",
-                "category": "test",
-                "confidence": 0.95
-            }
-        )
+        item = MemoryItem(content="Test", metadata={"user_id": "user123", "category": "test", "confidence": 0.95})
         item_id = memory.add(item)
 
         # Get history
@@ -551,6 +507,75 @@ class TestTemporalIntegration:
 
         # Verify metadata structure
         version = history[0]
-        assert hasattr(version, 'metadata'), "Version must have metadata attribute"
-        assert hasattr(version, 'content'), "Version must have content attribute"
-        assert hasattr(version, 'item_id'), "Version must have item_id attribute"
+        assert hasattr(version, "metadata"), "Version must have metadata attribute"
+        assert hasattr(version, "content"), "Version must have content attribute"
+        assert hasattr(version, "item_id"), "Version must have item_id attribute"
+
+
+class TestScopeProviderFiltering:
+    """Tests that scope_provider correctly filters temporal queries."""
+
+    def test_temporal_queries_accepts_scope_provider(self):
+        """TemporalQueries accepts scope_provider parameter without error."""
+        from smartmemory.scope_provider import DefaultScopeProvider
+
+        provider = DefaultScopeProvider(workspace_id="ws_test")
+        mem = SmartMemory(scope_provider=provider)
+
+        assert mem.temporal.scope_provider is provider
+        assert mem.version_tracker.scope_provider is provider
+
+    def test_temporal_queries_without_scope_provider_backward_compat(self):
+        """TemporalQueries works without scope_provider (OSS mode)."""
+        mem = SmartMemory()
+
+        # scope_provider should be DefaultScopeProvider with no workspace_id
+        assert mem.temporal is not None
+        assert mem.version_tracker is not None
+        # OSS mode: default scope provider has no workspace_id
+        filters = mem.scope_provider.get_isolation_filters()
+        assert "workspace_id" not in filters
+
+    def test_version_tracker_scope_provider_propagates(self):
+        """scope_provider propagates from SmartMemory to VersionTracker."""
+        from smartmemory.scope_provider import DefaultScopeProvider
+
+        provider = DefaultScopeProvider(workspace_id="ws_abc", tenant_id="t_abc")
+        mem = SmartMemory(scope_provider=provider)
+
+        assert mem.version_tracker.scope_provider is provider
+        assert mem.version_tracker.scope_provider.get_isolation_filters()["workspace_id"] == "ws_abc"
+
+    def test_temporal_relationships_scope_provider_propagates(self):
+        """scope_provider propagates from SmartMemory to TemporalRelationshipQueries."""
+        from smartmemory.scope_provider import DefaultScopeProvider
+
+        provider = DefaultScopeProvider(workspace_id="ws_xyz")
+        mem = SmartMemory(scope_provider=provider)
+
+        assert mem.temporal.relationships is not None
+        assert mem.temporal.relationships.scope_provider is provider
+
+    def test_version_tracker_create_version_injects_write_context(self):
+        """create_version injects workspace_id from scope_provider into version metadata."""
+        from smartmemory.scope_provider import DefaultScopeProvider
+
+        provider = DefaultScopeProvider(
+            workspace_id="ws_inject_test",
+            tenant_id="t_inject_test",
+            user_id="u_inject_test",
+        )
+        mem = SmartMemory(scope_provider=provider)
+        tracker = mem.version_tracker
+
+        # Add a node so create_version can find it
+        item_id = mem.add(MemoryItem(content="Test item for version injection"))
+
+        version = tracker.create_version(
+            item_id=item_id,
+            content="Versioned content",
+        )
+
+        assert version.metadata.get("workspace_id") == "ws_inject_test"
+        assert version.metadata.get("tenant_id") == "t_inject_test"
+        assert version.metadata.get("user_id") == "u_inject_test"

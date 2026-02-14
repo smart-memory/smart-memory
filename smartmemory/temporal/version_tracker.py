@@ -5,11 +5,10 @@ Tracks all versions of memory items with both valid time and transaction time.
 Enables full history tracking, version comparison, and temporal queries.
 """
 
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict, fields
 import logging
-import json
 
 from smartmemory.utils import unflatten_dict
 
@@ -19,63 +18,64 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Version:
     """Represents a single version of a memory item."""
+
     item_id: str
     version_number: int
     content: str
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Bi-temporal timestamps
     valid_time_start: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     valid_time_end: Optional[datetime] = None  # None = current/valid
     transaction_time_start: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     transaction_time_end: Optional[datetime] = None  # None = current version
-    
+
     # Change tracking
     changed_by: Optional[str] = None
     change_reason: Optional[str] = None
     previous_version: Optional[int] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
         data = asdict(self)
         # Convert datetime objects to ISO strings
-        for key in ['valid_time_start', 'valid_time_end', 'transaction_time_start', 'transaction_time_end']:
+        for key in ["valid_time_start", "valid_time_end", "transaction_time_start", "transaction_time_end"]:
             if data[key] and isinstance(data[key], datetime):
                 data[key] = data[key].isoformat()
         return data
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Version':
+    def from_dict(cls, data: Dict[str, Any]) -> "Version":
         """Create from dictionary."""
         # Parse datetime strings
-        for key in ['valid_time_start', 'valid_time_end', 'transaction_time_start', 'transaction_time_end']:
+        for key in ["valid_time_start", "valid_time_end", "transaction_time_start", "transaction_time_end"]:
             if data.get(key) and isinstance(data[key], str):
                 data[key] = datetime.fromisoformat(data[key])
-        
+
         # Separate known fields from metadata (handling flattened storage)
         known_fields = {f.name for f in fields(cls)}
         init_args = {}
-        metadata = data.get('metadata', {}).copy()
-        
+        metadata = data.get("metadata", {}).copy()
+
         # Handle reference item ID (stored as ref_item_id to avoid conflict with node ID)
-        if 'ref_item_id' in data:
-            data['item_id'] = data['ref_item_id']
-        
+        if "ref_item_id" in data:
+            data["item_id"] = data["ref_item_id"]
+
         for k, v in data.items():
             if k in known_fields:
                 init_args[k] = v
-            elif k != 'metadata':
+            elif k != "metadata":
                 # Flattened metadata field -> add to metadata dict
                 metadata[k] = v
-        
-        init_args['metadata'] = metadata
-        
+
+        init_args["metadata"] = metadata
+
         return cls(**init_args)
-    
+
     def is_current(self) -> bool:
         """Check if this is the current version."""
         return self.transaction_time_end is None
-    
+
     def is_valid_at(self, time: datetime) -> bool:
         """Check if version is valid at given time."""
         if self.valid_time_start > time:
@@ -88,7 +88,7 @@ class Version:
 class VersionTracker:
     """
     Tracks versions of memory items with bi-temporal support.
-    
+
     Features:
     - Full version history
     - Bi-temporal tracking (valid time + transaction time)
@@ -96,17 +96,18 @@ class VersionTracker:
     - Change detection
     - Version comparison
     """
-    
-    def __init__(self, graph_backend):
-        """
-        Initialize version tracker.
-        
+
+    def __init__(self, graph_backend: Any, scope_provider: Optional[Any] = None):
+        """Initialize version tracker.
+
         Args:
             graph_backend: Graph database backend for storage
+            scope_provider: Optional ScopeProvider for tenant isolation filtering
         """
         self.graph = graph_backend
+        self.scope_provider = scope_provider
         self._version_cache: Dict[str, List[Version]] = {}
-    
+
     def create_version(
         self,
         item_id: str,
@@ -114,11 +115,11 @@ class VersionTracker:
         metadata: Optional[Dict[str, Any]] = None,
         valid_time_start: Optional[datetime] = None,
         changed_by: Optional[str] = None,
-        change_reason: Optional[str] = None
+        change_reason: Optional[str] = None,
     ) -> Version:
         """
         Create a new version of a memory item.
-        
+
         Args:
             item_id: Memory item ID
             content: Item content
@@ -126,108 +127,111 @@ class VersionTracker:
             valid_time_start: When this version becomes valid (default: now)
             changed_by: User/system that made the change
             change_reason: Reason for the change
-            
+
         Returns:
             New Version object
         """
         now = datetime.now(timezone.utc)
-        
+
         # Get previous versions to determine version number
         previous_versions = self.get_versions(item_id)
-        
+
         if previous_versions:
             # Close the previous current version
             current_version = previous_versions[0]  # Most recent
             if current_version.is_current():
                 self._close_version(current_version, now)
-            
+
             version_number = max(v.version_number for v in previous_versions) + 1
             previous_version_num = current_version.version_number
         else:
             version_number = 1
             previous_version_num = None
-        
+
+        # Inject scope context into metadata so versions carry tenant identity
+        version_metadata = dict(metadata or {})
+        if self.scope_provider:
+            write_ctx = self.scope_provider.get_write_context()
+            for key in ("workspace_id", "tenant_id", "user_id"):
+                if key in write_ctx:
+                    version_metadata[key] = write_ctx[key]
+
         # Create new version
         version = Version(
             item_id=item_id,
             version_number=version_number,
             content=content,
-            metadata=metadata or {},
+            metadata=version_metadata,
             valid_time_start=valid_time_start or now,
             valid_time_end=None,  # Open-ended
             transaction_time_start=now,
             transaction_time_end=None,  # Current version
             changed_by=changed_by,
             change_reason=change_reason,
-            previous_version=previous_version_num
+            previous_version=previous_version_num,
         )
-        
+
         # Store in graph
         self._store_version(version)
-        
+
         # Invalidate cache
         if item_id in self._version_cache:
             del self._version_cache[item_id]
-        
+
         logger.info(f"Created version {version_number} for item {item_id}")
         return version
-    
+
     def get_versions(
         self,
         item_id: str,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        include_closed: bool = True
+        include_closed: bool = True,
     ) -> List[Version]:
         """
         Get all versions of an item.
-        
+
         Args:
             item_id: Memory item ID
             start_time: Filter by transaction time start
             end_time: Filter by transaction time end
             include_closed: Include closed (non-current) versions
-            
+
         Returns:
             List of versions, ordered by version number (newest first)
         """
         # Check cache
         if item_id in self._version_cache and not (start_time or end_time):
             return self._version_cache[item_id]
-        
+
         # Query from graph
         versions = self._query_versions(item_id, start_time, end_time, include_closed)
-        
+
         # Sort by version number (newest first)
         versions.sort(key=lambda v: v.version_number, reverse=True)
-        
+
         # Cache if no time filters
         if not (start_time or end_time):
             self._version_cache[item_id] = versions
-        
+
         return versions
-    
-    def get_version_at_time(
-        self,
-        item_id: str,
-        time: datetime,
-        time_type: str = 'transaction'
-    ) -> Optional[Version]:
+
+    def get_version_at_time(self, item_id: str, time: datetime, time_type: str = "transaction") -> Optional[Version]:
         """
         Get the version that was current at a specific time.
-        
+
         Args:
             item_id: Memory item ID
             time: Time point to query
             time_type: 'transaction' or 'valid' time
-            
+
         Returns:
             Version that was current at that time, or None
         """
         versions = self.get_versions(item_id, include_closed=True)
-        
+
         for version in versions:
-            if time_type == 'transaction':
+            if time_type == "transaction":
                 # Check transaction time
                 if version.transaction_time_start <= time:
                     if version.transaction_time_end is None or version.transaction_time_end > time:
@@ -235,52 +239,47 @@ class VersionTracker:
             else:  # valid time
                 if version.is_valid_at(time):
                     return version
-        
+
         return None
-    
+
     def get_current_version(self, item_id: str) -> Optional[Version]:
         """
         Get the current (latest) version of an item.
-        
+
         Args:
             item_id: Memory item ID
-            
+
         Returns:
             Current version or None
         """
         versions = self.get_versions(item_id, include_closed=False)
         return versions[0] if versions else None
-    
-    def compare_versions(
-        self,
-        item_id: str,
-        version1: int,
-        version2: int
-    ) -> Dict[str, Any]:
+
+    def compare_versions(self, item_id: str, version1: int, version2: int) -> Dict[str, Any]:
         """
         Compare two versions of an item.
-        
+
         Args:
             item_id: Memory item ID
             version1: First version number
             version2: Second version number
-            
+
         Returns:
             Dictionary with comparison results
         """
         versions = self.get_versions(item_id)
         v1 = next((v for v in versions if v.version_number == version1), None)
         v2 = next((v for v in versions if v.version_number == version2), None)
-        
+
         if not v1 or not v2:
             return {"error": "One or both versions not found"}
-        
+
         # Compare content
         content_changed = v1.content != v2.content
-        
+
         # Compare metadata
         metadata_changes = self._compare_metadata(v1.metadata, v2.metadata)
-        
+
         return {
             "item_id": item_id,
             "version1": version1,
@@ -289,180 +288,191 @@ class VersionTracker:
             "metadata_changes": metadata_changes,
             "time_difference": (v2.transaction_time_start - v1.transaction_time_start).total_seconds(),
             "changed_by": v2.changed_by,
-            "change_reason": v2.change_reason
+            "change_reason": v2.change_reason,
         }
-    
+
     def _close_version(self, version: Version, close_time: datetime):
         """Close a version by setting its transaction_time_end."""
         version.transaction_time_end = close_time
         self._update_version(version)
-    
+
     def _store_version(self, version: Version):
         """Store version in graph database."""
         try:
             # Store as a Version node in the graph
             properties = version.to_dict()
-            
+
             # Rename item_id to ref_item_id to avoid conflict with node ID (version_...)
-            if 'item_id' in properties:
-                properties['ref_item_id'] = properties.pop('item_id')
-            
+            if "item_id" in properties:
+                properties["ref_item_id"] = properties.pop("item_id")
+
             # Flatten metadata into properties to ensure compatibility with MemoryItemSerializer
             # This prevents double-nesting (metadata__key -> metadata: {key}) during retrieval
-            metadata = properties.pop('metadata', {})
+            metadata = properties.pop("metadata", {})
             if isinstance(metadata, dict):
                 for k, v in metadata.items():
                     # Don't overwrite system fields
                     if k not in properties:
                         properties[k] = v
-            
+
             # VersionTracker uses 'Version' as the type/label
-            
+
             # Use graph backend to store
             # Note: self.graph is expected to be SmartGraphNodes or compatible interface
             # add_node(item_id, properties, memory_type=...)
             self.graph.add_node(
                 item_id=f"version_{version.item_id}_{version.version_number}",
                 properties=properties,
-                memory_type='Version' 
+                memory_type="Version",
             )
-            
+
             # Ensure main node exists before creating edge
-            # Check if it exists first
-            check_query = "MATCH (m {item_id: $id}) RETURN COUNT(m) as count"
-            result = list(self.graph.execute_query(check_query, {'id': version.item_id}))
+            # Scope the existence check and placeholder creation to the tenant
+            scope_clause = ""
+            check_params: Dict[str, Any] = {"id": version.item_id}
+            create_set_extra = ""
+            if self.scope_provider:
+                scope_filters = self.scope_provider.get_isolation_filters()
+                if "workspace_id" in scope_filters:
+                    scope_clause = " AND m.workspace_id = $workspace_id"
+                    check_params["workspace_id"] = scope_filters["workspace_id"]
+                    create_set_extra = ", m.workspace_id = $workspace_id"
+
+            check_query = f"MATCH (m {{item_id: $id}}) WHERE true{scope_clause} RETURN COUNT(m) as count"
+            result = list(self.graph.execute_query(check_query, check_params))
             node_exists = result[0][0] > 0 if result else False
-            
+
             if not node_exists:
-                # Create minimal main node directly via backend to avoid version tracking loops
-                # Use a simple MERGE query to create if not exists
-                create_query = """
-                MERGE (m {item_id: $id})
-                ON CREATE SET m:Memory, m:semantic, m.item_id = $id
+                create_query = f"""
+                MERGE (m {{item_id: $id}})
+                ON CREATE SET m:Memory, m:semantic, m.item_id = $id{create_set_extra}
                 """
-                self.graph.execute_query(create_query, {'id': version.item_id})
+                self.graph.execute_query(create_query, check_params)
                 logger.debug(f"Created placeholder main node for {version.item_id}")
-            
+
             # Now create the edge
             self.graph.backend.add_edge(
                 source_id=version.item_id,
                 target_id=f"version_{version.item_id}_{version.version_number}",
-                edge_type='HAS_VERSION',
-                properties={'version_number': version.version_number}
+                edge_type="HAS_VERSION",
+                properties={"version_number": version.version_number},
             )
-            
+
         except Exception as e:
             logger.error(f"Error storing version: {e}")
             raise
-    
+
     def _update_version(self, version: Version):
         """Update an existing version in the graph."""
         try:
             version_id = f"version_{version.item_id}_{version.version_number}"
             properties = version.to_dict()
-            
+
             # Rename item_id to ref_item_id
-            if 'item_id' in properties:
-                properties['ref_item_id'] = properties.pop('item_id')
-            
+            if "item_id" in properties:
+                properties["ref_item_id"] = properties.pop("item_id")
+
             # Flatten metadata into properties
-            metadata = properties.pop('metadata', {})
+            metadata = properties.pop("metadata", {})
             if isinstance(metadata, dict):
                 for k, v in metadata.items():
                     if k not in properties:
                         properties[k] = v
-            
+
             # Update node properties
             # Use add_node for upsert
-            self.graph.add_node(
-                item_id=version_id,
-                properties=properties,
-                memory_type='Version'
-            )
-            
+            self.graph.add_node(item_id=version_id, properties=properties, memory_type="Version")
+
         except Exception as e:
             logger.error(f"Error updating version: {e}")
-    
+
     def _query_versions(
-        self,
-        item_id: str,
-        start_time: Optional[datetime],
-        end_time: Optional[datetime],
-        include_closed: bool
+        self, item_id: str, start_time: Optional[datetime], end_time: Optional[datetime], include_closed: bool
     ) -> List[Version]:
         """Query versions from graph database."""
         try:
+            # Build scope filter clause
+            scope_clause = ""
+            params: Dict[str, Any] = {"item_id": item_id}
+            if self.scope_provider:
+                filters = self.scope_provider.get_isolation_filters()
+                if "workspace_id" in filters:
+                    scope_clause = " AND m.workspace_id = $workspace_id"
+                    params["workspace_id"] = filters["workspace_id"]
+
             # First try to query via HAS_VERSION relationship
             query = f"""
             MATCH (m {{item_id: $item_id}})-[:HAS_VERSION]->(v:Version)
+            WHERE true{scope_clause}
             RETURN v
             ORDER BY v.version_number DESC
             """
-            
-            result = self.graph.execute_query(query, {'item_id': item_id})
+
+            result = self.graph.execute_query(query, params)
             result_list = list(result)
-            
+
             # If no results via relationship, try querying version nodes directly by item_id property
             if not result_list:
+                # For direct version query, filter on the version's ref_item_id
+                fallback_params: Dict[str, Any] = {"item_id": item_id}
+                fallback_scope = ""
+                if self.scope_provider:
+                    filters = self.scope_provider.get_isolation_filters()
+                    if "workspace_id" in filters:
+                        fallback_scope = " AND v.workspace_id = $workspace_id"
+                        fallback_params["workspace_id"] = filters["workspace_id"]
+
                 query = f"""
                 MATCH (v:Version)
-                WHERE v.item_id = $item_id
+                WHERE v.item_id = $item_id{fallback_scope}
                 RETURN v
                 ORDER BY v.version_number DESC
                 """
-                result = self.graph.execute_query(query, {'item_id': item_id})
+                result = self.graph.execute_query(query, fallback_params)
                 result_list = list(result)
-            
+
             versions = []
             for row in result_list:
                 # FalkorDB returns results as a list, not dict
                 # Each row is a list with values corresponding to RETURN clause
                 node = row[0]  # RETURN v
-                
+
                 # Convert node object to dict
-                if hasattr(node, 'properties'):
+                if hasattr(node, "properties"):
                     version_data = dict(node.properties)
                 else:
-                    version_data = {k: v for k, v in vars(node).items() if not k.startswith('_')}
-                
+                    version_data = {k: v for k, v in vars(node).items() if not k.startswith("_")}
+
                 # Remove internal properties that shouldn't be exposed
-                version_data.pop('is_global', None)
-                
+                version_data.pop("is_global", None)
+
                 # Unflatten the dict to restore nested structure (e.g., metadata__version -> metadata: {version: ...})
                 version_data = unflatten_dict(version_data)
-                
+
                 version = Version.from_dict(version_data)
-                
+
                 # Apply filters
                 if not include_closed and not version.is_current():
                     continue
-                
+
                 if start_time and version.transaction_time_start < start_time:
                     continue
-                
+
                 if end_time and version.transaction_time_start > end_time:
                     continue
-                
+
                 versions.append(version)
-            
+
             return versions
-            
+
         except Exception as e:
             logger.error(f"Error querying versions: {e}")
             return []
-    
+
     def _compare_metadata(self, meta1: Dict, meta2: Dict) -> Dict[str, Any]:
         """Compare two metadata dictionaries."""
         added = {k: v for k, v in meta2.items() if k not in meta1}
         removed = {k: v for k, v in meta1.items() if k not in meta2}
-        changed = {
-            k: {'old': meta1[k], 'new': meta2[k]}
-            for k in meta1.keys() & meta2.keys()
-            if meta1[k] != meta2[k]
-        }
-        
-        return {
-            'added': added,
-            'removed': removed,
-            'changed': changed
-        }
+        changed = {k: {"old": meta1[k], "new": meta2[k]} for k in meta1.keys() & meta2.keys() if meta1[k] != meta2[k]}
+
+        return {"added": added, "removed": removed, "changed": changed}
