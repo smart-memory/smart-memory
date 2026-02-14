@@ -450,8 +450,9 @@ class TestCodeIndexer:
         backend = MagicMock()
         backend.scope_provider = scope_provider
 
-        graph = MagicMock(spec=["execute_query", "add_nodes_bulk", "add_edges_bulk", "nodes"])
+        graph = MagicMock(spec=["execute_query", "add_nodes_bulk", "add_edges_bulk", "nodes", "get_scope_filters"])
         graph.nodes.backend = backend
+        graph.get_scope_filters.return_value = {"workspace_id": "ws-123"}
         graph.execute_query.return_value = []
 
         indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))

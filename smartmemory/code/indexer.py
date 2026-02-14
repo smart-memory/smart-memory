@@ -100,7 +100,7 @@ class CodeIndexer:
             where_clauses = ["n.repo = $repo"]
 
             # Inject workspace scope to prevent cross-tenant deletion
-            scope_filters = _get_scope_filters(self.graph)
+            scope_filters = self.graph.get_scope_filters()
             if scope_filters.get("workspace_id"):
                 params["workspace_id"] = scope_filters["workspace_id"]
                 where_clauses.append("n.workspace_id = $workspace_id")
@@ -111,24 +111,3 @@ class CodeIndexer:
             logger.info("Deleted existing code nodes for repo: %s", repo)
         except Exception as e:
             logger.warning("Failed to delete existing code nodes: %s", e)
-
-
-def _get_scope_filters(graph: Any) -> dict[str, Any]:
-    """Extract isolation filters from a graph's scope_provider.
-
-    Returns workspace_id (and tenant_id if present) for injecting into
-    raw Cypher WHERE clauses. Returns empty dict in OSS/unscoped mode.
-
-    Note: Duplicated in smartmemory_mcp/tools/code_tools.py — keep in sync.
-    """
-    try:
-        backend = getattr(graph, "backend", None)
-        if backend is None:
-            # SmartGraph wraps backend via nodes manager
-            nodes = getattr(graph, "nodes", None)
-            backend = getattr(nodes, "backend", None) if nodes else None
-        if backend and hasattr(backend, "scope_provider"):
-            return backend.scope_provider.get_isolation_filters()
-    except Exception:
-        pass
-    return {}

@@ -59,7 +59,7 @@ class SmartGraph:
             module = importlib.import_module(module_path)
             return getattr(module, backend_class_name)
         except (ImportError, AttributeError) as e:
-            raise ImportError(f"Failed to import backend class '{backend_class_name}' from '{module_path}': {e}")
+            raise ImportError(f"Failed to import backend class '{backend_class_name}' from '{module_path}': {e}") from e
 
     def _emit_graph_stats(
         self,
@@ -98,7 +98,7 @@ class SmartGraph:
 
         # Clear all submodule caches
         self.nodes.clear_cache()
-        self.edges.clear_cache() if hasattr(self.edges, "clear_cache") else None
+        self.edges.clear_cache()
         self.search.clear_cache()
 
         try:
@@ -193,11 +193,24 @@ class SmartGraph:
             Total number of edges created or updated.
         """
         count = self.backend.add_edges_bulk(edges, batch_size=batch_size)
-        if hasattr(self.edges, "clear_cache"):
-            self.edges.clear_cache()
+        self.edges.clear_cache()
         return count
 
-    def add_triple(self, triple: "Triple", properties: Dict[str, Any] = None, **kwargs):
+    def get_scope_filters(self) -> Dict[str, Any]:
+        """Extract isolation filters from the backend's scope_provider.
+
+        Returns workspace_id (and user_id at USER isolation level) for
+        injecting into raw Cypher WHERE clauses. Returns empty dict in
+        OSS/unscoped mode.
+        """
+        try:
+            if hasattr(self.backend, "scope_provider"):
+                return self.backend.scope_provider.get_isolation_filters()
+        except Exception:
+            pass
+        return {}
+
+    def add_triple(self, triple: Any, properties: Dict[str, Any] = None, **kwargs):
         """Add a triple (Triple models) to the graph."""
         return self.edges.add_triple(triple, properties, **kwargs)
 

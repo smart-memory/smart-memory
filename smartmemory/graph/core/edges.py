@@ -3,6 +3,7 @@ SmartGraph Edge Operations Module
 
 Handles all edge-related operations for the SmartGraph system.
 """
+
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
@@ -21,14 +22,20 @@ class SmartGraphEdges:
         self.enable_caching = enable_caching
         self.cache_size = cache_size
 
-    def add_edge(self,
-                 source_id: str,
-                 target_id: str,
-                 edge_type: str,
-                 properties: Dict[str, Any],
-                 valid_time: Optional[Tuple] = None,
-                 transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None):
+    def clear_cache(self) -> None:
+        """Clear edge cache. No-op for now (edges are not cached)."""
+        pass
+
+    def add_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        edge_type: str,
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        transaction_time: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
+    ):
         """Add an edge to the graph."""
         # Structural validation only (no ontology enforcement)
         try:
@@ -63,13 +70,18 @@ class SmartGraphEdges:
                 "edge_type": edge_type,
             }
 
-        result = self.backend.add_edge(source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type)
+        result = self.backend.add_edge(
+            source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
+        )
 
         # Invalidate neighbor caches
-        if self.enable_caching and hasattr(self.nodes, '_node_cache'):
+        if self.enable_caching and hasattr(self.nodes, "_node_cache"):
             # Clear any cached neighbors for source and target nodes
-            keys_to_remove = [key for key in self.nodes._node_cache.keys()
-                              if key.startswith(f"{source_id}:") or key.startswith(f"{target_id}:")]
+            keys_to_remove = [
+                key
+                for key in self.nodes._node_cache.keys()
+                if key.startswith(f"{source_id}:") or key.startswith(f"{target_id}:")
+            ]
             for key in keys_to_remove:
                 del self.nodes._node_cache[key]
 
@@ -86,7 +98,7 @@ class SmartGraphEdges:
 
         return result
 
-    def add_triple(self, triple: 'Triple', properties: Dict[str, Any] = None, **kwargs):
+    def add_triple(self, triple: "Triple", properties: Dict[str, Any] = None, **kwargs):
         """Add a triple (Triple models) to the graph. Properties are attached to the edge."""
         if properties is None:
             properties = {}
@@ -96,11 +108,11 @@ class SmartGraphEdges:
 
     def get_edges_for_node(self, item_id: str):
         """Get all edges (relationships) involving a specific node.
-        
+
         Delegates to the backend's get_edges_for_node method if available.
         Returns a list of edge dictionaries with 'source', 'target', and 'type' keys.
         """
-        if hasattr(self.backend, 'get_edges_for_node'):
+        if hasattr(self.backend, "get_edges_for_node"):
             return self.backend.get_edges_for_node(item_id)
         else:
             raise NotImplementedError("Triple extraction not supported for this graph backend.")
@@ -119,11 +131,9 @@ class SmartGraphEdges:
             pass
         return result
 
-    def _validate_edge_structural(self,
-                                  source_id: str,
-                                  target_id: str,
-                                  edge_type: str,
-                                  properties: Optional[Dict[str, Any]]) -> bool:
+    def _validate_edge_structural(
+        self, source_id: str, target_id: str, edge_type: str, properties: Optional[Dict[str, Any]]
+    ) -> bool:
         """Lightweight structural validation for edges.
 
         Checks only the shape and serializability of inputs without enforcing ontology.
@@ -178,7 +188,13 @@ class SmartGraphEdges:
 
         return is_valid
 
-    def _emit_graph_stats(self, operation: str, details: Dict[str, Any], delta_nodes: Optional[int] = None, delta_edges: Optional[int] = None) -> None:
+    def _emit_graph_stats(
+        self,
+        operation: str,
+        details: Dict[str, Any],
+        delta_nodes: Optional[int] = None,
+        delta_edges: Optional[int] = None,
+    ) -> None:
         """Best-effort emission of graph stats update events."""
         try:
             backend_name = type(self.backend).__name__
@@ -186,20 +202,20 @@ class SmartGraphEdges:
             edge_count: Optional[int] = None
 
             # Prefer explicit fast counters if backend provides them
-            if hasattr(self.backend, 'get_counts'):
+            if hasattr(self.backend, "get_counts"):
                 try:
                     counts = self.backend.get_counts()  # type: ignore[attr-defined]
                     if isinstance(counts, dict):
-                        node_count = counts.get('node_count')
-                        edge_count = counts.get('edge_count')
+                        node_count = counts.get("node_count")
+                        edge_count = counts.get("edge_count")
                 except Exception:
                     pass
             else:
                 # Fallbacks
                 try:
-                    if hasattr(self.backend, 'get_node_count'):
+                    if hasattr(self.backend, "get_node_count"):
                         node_count = self.backend.get_node_count()  # type: ignore[attr-defined]
-                    elif hasattr(self.backend, 'get_all_nodes'):
+                    elif hasattr(self.backend, "get_all_nodes"):
                         nodes = self.backend.get_all_nodes()  # type: ignore[attr-defined]
                         try:
                             node_count = len(nodes) if nodes is not None else None
@@ -208,7 +224,7 @@ class SmartGraphEdges:
                 except Exception:
                     node_count = None
                 try:
-                    if hasattr(self.backend, 'get_edge_count'):
+                    if hasattr(self.backend, "get_edge_count"):
                         edge_count = self.backend.get_edge_count()  # type: ignore[attr-defined]
                 except Exception:
                     edge_count = None

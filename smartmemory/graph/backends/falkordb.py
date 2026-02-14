@@ -165,15 +165,29 @@ class FalkorDBBackend(SmartGraphBackend):
             props.update(write_ctx)
             by_type.setdefault(sanitized, []).append({"src": src, "tgt": tgt, "props": props})
 
+        # Scope MATCH to workspace when in multi-tenant mode
+        ws_id = write_ctx.get("workspace_id")
+        if ws_id:
+            match_tpl = (
+                "UNWIND $batch AS edge "
+                "MATCH (a {{item_id: edge.src, workspace_id: edge.props.workspace_id}}), "
+                "(b {{item_id: edge.tgt, workspace_id: edge.props.workspace_id}}) "
+                "MERGE (a)-[r:{etype}]->(b) "
+                "SET r += edge.props "
+                "RETURN count(r) AS cnt"
+            )
+        else:
+            match_tpl = (
+                "UNWIND $batch AS edge "
+                "MATCH (a {{item_id: edge.src}}), (b {{item_id: edge.tgt}}) "
+                "MERGE (a)-[r:{etype}]->(b) "
+                "SET r += edge.props "
+                "RETURN count(r) AS cnt"
+            )
+
         total = 0
         for etype, batch_items in by_type.items():
-            query = (
-                f"UNWIND $batch AS edge "
-                f"MATCH (a {{item_id: edge.src}}), (b {{item_id: edge.tgt}}) "
-                f"MERGE (a)-[r:{etype}]->(b) "
-                f"SET r += edge.props "
-                f"RETURN count(r) AS cnt"
-            )
+            query = match_tpl.format(etype=etype)
             for chunk in self._chunked(batch_items, batch_size):
                 res = self.graph.query(query, {"batch": chunk})
                 created = 0
@@ -209,7 +223,7 @@ class FalkorDBBackend(SmartGraphBackend):
         memory_type: Optional[str] = None,
         is_global: bool = False,
     ):
-        label = memory_type.capitalize() if memory_type else "Node"
+        label = sanitize_label(memory_type.capitalize()) if memory_type else "Node"
         props = flatten_dict(properties)
 
         # Detect write mode marker (used by CRUD.update_memory_node for replace semantics)
@@ -304,49 +318,69 @@ class FalkorDBBackend(SmartGraphBackend):
             if self._is_valid_property(k, v):
                 serialized_props[k] = self._serialize_value(v)
 
+        # Sanitize edge type (same logic as add_edges_bulk)
+        sanitized_type = re.sub(r"[^A-Z0-9_]", "_", edge_type.upper().replace("-", "_"))
+        if not sanitized_type:
+            sanitized_type = "RELATED"
+
         params = {
             "source": source_id,
             "target": target_id,
             "props": serialized_props,
         }
-        query = (
-            f"MATCH (a {{item_id: $source}}), (b {{item_id: $target}}) "
-            f"MERGE (a)-[r:{edge_type.upper()}]->(b) "
-            f"SET r += $props"
-        )
+        # Scope MATCH to workspace when in multi-tenant mode
+        ws_id = write_ctx.get("workspace_id")
+        if ws_id:
+            params["ws_id"] = ws_id
+            query = (
+                f"MATCH (a {{item_id: $source, workspace_id: $ws_id}}), "
+                f"(b {{item_id: $target, workspace_id: $ws_id}}) "
+                f"MERGE (a)-[r:{sanitized_type}]->(b) "
+                f"SET r += $props"
+            )
+        else:
+            query = (
+                f"MATCH (a {{item_id: $source}}), (b {{item_id: $target}}) "
+                f"MERGE (a)-[r:{sanitized_type}]->(b) "
+                f"SET r += $props"
+            )
 
-        # CRITICAL DEBUG: Add logging to understand edge creation failures
         try:
-            result = self._query(query, params)
+            self._query(query, params)
             # Verify the edge was actually created
-            verify_query = f"MATCH (a {{item_id: $source}})-[r:{edge_type.upper()}]->(b {{item_id: $target}}) RETURN count(r) as edge_count"
-            verify_result = self._query(verify_query, {"source": source_id, "target": target_id})
+            verify_params = {"source": source_id, "target": target_id}
+            if ws_id:
+                verify_params["ws_id"] = ws_id
+                verify_query = (
+                    f"MATCH (a {{item_id: $source, workspace_id: $ws_id}})"
+                    f"-[r:{sanitized_type}]->"
+                    f"(b {{item_id: $target, workspace_id: $ws_id}}) RETURN count(r) as edge_count"
+                )
+            else:
+                verify_query = f"MATCH (a {{item_id: $source}})-[r:{sanitized_type}]->(b {{item_id: $target}}) RETURN count(r) as edge_count"
+            verify_result = self._query(verify_query, verify_params)
             edge_count = verify_result[0][0] if verify_result and verify_result[0] else 0
 
             if edge_count == 0:
-                # Edge creation failed - check if nodes exist
                 source_check = self._query("MATCH (n {item_id: $id}) RETURN count(n) as count", {"id": source_id})
                 target_check = self._query("MATCH (n {item_id: $id}) RETURN count(n) as count", {"id": target_id})
                 source_exists = source_check[0][0] if source_check and source_check[0] else 0
                 target_exists = target_check[0][0] if target_check and target_check[0] else 0
-
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(
-                        "EDGE CREATION FAILED: %s --[%s]--> %s | source_exists=%s target_exists=%s",
-                        source_id,
-                        edge_type,
-                        target_id,
-                        bool(source_exists),
-                        bool(target_exists),
-                    )
+                logger.debug(
+                    "Edge not created: %s --[%s]--> %s | source_exists=%s target_exists=%s",
+                    source_id,
+                    sanitized_type,
+                    target_id,
+                    bool(source_exists),
+                    bool(target_exists),
+                )
                 return False
-            else:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("EDGE CREATED: %s --[%s]--> %s", source_id, edge_type, target_id)
-                return True
+
+            logger.debug("Edge created: %s --[%s]--> %s", source_id, sanitized_type, target_id)
+            return True
 
         except Exception as e:
-            logger.warning("EDGE CREATION ERROR: %s --[%s]--> %s: %s", source_id, edge_type, target_id, e)
+            logger.warning("Edge creation error: %s --[%s]--> %s: %s", source_id, sanitized_type, target_id, e)
             return False
 
     def get_node(self, item_id: str, as_of_time: Optional[str] = None):
@@ -1016,8 +1050,6 @@ class FalkorDBBackend(SmartGraphBackend):
                     target_idx = rel.get("target_index")
                     rel_type = rel.get("relation_type", "RELATED")
                     if target_idx is not None and target_idx in entity_id_map:
-                        source_id = entity_id_map[i]
-                        target_id = entity_id_map[target_idx]
                         # Only create if both are new entities (resolved entities already have relationships)
                         source_resolved = any(e["index"] == i and e["resolved"] for e in resolved_entities)
                         target_resolved = any(e["index"] == target_idx and e["resolved"] for e in resolved_entities)
