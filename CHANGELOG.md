@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.14] - 2026-02-14
+
+### Added
+
+#### Bulk Graph API (CORE-BULK-1)
+
+- `FalkorDBBackend.add_nodes_bulk()` — UNWIND Cypher batch upserts, grouped by label, chunked at 500 items
+- `FalkorDBBackend.add_edges_bulk()` — UNWIND Cypher batch upserts, grouped by edge type, chunked at 500 items
+- `FalkorDBBackend._chunked()` — static helper for splitting lists into fixed-size chunks
+- `SmartGraph.add_nodes_bulk()` / `add_edges_bulk()` — delegation methods with cache clearing
+- New `POST /memory/graph/bulk` endpoint — general-purpose bulk write with optional `delete_prefix` for clean-replace semantics
+- Pydantic models: `BulkNode`, `BulkEdge`, `BulkWriteRequest`, `BulkWriteResponse`
+
+### Changed
+
+- `CodeIndexer.index()` — replaced individual `graph.add_node()`/`add_edge()` loops with `add_nodes_bulk()`/`add_edges_bulk()` calls
+- `POST /memory/code/index` — refactored to use bulk graph methods instead of individual writes
+- Performance: ~14,000 individual graph calls replaced by batched UNWIND queries
+
+---
+
 ## [0.3.13] - 2026-02-13
 
 ### Added
