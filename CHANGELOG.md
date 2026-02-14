@@ -32,6 +32,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.16] - 2026-02-14
+
+### Fixed
+
+#### Pre-Existing Issues Resolution (gaps.md PRE-1 through PRE-12)
+
+- `add_edge()` now sanitizes edge types with `re.sub` (PRE-1)
+- `SmartGraphBackend` ABC rewritten — correct signatures, `add_nodes_bulk`/`add_edges_bulk` fallback methods (PRE-2, PRE-3)
+- `get_scope_filters()` added to `SmartGraph` — eliminates duplication in indexer and MCP tools (PRE-4)
+- `extract_node()`/`extract_rel_type()` moved to shared `graph_utils.py` (PRE-5)
+- `SmartGraphEdges.clear_cache()` added, `hasattr` guards removed (PRE-6)
+- `Triple` forward ref replaced with `Any` in SmartGraph and SmartGraphEdges (PRE-7)
+- Exception re-raises now include `from e`/`from exc` (PRE-8)
+- Unused variables removed from `falkordb.py` (PRE-9)
+- `add_edge()` and `add_edges_bulk()` MATCH clauses now scoped to `workspace_id` in multi-tenant mode (PRE-11)
+- `add_node()` now applies `sanitize_label()` (PRE-12)
+
+---
+
 ## [0.3.14] - 2026-02-14
 
 ### Added
