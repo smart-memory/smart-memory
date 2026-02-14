@@ -97,6 +97,10 @@ class FalkorDBBackend(SmartGraphBackend):
     def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
         """Bulk upsert nodes using UNWIND Cypher, grouped by label.
 
+        All nodes receive write context (workspace_id, user_id) from the
+        scope provider.  Global nodes (``is_global=True``) are not supported
+        in bulk mode — use ``add_node()`` individually for those.
+
         Returns the total number of nodes created or updated.
         """
         if not nodes:
