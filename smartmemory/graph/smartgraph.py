@@ -167,13 +167,31 @@ class SmartGraph:
         )
 
     def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
-        """Bulk upsert nodes via backend. Returns count of nodes created/updated."""
+        """Bulk upsert nodes using UNWIND Cypher batching.
+
+        Args:
+            nodes: List of node dicts, each with at least ``item_id`` and
+                optionally ``memory_type`` plus arbitrary properties.
+            batch_size: Maximum nodes per UNWIND query chunk.
+
+        Returns:
+            Total number of nodes created or updated.
+        """
         count = self.backend.add_nodes_bulk(nodes, batch_size=batch_size)
         self.nodes.clear_cache()
         return count
 
     def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
-        """Bulk upsert edges via backend. Returns count of edges created/updated."""
+        """Bulk upsert edges using UNWIND Cypher batching.
+
+        Args:
+            edges: List of ``(source_id, target_id, edge_type, properties)``
+                tuples.
+            batch_size: Maximum edges per UNWIND query chunk.
+
+        Returns:
+            Total number of edges created or updated.
+        """
         count = self.backend.add_edges_bulk(edges, batch_size=batch_size)
         if hasattr(self.edges, "clear_cache"):
             self.edges.clear_cache()

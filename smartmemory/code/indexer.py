@@ -36,7 +36,7 @@ class CodeIndexer:
 
         # Collect files
         py_files = collect_python_files(self.repo_root, self.exclude_dirs)
-        logger.info(f"Found {len(py_files)} Python files in {self.repo_root}")
+        logger.info("Found %d Python files in %s", len(py_files), self.repo_root)
 
         # Parse all files
         all_entities: list[CodeEntity] = []
@@ -63,7 +63,7 @@ class CodeIndexer:
         try:
             result.entities_created = self.graph.add_nodes_bulk(bulk_nodes)
         except Exception as e:
-            logger.error(f"Bulk node write failed for {self.repo}: {e}")
+            logger.error("Bulk node write failed for %s: %s", self.repo, e)
             result.errors.append(f"Bulk node write failed: {e}")
 
         # Write edges in bulk (only if both endpoints exist)
@@ -75,14 +75,17 @@ class CodeIndexer:
         try:
             result.edges_created = self.graph.add_edges_bulk(bulk_edges)
         except Exception as e:
-            logger.error(f"Bulk edge write failed for {self.repo}: {e}")
+            logger.error("Bulk edge write failed for %s: %s", self.repo, e)
             result.errors.append(f"Bulk edge write failed: {e}")
 
         result.elapsed_seconds = round(time.time() - start, 2)
         logger.info(
-            f"Indexed {self.repo}: {result.files_parsed} files, "
-            f"{result.entities_created} entities, {result.edges_created} edges "
-            f"in {result.elapsed_seconds}s"
+            "Indexed %s: %d files, %d entities, %d edges in %.2fs",
+            self.repo,
+            result.files_parsed,
+            result.entities_created,
+            result.edges_created,
+            result.elapsed_seconds,
         )
         return result
 
@@ -105,9 +108,9 @@ class CodeIndexer:
             where = " AND ".join(where_clauses)
             query = f"MATCH (n:Code) WHERE {where} DETACH DELETE n"
             self.graph.execute_query(query, params)
-            logger.info(f"Deleted existing code nodes for repo: {repo}")
+            logger.info("Deleted existing code nodes for repo: %s", repo)
         except Exception as e:
-            logger.warning(f"Failed to delete existing code nodes: {e}")
+            logger.warning("Failed to delete existing code nodes: %s", e)
 
 
 def _get_scope_filters(graph: Any) -> dict[str, Any]:
