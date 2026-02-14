@@ -183,6 +183,13 @@ class TestAddEdgesBulk:
         cypher, _ = g.calls[0]
         assert ":RELATES_TO" in cypher
 
+    def test_empty_edge_type_falls_back_to_related(self):
+        b, g = _make_backend()
+        edges = [("a", "b", "", {})]
+        b.add_edges_bulk(edges)
+        cypher, _ = g.calls[0]
+        assert ":RELATED" in cypher
+
     def test_write_context_injected(self):
         b, g = _make_backend()
         edges = [("a", "b", "IMPORTS", {"weight": 1})]
