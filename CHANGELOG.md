@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Insights Span Event Compatibility (INS-SPAN-1)
+
+- `normalize_span_event()` backend normalization shim — promotes trace fields (`name`, `trace_id`, `span_id`, `parent_span_id`, `duration_ms`) from `data` blob to top-level for span events
+- Applied to all 4 data paths: `get_recent_events()` (2 paths), WebSocket streaming (2 paths)
+- Fixed error detection in `get_recent_errors()` and `get_operations_timeline()` for span events
+- `EventData.session_id` now Optional; 6 new trace fields added to model
+- Frontend: 21 span name → description mappings, trace context in hover card and expanded view
+- 15 invariant tests for the normalization function (100% branch coverage)
+- **Scope:** `smart-memory-insights` only (forward-compatible patch; CORE-OBS-2 will eliminate the shim)
+
 ### Fixed
 
 #### Test Audit Fixes — Batches 1 & 2
