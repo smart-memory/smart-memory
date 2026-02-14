@@ -58,33 +58,25 @@ class CodeIndexer:
         # Delete existing code nodes for this repo (clean slate)
         self._delete_existing(self.repo)
 
-        # Write nodes
-        for entity in all_entities:
-            try:
-                self.graph.add_node(
-                    item_id=entity.item_id,
-                    properties=entity.to_properties(),
-                    memory_type="code",
-                )
-                result.entities_created += 1
-            except Exception as e:
-                result.errors.append(f"Failed to create node {entity.item_id}: {e}")
+        # Write nodes in bulk
+        bulk_nodes = [entity.to_properties() for entity in all_entities]
+        try:
+            result.entities_created = self.graph.add_nodes_bulk(bulk_nodes)
+        except Exception as e:
+            logger.error(f"Bulk node write failed for {self.repo}: {e}")
+            result.errors.append(f"Bulk node write failed: {e}")
 
-        # Write edges (only if both endpoints exist)
-        for relation in all_relations:
-            if relation.source_id not in entity_ids or relation.target_id not in entity_ids:
-                continue  # skip dangling edges
-            try:
-                self.graph.add_edge(
-                    source_id=relation.source_id,
-                    target_id=relation.target_id,
-                    edge_type=relation.relation_type,
-                    properties=relation.properties,
-                    memory_type="code",
-                )
-                result.edges_created += 1
-            except Exception as e:
-                result.errors.append(f"Failed to create edge {relation.relation_type}: {e}")
+        # Write edges in bulk (only if both endpoints exist)
+        bulk_edges = [
+            (rel.source_id, rel.target_id, rel.relation_type, rel.properties)
+            for rel in all_relations
+            if rel.source_id in entity_ids and rel.target_id in entity_ids
+        ]
+        try:
+            result.edges_created = self.graph.add_edges_bulk(bulk_edges)
+        except Exception as e:
+            logger.error(f"Bulk edge write failed for {self.repo}: {e}")
+            result.errors.append(f"Bulk edge write failed: {e}")
 
         result.elapsed_seconds = round(time.time() - start, 2)
         logger.info(

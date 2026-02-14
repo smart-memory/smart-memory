@@ -379,12 +379,14 @@ class TestCodeIndexer:
     """Tests for CodeIndexer orchestration with a mock graph."""
 
     def test_golden_flow(self, tmp_path):
-        """Index a small directory and verify graph calls."""
+        """Index a small directory and verify bulk graph calls."""
         (tmp_path / "app.py").write_text('class App:\n    """Main app."""\n    pass\n')
         (tmp_path / "utils.py").write_text("def helper():\n    return 1\n")
 
         graph = MagicMock()
         graph.execute_query.return_value = []
+        graph.add_nodes_bulk.return_value = 4  # module + class + module + function
+        graph.add_edges_bulk.return_value = 2  # DEFINES edges
 
         indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))
         result = indexer.index()
@@ -396,10 +398,12 @@ class TestCodeIndexer:
         # Verify delete was called
         graph.execute_query.assert_called_once()
         assert "DETACH DELETE" in graph.execute_query.call_args[0][0]
-        # Verify add_node was called for each entity
-        assert graph.add_node.call_count == result.entities_created
-        # Verify add_edge was called for valid edges
-        assert graph.add_edge.call_count == result.edges_created
+        # Verify bulk methods were called once each
+        graph.add_nodes_bulk.assert_called_once()
+        graph.add_edges_bulk.assert_called_once()
+        # Verify the bulk node list contains properties dicts
+        bulk_nodes = graph.add_nodes_bulk.call_args[0][0]
+        assert all(isinstance(n, dict) and "item_id" in n for n in bulk_nodes)
 
     def test_skips_dangling_edges(self, tmp_path):
         """Edges referencing non-existent entities are filtered out."""
@@ -408,15 +412,17 @@ class TestCodeIndexer:
 
         graph = MagicMock()
         graph.execute_query.return_value = []
+        graph.add_nodes_bulk.return_value = 2
+        graph.add_edges_bulk.return_value = 1
 
         indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))
         result = indexer.index()
 
-        # CALLS edge to 'something' should be skipped (not in entity_ids)
-        # Only DEFINES and IMPORTS edges where both ends exist should be created
-        for call_args in graph.add_edge.call_args_list:
-            _, kwargs = call_args
-            assert kwargs.get("edge_type") != "CALLS" or "caller.py" in kwargs.get("source_id", "")
+        # The bulk edge list should only contain edges where both endpoints exist
+        bulk_edges = graph.add_edges_bulk.call_args[0][0]
+        entity_ids = {n["item_id"] for n in graph.add_nodes_bulk.call_args[0][0]}
+        for source_id, target_id, edge_type, _ in bulk_edges:
+            assert source_id in entity_ids and target_id in entity_ids
 
     def test_handles_graph_write_errors(self, tmp_path):
         """Graph write failures are captured as errors, not raised."""
@@ -424,7 +430,8 @@ class TestCodeIndexer:
 
         graph = MagicMock()
         graph.execute_query.return_value = []
-        graph.add_node.side_effect = RuntimeError("Graph unavailable")
+        graph.add_nodes_bulk.side_effect = RuntimeError("Graph unavailable")
+        graph.add_edges_bulk.return_value = 0
 
         indexer = CodeIndexer(graph=graph, repo="test-repo", repo_root=str(tmp_path))
         result = indexer.index()
@@ -443,7 +450,7 @@ class TestCodeIndexer:
         backend = MagicMock()
         backend.scope_provider = scope_provider
 
-        graph = MagicMock(spec=["execute_query", "add_node", "add_edge", "nodes"])
+        graph = MagicMock(spec=["execute_query", "add_nodes_bulk", "add_edges_bulk", "nodes"])
         graph.nodes.backend = backend
         graph.execute_query.return_value = []
 
