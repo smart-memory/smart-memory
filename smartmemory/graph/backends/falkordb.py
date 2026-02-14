@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def sanitize_label(label: str) -> str:
     """
     Sanitize a string for use as a Neo4j/FalkorDB node label.
-    
+
     Labels must:
     - Start with a letter
     - Contain only letters, numbers, and underscores
@@ -24,12 +24,12 @@ def sanitize_label(label: str) -> str:
     if not label:
         return "Entity"
     # Replace hyphens and spaces with underscores
-    sanitized = re.sub(r'[-\s]+', '_', label)
+    sanitized = re.sub(r"[-\s]+", "_", label)
     # Remove any other non-alphanumeric characters (except underscores)
-    sanitized = re.sub(r'[^a-zA-Z0-9_]', '', sanitized)
+    sanitized = re.sub(r"[^a-zA-Z0-9_]", "", sanitized)
     # Ensure it starts with a letter
     if sanitized and not sanitized[0].isalpha():
-        sanitized = 'E_' + sanitized
+        sanitized = "E_" + sanitized
     # Default if empty
     return sanitized if sanitized else "Entity"
 
@@ -50,12 +50,12 @@ class FalkorDBBackend(SmartGraphBackend):
     """
 
     def __init__(
-            self,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            graph_name: str = "smartmemory",
-            config_path: str = "config.json",
-            scope_provider: Optional[ScopeProvider] = None,
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        graph_name: str = "smartmemory",
+        config_path: str = "config.json",
+        scope_provider: Optional[ScopeProvider] = None,
     ):
         config = get_config("graph_db")
 
@@ -63,7 +63,7 @@ class FalkorDBBackend(SmartGraphBackend):
         self.host = host or config.host
         self.port = port or config.port
         self.graph_name = graph_name or config.get("graph_name", "smartmemory")
-        
+
         self.scope_provider = scope_provider or DefaultScopeProvider()
 
         self.db = FalkorDB(host=self.host, port=self.port)
@@ -87,34 +87,77 @@ class FalkorDBBackend(SmartGraphBackend):
         return res.result_set if hasattr(res, "result_set") else []
 
     # ---------- Bulk helpers ----------
-    def add_nodes_bulk(self, nodes: List[Dict[str, Any]]):
-        if not nodes:
-            return
-        # Bulk operations generally bypass fine-grained scope checks for performance,
-        # assuming the caller (bulk loader) handles scope. 
-        # However, we should inject write context if possible.
-        write_ctx = self.scope_provider.get_write_context()
-        
-        for n in nodes:
-            item_id = n.get("item_id")
-            label = n.get("memory_type", "Node").capitalize()
-            props = flatten_dict(n)
-            # Merge write context
-            props.update(write_ctx)
-            
-            query = f"MERGE (n:{label} {{item_id: $item_id}}) SET n += $props"
-            self.graph.query(query, {"item_id": item_id, "props": props})
 
-    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]]):
-        if not edges:
-            return
+    @staticmethod
+    def _chunked(items: list, size: int):
+        """Yield successive chunks of *size* from *items*."""
+        for i in range(0, len(items), size):
+            yield items[i : i + size]
+
+    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
+        """Bulk upsert nodes using UNWIND Cypher, grouped by label.
+
+        Returns the total number of nodes created or updated.
+        """
+        if not nodes:
+            return 0
+
         write_ctx = self.scope_provider.get_write_context()
-        
+
+        # Group nodes by sanitized label
+        by_label: Dict[str, List[Dict[str, Any]]] = {}
+        for n in nodes:
+            label = sanitize_label(n.get("memory_type", "Node"))
+            props = flatten_dict(n)
+            props.update(write_ctx)
+            by_label.setdefault(label, []).append({"item_id": n.get("item_id"), "props": props})
+
+        total = 0
+        for label, batch_items in by_label.items():
+            query = (
+                f"UNWIND $batch AS item "
+                f"MERGE (n:{label} {{item_id: item.item_id}}) "
+                f"SET n += item.props "
+                f"RETURN count(n) AS cnt"
+            )
+            for chunk in self._chunked(batch_items, batch_size):
+                res = self.graph.query(query, {"batch": chunk})
+                if hasattr(res, "result_set") and res.result_set:
+                    total += res.result_set[0][0]
+        return total
+
+    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
+        """Bulk upsert edges using UNWIND Cypher, grouped by edge type.
+
+        Returns the total number of edges created or updated.
+        """
+        if not edges:
+            return 0
+
+        write_ctx = self.scope_provider.get_write_context()
+
+        # Group edges by sanitized type
+        by_type: Dict[str, List[Dict[str, Any]]] = {}
         for src, tgt, etype, props in edges:
+            sanitized = re.sub(r"[^A-Z0-9_]", "_", etype.upper().replace("-", "_"))
             flat_props = flatten_dict(props)
             flat_props.update(write_ctx)
-            query = f"MATCH (a {{item_id: $src}}), (b {{item_id: $tgt}}) MERGE (a)-[r:{etype.upper()}]->(b) SET r += $props"
-            self.graph.query(query, {"src": src, "tgt": tgt, "props": flat_props})
+            by_type.setdefault(sanitized, []).append({"src": src, "tgt": tgt, "props": flat_props})
+
+        total = 0
+        for etype, batch_items in by_type.items():
+            query = (
+                f"UNWIND $batch AS edge "
+                f"MATCH (a {{item_id: edge.src}}), (b {{item_id: edge.tgt}}) "
+                f"MERGE (a)-[r:{etype}]->(b) "
+                f"SET r += edge.props "
+                f"RETURN count(r) AS cnt"
+            )
+            for chunk in self._chunked(batch_items, batch_size):
+                res = self.graph.query(query, {"batch": chunk})
+                if hasattr(res, "result_set") and res.result_set:
+                    total += res.result_set[0][0]
+        return total
 
     # ---------- CRUD ----------
 
@@ -127,19 +170,19 @@ class FalkorDBBackend(SmartGraphBackend):
                 raise
 
     def add_node(
-            self,
-            item_id: Optional[str],
-            properties: Dict[str, Any],
-            valid_time: Optional[Tuple] = None,
-            created_at: Optional[Tuple] = None,
-            memory_type: Optional[str] = None,
-            is_global: bool = False,
+        self,
+        item_id: Optional[str],
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        created_at: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
+        is_global: bool = False,
     ):
         label = memory_type.capitalize() if memory_type else "Node"
         props = flatten_dict(properties)
 
         # Detect write mode marker (used by CRUD.update_memory_node for replace semantics)
-        write_mode = props.pop('_write_mode', None)
+        write_mode = props.pop("_write_mode", None)
 
         # Apply Scope Provider Logic
         # Only apply context if not explicitly global
@@ -163,18 +206,18 @@ class FalkorDBBackend(SmartGraphBackend):
             params[param_key] = self._serialize_value(value)
 
         # If replace semantics requested, remove existing properties first (except item_id)
-        if write_mode == 'replace':
+        if write_mode == "replace":
             try:
                 # Get existing keys
                 existing_res = self._query("MATCH (n {item_id: $item_id}) RETURN n LIMIT 1", {"item_id": item_id})
                 if existing_res and existing_res[0]:
                     node_obj = existing_res[0][0]
-                    if hasattr(node_obj, 'properties'):
+                    if hasattr(node_obj, "properties"):
                         existing_keys = list(node_obj.properties.keys())
                     else:
-                        existing_keys = [k for k in vars(node_obj).keys() if not k.startswith('_')]
+                        existing_keys = [k for k in vars(node_obj).keys() if not k.startswith("_")]
                     # Exclude item_id
-                    keys_to_remove = [k for k in existing_keys if k != 'item_id']
+                    keys_to_remove = [k for k in existing_keys if k != "item_id"]
                     if keys_to_remove:
                         remove_clause = ", ".join([f"n.{k}" for k in keys_to_remove])
                         remove_query = f"MATCH (n:{label} {{item_id: $item_id}}) REMOVE {remove_clause}"
@@ -209,14 +252,14 @@ class FalkorDBBackend(SmartGraphBackend):
         return {"item_id": item_id, "properties": props}
 
     def add_edge(
-            self,
-            source_id: str,
-            target_id: str,
-            edge_type: str,
-            properties: Dict[str, Any],
-            valid_time: Optional[Tuple] = None,
-            created_at: Optional[Tuple] = None,
-            memory_type: Optional[str] = None,
+        self,
+        source_id: str,
+        target_id: str,
+        edge_type: str,
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        created_at: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
     ):
         # Attach write context to relationship properties
         props_in = dict(properties or {})
@@ -228,7 +271,7 @@ class FalkorDBBackend(SmartGraphBackend):
         serialized_props = {}
         for k, v in flat_props.items():
             if self._is_valid_property(k, v):
-                 serialized_props[k] = self._serialize_value(v)
+                serialized_props[k] = self._serialize_value(v)
 
         params = {
             "source": source_id,
@@ -259,7 +302,11 @@ class FalkorDBBackend(SmartGraphBackend):
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(
                         "EDGE CREATION FAILED: %s --[%s]--> %s | source_exists=%s target_exists=%s",
-                        source_id, edge_type, target_id, bool(source_exists), bool(target_exists)
+                        source_id,
+                        edge_type,
+                        target_id,
+                        bool(source_exists),
+                        bool(target_exists),
                     )
                 return False
             else:
@@ -278,32 +325,29 @@ class FalkorDBBackend(SmartGraphBackend):
 
         # Extract properties from FalkorDB Node object
         node = res[0][0]
-        if hasattr(node, 'properties'):
+        if hasattr(node, "properties"):
             props = dict(node.properties)
         else:
             # Fallback to direct attribute access if properties attribute is not available
-            props = {k: v for k, v in vars(node).items()
-                     if not k.startswith('_') and k != 'properties'}
+            props = {k: v for k, v in vars(node).items() if not k.startswith("_") and k != "properties"}
 
         # Ensure item_id is included in the returned properties at the top level
-        props['item_id'] = item_id
+        props["item_id"] = item_id
 
         # Remove internal properties that shouldn't be exposed
-        props.pop('is_global', None)
+        props.pop("is_global", None)
 
         return props
 
     def get_neighbors(
-            self,
-            item_id: str,
-            edge_type: Optional[str] = None,
-            as_of_time: Optional[str] = None,
+        self,
+        item_id: str,
+        edge_type: Optional[str] = None,
+        as_of_time: Optional[str] = None,
     ):
         # Use WHERE clause for better FalkorDB compatibility
         if edge_type:
-            query = (
-                f"MATCH (n)-[r:{edge_type.upper()}]-(m) WHERE n.item_id = $item_id RETURN m, type(r) as link_type"
-            )
+            query = f"MATCH (n)-[r:{edge_type.upper()}]-(m) WHERE n.item_id = $item_id RETURN m, type(r) as link_type"
         else:
             query = "MATCH (n)-[r]-(m) WHERE n.item_id = $item_id RETURN m, type(r) as link_type"
         res = self._query(query, {"item_id": item_id})
@@ -311,11 +355,11 @@ class FalkorDBBackend(SmartGraphBackend):
         for record in res:
             node = record[0]
             link_type = record[1] if len(record) > 1 else None
-            
+
             # Handle both dict-like and Node objects
-            if hasattr(node, 'keys') and hasattr(node, 'values'):
-                props = dict(zip(node.keys(), node.values()))
-            elif hasattr(node, 'properties'):
+            if hasattr(node, "keys") and hasattr(node, "values"):
+                props = dict(zip(node.keys(), node.values(), strict=False))
+            elif hasattr(node, "properties"):
                 # FalkorDB Node object
                 props = dict(node.properties)
             elif isinstance(node, dict):
@@ -339,21 +383,21 @@ class FalkorDBBackend(SmartGraphBackend):
             for record in result:
                 # FalkorDB returns results as tuples/lists
                 if len(record) >= 4:
-                    source_id = record[0] if record[0] else 'unknown'
-                    edge_type = record[1] if record[1] else 'unknown'
-                    target_id = record[2] if record[2] else 'unknown'
+                    source_id = record[0] if record[0] else "unknown"
+                    edge_type = record[1] if record[1] else "unknown"
+                    target_id = record[2] if record[2] else "unknown"
                     edge_obj = record[3]
 
                     # Extract edge properties
                     edge_props = {}
-                    if hasattr(edge_obj, 'properties'):
+                    if hasattr(edge_obj, "properties"):
                         edge_props = dict(edge_obj.properties)
 
                     edge_info = {
-                        'source_id': source_id,
-                        'target_id': target_id,
-                        'edge_type': edge_type,
-                        'properties': edge_props
+                        "source_id": source_id,
+                        "target_id": target_id,
+                        "edge_type": edge_type,
+                        "properties": edge_props,
                     }
                     edges.append(edge_info)
             return edges
@@ -367,13 +411,9 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def remove_edge(self, source_id: str, target_id: str, edge_type: Optional[str] = None):
         if edge_type:
-            query = (
-                f"MATCH (a {{item_id: $source}})-[r:{edge_type.upper()}]->(b {{item_id: $target}}) DELETE r"
-            )
+            query = f"MATCH (a {{item_id: $source}})-[r:{edge_type.upper()}]->(b {{item_id: $target}}) DELETE r"
         else:
-            query = (
-                "MATCH (a {item_id: $source})-[r]->(b {item_id: $target}) DELETE r"
-            )
+            query = "MATCH (a {item_id: $source})-[r]->(b {item_id: $target}) DELETE r"
         self._query(query, {"source": source_id, "target": target_id})
         return True
 
@@ -392,12 +432,13 @@ class FalkorDBBackend(SmartGraphBackend):
     def get_properties(self, item_id: str) -> Dict[str, Any]:
         props = self.get_node(item_id) or {}
         # Remove internal flags
-        props.pop('is_global', None)
+        props.pop("is_global", None)
         return props
 
     def set_properties(self, item_id: str, properties: Dict[str, Any]) -> bool:
         # Update only provided scalar properties
         from smartmemory.utils import flatten_dict
+
         props = flatten_dict(properties or {})
         if not props:
             return True
@@ -406,7 +447,7 @@ class FalkorDBBackend(SmartGraphBackend):
         for k, v in props.items():
             if v is None:
                 continue
-            if hasattr(v, 'isoformat'):
+            if hasattr(v, "isoformat"):
                 v = v.isoformat()
             if not isinstance(v, (str, int, float, bool)):
                 continue
@@ -421,9 +462,7 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def edge_exists(self, source_id: str, target_id: str, relation_type: str) -> bool:
         try:
-            q = (
-                f"MATCH (a {{item_id: $s}})-[r:{relation_type.upper()}]->(b {{item_id: $t}}) RETURN count(r)"
-            )
+            q = f"MATCH (a {{item_id: $s}})-[r:{relation_type.upper()}]->(b {{item_id: $t}}) RETURN count(r)"
             res = self._query(q, {"s": source_id, "t": target_id})
             if res and res[0]:
                 return int(res[0][0]) > 0
@@ -433,16 +472,14 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def get_edge_properties(self, source_id: str, target_id: str, relation_type: str) -> Optional[Dict[str, Any]]:
         try:
-            q = (
-                f"MATCH (a {{item_id: $s}})-[r:{relation_type.upper()}]->(b {{item_id: $t}}) RETURN r LIMIT 1"
-            )
+            q = f"MATCH (a {{item_id: $s}})-[r:{relation_type.upper()}]->(b {{item_id: $t}}) RETURN r LIMIT 1"
             res = self._query(q, {"s": source_id, "t": target_id})
             if res and res[0] and res[0][0] is not None:
                 r = res[0][0]
-                if hasattr(r, 'properties'):
+                if hasattr(r, "properties"):
                     return dict(r.properties)
                 # best-effort
-                return {k: v for k, v in vars(r).items() if not k.startswith('_')}
+                return {k: v for k, v in vars(r).items() if not k.startswith("_")}
         except Exception:
             return None
         return None
@@ -465,26 +502,26 @@ class FalkorDBBackend(SmartGraphBackend):
         """
         Merge multiple source nodes into a target node.
         Rewires relationships and merges properties, then deletes source nodes.
-        
+
         Args:
             target_id: The ID of the node to keep (canonical node)
             source_ids: List of IDs of nodes to merge into the target
-            
+
         Returns:
             bool: True if successful
         """
         if not source_ids:
             return True
-            
+
         try:
             # 1. Rewire incoming relationships (others -> source) to (others -> target)
-            # We use APOC if available, or manual rewiring if not. 
+            # We use APOC if available, or manual rewiring if not.
             # Since FalkorDB supports Cypher, we can do this with standard Cypher.
-            
+
             for source_id in source_ids:
                 if source_id == target_id:
                     continue
-                    
+
                 # Rewire outgoing relationships: (source)-[r]->(other) ==> (target)-[r]->(other)
                 query_out = """
                 MATCH (source {item_id: $source_id})-[r]->(other)
@@ -494,7 +531,7 @@ class FalkorDBBackend(SmartGraphBackend):
                 DELETE r
                 """
                 self._query(query_out, {"source_id": source_id, "target_id": target_id})
-                
+
                 # Rewire incoming relationships: (other)-[r]->(source) ==> (other)-[r]->(target)
                 query_in = """
                 MATCH (other)-[r]->(source {item_id: $source_id})
@@ -504,7 +541,7 @@ class FalkorDBBackend(SmartGraphBackend):
                 DELETE r
                 """
                 self._query(query_in, {"source_id": source_id, "target_id": target_id})
-                
+
                 # Merge properties (target properties take precedence, but we can fill in missing ones)
                 # Note: This is a simple merge. Complex merging strategies might be needed for specific fields.
                 query_props = """
@@ -512,12 +549,12 @@ class FalkorDBBackend(SmartGraphBackend):
                 SET target += properties(source)
                 """
                 self._query(query_props, {"source_id": source_id, "target_id": target_id})
-                
+
                 # Delete the source node
                 self.remove_node(source_id)
-                
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to merge nodes into {target_id}: {e}")
             return False
@@ -531,11 +568,11 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def search_nodes(self, query: Dict[str, Any], is_global: bool = False):
         """Search for nodes matching query properties.
-        
+
         Args:
             query: Dictionary of property filters (simple equality only)
             is_global: Whether to search globally or scope to user/workspace
-            
+
         Returns:
             List of node dictionaries matching the query
         """
@@ -553,7 +590,7 @@ class FalkorDBBackend(SmartGraphBackend):
             # Global search: Explicitly exclude user-scoped nodes (Public/Shared nodes)
             user_key = self.scope_provider.get_user_isolation_key()
             clauses.append(f"(n.{user_key} IS NULL)")
-            
+
             # Enforce isolation filters for global searches (excludes user-level)
             filters = self.scope_provider.get_global_search_filters()
             for k, v in filters.items():
@@ -577,15 +614,14 @@ class FalkorDBBackend(SmartGraphBackend):
         result = []
         for record in res:
             node = record[0]
-            if hasattr(node, 'properties'):
+            if hasattr(node, "properties"):
                 props = dict(node.properties)
             else:
                 # Fallback to direct attribute access if properties attribute is not available
-                props = {k: v for k, v in vars(node).items()
-                         if not k.startswith('_') and k != 'properties'}
+                props = {k: v for k, v in vars(node).items() if not k.startswith("_") and k != "properties"}
 
             # Remove internal properties that shouldn't be exposed
-            props.pop('is_global', None)
+            props.pop("is_global", None)
 
             # Don't use unflatten_dict to preserve flat structure with item_id
             result.append(props)
@@ -593,13 +629,13 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def search_nodes_by_type_or_tag(self, type_or_tag: str, is_global: bool = False) -> List[Dict[str, Any]]:
         """Search for nodes by type OR tag using proper Cypher OR logic.
-        
+
         This replaces the MongoDB-style {"$or": [{"type": x}, {"tags": x}]} pattern.
-        
+
         Args:
             type_or_tag: The type or tag value to search for
             is_global: Whether to search globally or scope to user/workspace
-            
+
         Returns:
             List of node dictionaries matching the query
         """
@@ -629,16 +665,15 @@ class FalkorDBBackend(SmartGraphBackend):
         where_clause = " AND ".join(clauses)
         cypher = f"MATCH (n) WHERE {where_clause} RETURN n"
         res = self._query(cypher, params)
-        
+
         result = []
         for record in res:
             node = record[0]
-            if hasattr(node, 'properties'):
+            if hasattr(node, "properties"):
                 props = dict(node.properties)
             else:
-                props = {k: v for k, v in vars(node).items()
-                         if not k.startswith('_') and k != 'properties'}
-            props.pop('is_global', None)
+                props = {k: v for k, v in vars(node).items() if not k.startswith("_") and k != "properties"}
+            props.pop("is_global", None)
             result.append(props)
         return result
 
@@ -650,7 +685,7 @@ class FalkorDBBackend(SmartGraphBackend):
         for record in result:
             if record and len(record) > 0:
                 node = record[0]
-                if hasattr(node, 'properties'):
+                if hasattr(node, "properties"):
                     node_dict = dict(node.properties)
                     nodes.append(node_dict)
                 elif isinstance(node, dict):
@@ -659,7 +694,7 @@ class FalkorDBBackend(SmartGraphBackend):
 
     def get_edges_for_node(self, item_id: str) -> List[Dict[str, Any]]:
         """Get all edges (relationships) involving a specific node.
-        
+
         Returns a list of edge dictionaries with 'source', 'target', and 'type' keys.
         """
         query = """
@@ -677,11 +712,7 @@ class FalkorDBBackend(SmartGraphBackend):
                 end_node = record[4]
                 rel_type = record[1]
 
-                edges.append({
-                    "source": start_node,
-                    "target": end_node,
-                    "type": rel_type
-                })
+                edges.append({"source": start_node, "target": end_node, "type": rel_type})
 
         return edges
 
@@ -729,7 +760,7 @@ class FalkorDBBackend(SmartGraphBackend):
         edges_res = self._query("MATCH (a)-[r]->(b) RETURN a.item_id, b.item_id, type(r), r")
         nodes = []
         for rec in nodes_res:
-            props = dict(zip(rec[0].keys(), rec[0].values()))  # type: ignore[index]
+            props = dict(zip(rec[0].keys(), rec[0].values(), strict=False))  # type: ignore[index]
             nodes.append(props)
         edges = []
         for src, tgt, etype, rprops in edges_res:
@@ -752,33 +783,33 @@ class FalkorDBBackend(SmartGraphBackend):
             self.add_edge(edge["source"], edge["target"], edge["type"], edge.get("properties") or {})
 
     def find_entity_by_canonical_key(
-            self,
-            canonical_key: str,
+        self,
+        canonical_key: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Find an existing entity node by its canonical key.
-        
+
         Used for cross-memory entity resolution - if an entity with the same
         canonical key exists, we link to it instead of creating a duplicate.
-        
+
         Args:
             canonical_key: Normalized key like "john smith|person"
-            
+
         Returns:
             Entity node dict with item_id and properties, or None if not found
         """
         # Build query with scope isolation filters
         filters = ["n.canonical_key = $canonical_key"]
         params = {"canonical_key": canonical_key}
-        
+
         # Apply scope provider isolation
         isolation_filters = self.scope_provider.get_isolation_filters()
         for k, v in isolation_filters.items():
             filters.append(f"n.{k} = $ctx_{k}")
             params[f"ctx_{k}"] = v
-            
+
         where_clause = " AND ".join(filters)
-        
+
         # Search across all entity labels (we don't know the exact type)
         query = f"""
             MATCH (n)
@@ -786,41 +817,41 @@ class FalkorDBBackend(SmartGraphBackend):
             RETURN n.item_id AS item_id, n AS props
             LIMIT 1
         """
-        
+
         try:
             result = self._query(query, params)
             if result and result.result_set:
                 row = result.result_set[0]
                 return {
                     "item_id": row[0],
-                    "properties": dict(row[1].properties) if hasattr(row[1], 'properties') else {}
+                    "properties": dict(row[1].properties) if hasattr(row[1], "properties") else {},
                 }
         except Exception as e:
             logger.debug(f"Entity lookup failed for {canonical_key}: {e}")
-            
+
         return None
 
     def add_dual_node(
-            self,
-            item_id: str,
-            memory_properties: Dict[str, Any],
-            memory_type: str,
-            entity_nodes: List[Dict[str, Any]] = None,
-            is_global: bool = False,
+        self,
+        item_id: str,
+        memory_properties: Dict[str, Any],
+        memory_type: str,
+        entity_nodes: List[Dict[str, Any]] = None,
+        is_global: bool = False,
     ):
         """
         Add a dual-node structure: one memory node + related entity nodes.
-        
+
         Args:
             item_id: Unique identifier for the memory node
             memory_properties: Properties for the memory node (content, metadata, etc.)
             memory_type: Memory type for the memory node label (semantic, episodic, etc.)
             entity_nodes: List of entity node dicts with {entity_type, properties, relationships}
             is_global: Whether nodes are global or user-scoped
-            
+
         Returns:
             Dict with creation results and node IDs
-            
+
         .. warning::
             This operation is NOT atomic in FalkorDB as it executes multiple sequential queries.
             If an error occurs midway, the graph may be left in an inconsistent state (e.g., memory node created but entities missing).
@@ -836,7 +867,7 @@ class FalkorDBBackend(SmartGraphBackend):
         if not is_global:
             write_ctx = self.scope_provider.get_write_context()
             memory_props.update(write_ctx)
-            
+
         memory_props["is_global"] = is_global
 
         # Build transaction query for atomic dual-node creation
@@ -861,40 +892,39 @@ class FalkorDBBackend(SmartGraphBackend):
         entity_ids = []
         resolved_entities = []  # Track which entities were resolved vs created
         entity_id_map = {}  # Map index to actual entity_id for relationship creation
-        
+
         if entity_nodes:
             for i, entity_node in enumerate(entity_nodes):
-                entity_type = entity_node.get('entity_type', 'Entity')
-                entity_props = entity_node.get('properties') or {}
-                entity_relationships = entity_node.get('relations', [])
-                entity_name = entity_props.get('name') or entity_props.get('content', '')
-                
+                entity_type = entity_node.get("entity_type", "Entity")
+                entity_props = entity_node.get("properties") or {}
+                entity_relationships = entity_node.get("relations", [])
+                entity_name = entity_props.get("name") or entity_props.get("content", "")
+
                 # Generate canonical key for entity resolution
-                canonical_key = entity_props.get('canonical_key')
+                canonical_key = entity_props.get("canonical_key")
                 if not canonical_key and entity_name:
                     canonical_key = get_canonical_key(entity_name, entity_type)
-                
-                logger.info(f"Entity resolution: name='{entity_name}', type='{entity_type}', canonical_key='{canonical_key}'")
-                
+
+                logger.info(
+                    f"Entity resolution: name='{entity_name}', type='{entity_type}', canonical_key='{canonical_key}'"
+                )
+
                 # Try to find existing entity with same canonical key (uses scope_provider for isolation)
                 existing_entity = None
                 if canonical_key:
                     existing_entity = self.find_entity_by_canonical_key(canonical_key)
                     logger.info(f"Entity lookup result for '{canonical_key}': {existing_entity}")
-                
+
                 if existing_entity:
                     # Reuse existing entity - just link to it
-                    entity_id = existing_entity['item_id']
+                    entity_id = existing_entity["item_id"]
                     entity_ids.append(entity_id)
                     entity_id_map[i] = entity_id
-                    resolved_entities.append({
-                        'index': i,
-                        'entity_id': entity_id,
-                        'resolved': True,
-                        'canonical_key': canonical_key
-                    })
+                    resolved_entities.append(
+                        {"index": i, "entity_id": entity_id, "resolved": True, "canonical_key": canonical_key}
+                    )
                     logger.debug(f"Resolved entity '{entity_name}' to existing node {entity_id}")
-                    
+
                     # Create MENTIONED_IN relationship from existing entity to new memory
                     # This links the entity to all memories that mention it
                     link_query = f"""
@@ -904,26 +934,23 @@ class FalkorDBBackend(SmartGraphBackend):
                     """
                     params[f"existing_entity_id_{i}"] = entity_id
                     # Execute this after memory node is created
-                    
+
                 else:
                     # Create new entity node
                     entity_id = f"{item_id}_entity_{i}"
                     entity_ids.append(entity_id)
                     entity_id_map[i] = entity_id
                     entity_label = sanitize_label(normalize_entity_type(entity_type).capitalize())
-                    
-                    resolved_entities.append({
-                        'index': i,
-                        'entity_id': entity_id,
-                        'resolved': False,
-                        'canonical_key': canonical_key
-                    })
+
+                    resolved_entities.append(
+                        {"index": i, "entity_id": entity_id, "resolved": False, "canonical_key": canonical_key}
+                    )
 
                     # Add user context to entity via scope provider
                     if not is_global:
                         write_ctx = self.scope_provider.get_write_context()
                         entity_props.update(write_ctx)
-                        
+
                     entity_props["is_global"] = is_global
                     entity_props["canonical_key"] = canonical_key  # Store for future resolution
 
@@ -948,28 +975,28 @@ class FalkorDBBackend(SmartGraphBackend):
                     queries.append(f"CREATE (e{i})-[:MENTIONED_IN]->(m)")
 
                 # Store relationships for later (after all entities processed)
-                entity_node['_relationships'] = entity_relationships
-                entity_node['_index'] = i
-            
+                entity_node["_relationships"] = entity_relationships
+                entity_node["_index"] = i
+
             # Create semantic relationships between entities (using resolved IDs)
             for entity_node in entity_nodes:
-                i = entity_node.get('_index', 0)
-                for rel in entity_node.get('_relationships', []):
-                    target_idx = rel.get('target_index')
-                    rel_type = rel.get('relation_type', 'RELATED')
+                i = entity_node.get("_index", 0)
+                for rel in entity_node.get("_relationships", []):
+                    target_idx = rel.get("target_index")
+                    rel_type = rel.get("relation_type", "RELATED")
                     if target_idx is not None and target_idx in entity_id_map:
                         source_id = entity_id_map[i]
                         target_id = entity_id_map[target_idx]
                         # Only create if both are new entities (resolved entities already have relationships)
-                        source_resolved = any(e['index'] == i and e['resolved'] for e in resolved_entities)
-                        target_resolved = any(e['index'] == target_idx and e['resolved'] for e in resolved_entities)
+                        source_resolved = any(e["index"] == i and e["resolved"] for e in resolved_entities)
+                        target_resolved = any(e["index"] == target_idx and e["resolved"] for e in resolved_entities)
                         if not source_resolved and not target_resolved:
                             queries.append(f"CREATE (e{i})-[:{rel_type}]->(e{target_idx})")
 
         # Create memory node first with all properties
-        # Note: The logic below duplicates the queries list building above. 
+        # Note: The logic below duplicates the queries list building above.
         # The original code had a confusing double-block structure (queries append vs memory_query direct execution?).
-        # Ah, I see the original code builds 'queries' list but then seems to have a secondary block 
+        # Ah, I see the original code builds 'queries' list but then seems to have a secondary block
         # starting at line 783 "Create memory node first with all properties" which re-does memory params.
         # This looks like dead code or a merge artifact in the original file.
         # I will stick to the first block which builds 'queries'.
@@ -977,29 +1004,26 @@ class FalkorDBBackend(SmartGraphBackend):
         # No, looking at the end of the file (which I can't see all of), it probably executes 'queries'.
         # But there is a block at 783 that rebuilds memory params.
         # Let's assume the first block is the correct one for the transaction.
-        
+
         # Execute queries sequentially
         if queries:
             for q in queries:
                 self._query(q, params)
-        
+
         # Link resolved entities to the new memory node
         for resolved in resolved_entities:
-            if resolved['resolved']:
+            if resolved["resolved"]:
                 link_query = f"""
                     MATCH (m:{memory_label} {{item_id: $memory_id}}), (e {{item_id: $resolved_entity_id}})
                     MERGE (m)-[:CONTAINS_ENTITY]->(e)
                     MERGE (e)-[:MENTIONED_IN]->(m)
                 """
-                self._query(link_query, {
-                    "memory_id": item_id,
-                    "resolved_entity_id": resolved['entity_id']
-                })
+                self._query(link_query, {"memory_id": item_id, "resolved_entity_id": resolved["entity_id"]})
                 logger.info(f"Linked existing entity {resolved['entity_id']} to memory {item_id}")
 
         # Log resolution stats
-        new_count = sum(1 for e in resolved_entities if not e['resolved'])
-        resolved_count = sum(1 for e in resolved_entities if e['resolved'])
+        new_count = sum(1 for e in resolved_entities if not e["resolved"])
+        resolved_count = sum(1 for e in resolved_entities if e["resolved"])
         if resolved_count > 0:
             logger.info(f"Entity resolution: {new_count} new, {resolved_count} resolved to existing")
 
@@ -1010,12 +1034,12 @@ class FalkorDBBackend(SmartGraphBackend):
             "memory_type": memory_type,
             "entity_count": len(entity_ids),
             "new_entity_count": new_count,
-            "resolved_entity_count": resolved_count
+            "resolved_entity_count": resolved_count,
         }
 
     def _is_valid_property(self, key: str, value: Any) -> bool:
         """Check if a property is valid for FalkorDB storage."""
-        if value is None or key == 'embedding':
+        if value is None or key == "embedding":
             return False
         if isinstance(value, str) and value == "":
             return False
@@ -1025,7 +1049,8 @@ class FalkorDBBackend(SmartGraphBackend):
     def _serialize_value(self, value: Any) -> Any:
         """Serialize a value for FalkorDB storage."""
         import json
-        if hasattr(value, 'isoformat'):
+
+        if hasattr(value, "isoformat"):
             return value.isoformat()
         if isinstance(value, (list, tuple, dict)):
             return json.dumps(value, default=str)

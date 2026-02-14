@@ -166,6 +166,19 @@ class SmartGraph:
             source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
         )
 
+    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
+        """Bulk upsert nodes via backend. Returns count of nodes created/updated."""
+        count = self.backend.add_nodes_bulk(nodes, batch_size=batch_size)
+        self.nodes.clear_cache()
+        return count
+
+    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
+        """Bulk upsert edges via backend. Returns count of edges created/updated."""
+        count = self.backend.add_edges_bulk(edges, batch_size=batch_size)
+        if hasattr(self.edges, "clear_cache"):
+            self.edges.clear_cache()
+        return count
+
     def add_triple(self, triple: "Triple", properties: Dict[str, Any] = None, **kwargs):
         """Add a triple (Triple models) to the graph."""
         return self.edges.add_triple(triple, properties, **kwargs)
