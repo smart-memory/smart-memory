@@ -33,6 +33,7 @@ class SmartGraphBackend(ABC):
         valid_time: Optional[Tuple] = None,
         created_at: Optional[Tuple] = None,
         memory_type: Optional[str] = None,
+        is_global: bool = False,
     ) -> bool:
         """Add an edge with properties, bi-temporal info, and memory type."""
         ...
@@ -87,14 +88,9 @@ class SmartGraphBackend(ABC):
     def add_edges_bulk(
         self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500, is_global: bool = False
     ) -> int:
-        """Bulk upsert edges. Default: loop over add_edge(). Override for performance.
-
-        Note: the default fallback does NOT forward ``is_global`` to
-        ``add_edge()`` (which has no ``is_global`` parameter).  Backends
-        that need global edge support must override this method.
-        """
+        """Bulk upsert edges. Default: loop over add_edge(). Override for performance."""
         count = 0
         for src, tgt, etype, props in edges:
-            self.add_edge(src, tgt, etype, props)
+            self.add_edge(src, tgt, etype, props, is_global=is_global)
             count += 1
         return count

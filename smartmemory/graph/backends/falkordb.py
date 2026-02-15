@@ -320,10 +320,11 @@ class FalkorDBBackend(SmartGraphBackend):
         valid_time: Optional[Tuple] = None,
         created_at: Optional[Tuple] = None,
         memory_type: Optional[str] = None,
+        is_global: bool = False,
     ):
         # Attach write context to relationship properties
         props_in = dict(properties or {})
-        write_ctx = self.scope_provider.get_write_context()
+        write_ctx = {} if is_global else self.scope_provider.get_write_context()
         props_in.update(write_ctx)
 
         # Serialize properties for edge
