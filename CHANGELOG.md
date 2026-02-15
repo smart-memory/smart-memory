@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Auth Model Simplification — Teams+Users Only (SVC-6)
+
+- **smart-memory-common:** Removed dual scope resolution path — `scope.py` no longer reads `X-Workspace-Id` or validates against MongoDB workspaces. `core.py` now reads `team_id` from `request.state` (set by scope dependency). Single source of truth for scope resolution.
+- **smart-memory-common:** Removed `_can_access_workspace()`, `effective_workspace_id`, `has_workspace_access()`. `ScopePolicy.workspace_required/optional` → `team_required/optional`. Removed `ensure_personal_workspace()` call from middleware.
+- **smart-memory-service:** Updated 11 route files from `ScopePolicy.workspace_required` → `team_required`. Removed dead `ensure_workspace_access()` from tenancy.py.
+- **Cross-project:** Changed `X-Workspace-Id` → `X-Team-Id` header in JS SDK, E2E fixtures, MCP server, Studio, Hub.
+- **Dormant:** Workspace models and repository remain in codebase for future PLAT-WS-1 (Workspaces & Sharing).
+
 ### Fixed
 
 #### Graph Edge Global Scope Support (CORE-GRAPH-1)
