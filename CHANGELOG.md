@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### Graph Edge Global Scope Support (CORE-GRAPH-1)
+
+- Added `is_global: bool = False` to `add_edge()` across the full propagation chain (ABC → FalkorDB → SmartGraphEdges → SmartGraph)
+- When `is_global=True`, skips `get_write_context()` and uses unscoped MATCH — edges can now reach global nodes (no `workspace_id`)
+- Updated `add_edges_bulk()` ABC fallback to forward `is_global` to `add_edge()`
+- Updated Wikipedia grounder and grounding pipeline stage to pass `is_global=True` for `GROUNDED_IN` edges
+- **Bug fixed:** In multi-tenant mode, `add_edge()` scoped MATCH to `workspace_id`, causing edges to global nodes (e.g. Wikipedia entities) to silently fail (PRE-13)
+
 ### Added
 
 #### Admin Console Completion (PLAT-ADMIN-1)
