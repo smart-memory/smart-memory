@@ -166,18 +166,20 @@ class SmartGraph:
             source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
         )
 
-    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
+    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500, is_global: bool = False) -> int:
         """Bulk upsert nodes using UNWIND Cypher batching.
 
         Args:
             nodes: List of node dicts, each with at least ``item_id`` and
                 optionally ``memory_type`` plus arbitrary properties.
             batch_size: Maximum nodes per UNWIND query chunk.
+            is_global: When True, skip workspace scoping — nodes are visible
+                across all workspaces (for shared reference data).
 
         Returns:
             Total number of nodes created or updated.
         """
-        count = self.backend.add_nodes_bulk(nodes, batch_size=batch_size)
+        count = self.backend.add_nodes_bulk(nodes, batch_size=batch_size, is_global=is_global)
         self.nodes.clear_cache()
         return count
 

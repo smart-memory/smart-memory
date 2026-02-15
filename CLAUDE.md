@@ -42,7 +42,7 @@ SmartMemory is a multi-layered AI memory system using FalkorDB (graph + vectors)
 ### Core Components
 
 - **SmartMemory** (`smartmemory/smart_memory.py`): Unified API entry point
-- **SmartGraph** (`smartmemory/graph/smartgraph.py`): FalkorDB graph interface (includes `add_nodes_bulk`/`add_edges_bulk` with UNWIND Cypher batching). Note: bulk methods always apply workspace scoping — nodes needing `is_global=True` must use `add_node()` individually.
+- **SmartGraph** (`smartmemory/graph/smartgraph.py`): FalkorDB graph interface (includes `add_nodes_bulk`/`add_edges_bulk` with UNWIND Cypher batching). `add_nodes_bulk` supports `is_global=True` to skip workspace scoping for shared reference data.
 - **MemoryItem** (`smartmemory/models/memory_item.py`): Core data structure
 - **ScopeProvider** (`smartmemory/scope_provider.py`): Multi-tenancy & security scoping
 
@@ -74,9 +74,27 @@ Plugins in `smartmemory/plugins/`:
 
 Custom plugins extend base classes in `smartmemory/plugins/base.py`.
 
+### Observability
+
+All event emission uses `trace_span()` from `smartmemory.observability.tracing`:
+
+```python
+from smartmemory.observability.tracing import trace_span, current_trace_id
+
+with trace_span("pipeline.classify", {"memory_type": "semantic"}):
+    result = classifier.run(text)
+```
+
+- Spans nest automatically via Python contextvars
+- OTel-compatible fields: `trace_id`, `span_id`, `parent_span_id`
+- Events emitted to Redis Stream `smartmemory:events` on span close
+- Disabled via `SMARTMEMORY_OBSERVABILITY=false` (default)
+- **Deprecated:** `emit_ctx()`, `make_emitter()`, `emit_after()` — use `trace_span()` instead
+
 ### Key Directories
 
 - `smartmemory/memory/pipeline/`: Processing stages (classification, extraction, enrichment, linking, grounding)
+- `smartmemory/observability/`: Tracing (`trace_span`), events (Redis Stream), logging filter, instrumentation (deprecated)
 - `smartmemory/stores/`: Storage backends (vector, persistence)
 - `smartmemory/models/`: Data models (MemoryItem, Entity, Opinion, Reasoning)
 - `examples/`: Working demonstrations

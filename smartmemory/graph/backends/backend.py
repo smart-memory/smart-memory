@@ -74,13 +74,13 @@ class SmartGraphBackend(ABC):
         """Load the graph from a serialized format."""
         ...
 
-    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
+    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500, is_global: bool = False) -> int:
         """Bulk upsert nodes. Default: loop over add_node(). Override for performance."""
         count = 0
         for node in nodes:
             item_id = node.get("item_id")
             memory_type = node.get("memory_type")
-            self.add_node(item_id, node, memory_type=memory_type)
+            self.add_node(item_id, node, memory_type=memory_type, is_global=is_global)
             count += 1
         return count
 

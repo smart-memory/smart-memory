@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### `is_global` Support for Bulk Graph Methods (CORE-BULK-2)
+
+- `add_nodes_bulk()` now accepts `is_global: bool = False` parameter
+- When `True`, workspace scoping is skipped — nodes are visible across all workspaces
+- Propagated through ABC (`SmartGraphBackend`), `FalkorDBBackend`, and `SmartGraph` delegation
+- Use for bulk loading shared reference data (ontology types, Wikipedia entities)
+
 #### Insights Span Event Compatibility (INS-SPAN-1)
 
 - `normalize_span_event()` backend normalization shim — promotes trace fields (`name`, `trace_id`, `span_id`, `parent_span_id`, `duration_ms`) from `data` blob to top-level for span events

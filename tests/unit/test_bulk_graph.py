@@ -140,6 +140,26 @@ class TestAddNodesBulk:
         assert "empty" not in props  # empty strings filtered
         assert "embedding" not in props  # embedding key filtered
 
+    def test_is_global_skips_write_context(self):
+        b, g = _make_backend()
+        nodes = [{"item_id": "n1", "memory_type": "code", "name": "global_entity"}]
+        b.add_nodes_bulk(nodes, is_global=True)
+        _, params = g.calls[0]
+        props = params["batch"][0]["props"]
+        assert "workspace_id" not in props
+        assert "user_id" not in props
+        assert props["name"] == "global_entity"
+
+    def test_is_global_false_injects_write_context(self):
+        """Explicit is_global=False should behave identically to the default."""
+        b, g = _make_backend()
+        nodes = [{"item_id": "n1", "memory_type": "code"}]
+        b.add_nodes_bulk(nodes, is_global=False)
+        _, params = g.calls[0]
+        props = params["batch"][0]["props"]
+        assert props["workspace_id"] == "ws_test"
+        assert props["user_id"] == "u_test"
+
 
 # ---------------------------------------------------------------------------
 # TestAddEdgesBulk

@@ -94,19 +94,22 @@ class FalkorDBBackend(SmartGraphBackend):
         for i in range(0, len(items), size):
             yield items[i : i + size]
 
-    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500) -> int:
+    def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500, is_global: bool = False) -> int:
         """Bulk upsert nodes using UNWIND Cypher, grouped by label.
 
-        All nodes receive write context (workspace_id, user_id) from the
-        scope provider.  Global nodes (``is_global=True``) are not supported
-        in bulk mode — use ``add_node()`` individually for those.
+        When ``is_global=False`` (default), all nodes receive write context
+        (workspace_id, user_id) from the scope provider for tenant isolation.
+
+        When ``is_global=True``, write context is skipped — nodes are visible
+        across all workspaces.  Use for shared reference data (ontology types,
+        Wikipedia entities).
 
         Returns the total number of nodes created or updated.
         """
         if not nodes:
             return 0
 
-        write_ctx = self.scope_provider.get_write_context()
+        write_ctx = {} if is_global else self.scope_provider.get_write_context()
 
         # Group nodes by sanitized label
         by_label: Dict[str, List[Dict[str, Any]]] = {}
