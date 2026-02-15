@@ -225,3 +225,25 @@ class TestAddEdgesBulk:
         result = b.add_edges_bulk(edges, batch_size=2)
         assert len(g.calls) == 3  # 5 / 2 -> 3 chunks
         assert result == 5
+
+    def test_is_global_skips_write_context_and_match_scoping(self):
+        b, g = _make_backend()
+        edges = [("a", "b", "IMPORTS", {"weight": 1})]
+        b.add_edges_bulk(edges, is_global=True)
+        cypher, params = g.calls[0]
+        # Props should NOT have workspace_id or user_id
+        props = params["batch"][0]["props"]
+        assert "workspace_id" not in props
+        assert "user_id" not in props
+        # MATCH clause should NOT scope to workspace_id
+        assert "workspace_id" not in cypher
+
+    def test_is_global_false_injects_write_context(self):
+        """Explicit is_global=False should behave identically to the default."""
+        b, g = _make_backend()
+        edges = [("a", "b", "IMPORTS", {})]
+        b.add_edges_bulk(edges, is_global=False)
+        _, params = g.calls[0]
+        props = params["batch"][0]["props"]
+        assert props["workspace_id"] == "ws_test"
+        assert props["user_id"] == "u_test"

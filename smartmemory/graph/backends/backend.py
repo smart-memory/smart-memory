@@ -84,7 +84,9 @@ class SmartGraphBackend(ABC):
             count += 1
         return count
 
-    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
+    def add_edges_bulk(
+        self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500, is_global: bool = False
+    ) -> int:
         """Bulk upsert edges. Default: loop over add_edge(). Override for performance."""
         count = 0
         for src, tgt, etype, props in edges:

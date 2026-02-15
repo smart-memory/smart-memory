@@ -183,18 +183,25 @@ class SmartGraph:
         self.nodes.clear_cache()
         return count
 
-    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
+    def add_edges_bulk(
+        self,
+        edges: List[Tuple[str, str, str, Dict[str, Any]]],
+        batch_size: int = 500,
+        is_global: bool = False,
+    ) -> int:
         """Bulk upsert edges using UNWIND Cypher batching.
 
         Args:
             edges: List of ``(source_id, target_id, edge_type, properties)``
                 tuples.
             batch_size: Maximum edges per UNWIND query chunk.
+            is_global: When True, skip workspace scoping on both edge
+                properties and MATCH clauses (for edges between global nodes).
 
         Returns:
             Total number of edges created or updated.
         """
-        count = self.backend.add_edges_bulk(edges, batch_size=batch_size)
+        count = self.backend.add_edges_bulk(edges, batch_size=batch_size, is_global=is_global)
         self.edges.clear_cache()
         return count
 

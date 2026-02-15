@@ -143,15 +143,24 @@ class FalkorDBBackend(SmartGraphBackend):
                     total += res.result_set[0][0]
         return total
 
-    def add_edges_bulk(self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500) -> int:
+    def add_edges_bulk(
+        self,
+        edges: List[Tuple[str, str, str, Dict[str, Any]]],
+        batch_size: int = 500,
+        is_global: bool = False,
+    ) -> int:
         """Bulk upsert edges using UNWIND Cypher, grouped by edge type.
+
+        When ``is_global=True``, workspace scoping is skipped for both edge
+        properties and MATCH clauses — use when connecting global nodes that
+        have no ``workspace_id``.
 
         Returns the total number of edges created or updated.
         """
         if not edges:
             return 0
 
-        write_ctx = self.scope_provider.get_write_context()
+        write_ctx = {} if is_global else self.scope_provider.get_write_context()
 
         # Group edges by sanitized type
         by_type: Dict[str, List[Dict[str, Any]]] = {}
@@ -238,7 +247,7 @@ class FalkorDBBackend(SmartGraphBackend):
             write_ctx = self.scope_provider.get_write_context()
             props.update(write_ctx)
 
-        # Store is_global in properties (will be used internally but not persisted)
+        # Persist is_global flag — stripped by get_node()/get_properties() on read
         props["is_global"] = is_global
 
         # Build individual SET clauses for each property to avoid parameter expansion issues
