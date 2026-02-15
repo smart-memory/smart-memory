@@ -261,17 +261,24 @@ class TestAddEdgeSingle:
 
     def test_is_global_skips_write_context(self):
         b, g = _make_backend()
-        b.add_edge("src", "tgt", "RELATED", {"weight": 1}, is_global=True)
+        result = b.add_edge("src", "tgt", "RELATED", {"weight": 1}, is_global=True)
+        assert result is True
         # First call is the MERGE query — check props have no workspace_id
-        cypher, params = g.calls[0]
+        _, params = g.calls[0]
         assert "workspace_id" not in params.get("props", {})
         assert "user_id" not in params.get("props", {})
+        # User-provided properties must survive is_global=True
+        assert params.get("props", {}).get("weight") == 1
 
     def test_is_global_skips_match_scoping(self):
         b, g = _make_backend()
         b.add_edge("src", "tgt", "RELATED", {}, is_global=True)
+        # MERGE query — unscoped
         cypher, _ = g.calls[0]
         assert "workspace_id" not in cypher
+        # Verify query — also unscoped
+        verify_cypher, _ = g.calls[1]
+        assert "workspace_id" not in verify_cypher
 
     def test_is_global_false_injects_write_context(self):
         b, g = _make_backend()
