@@ -1,4 +1,5 @@
 """Unit tests for LinkExpansionEnricher plugin."""
+
 import pytest
 
 pytestmark = pytest.mark.unit
@@ -307,14 +308,14 @@ class TestMetadataExtraction:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
 
         enricher = LinkExpansionEnricher()
-        html = '''
+        html = """
         <html>
         <head>
             <meta property="og:title" content="OG Title">
             <title>HTML Title</title>
         </head>
         </html>
-        '''
+        """
 
         metadata = enricher._extract_metadata(html, "https://example.com")
 
@@ -336,14 +337,14 @@ class TestMetadataExtraction:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
 
         enricher = LinkExpansionEnricher()
-        html = '''
+        html = """
         <html>
         <head>
             <meta property="og:description" content="OG Description">
             <meta name="description" content="Meta Description">
         </head>
         </html>
-        '''
+        """
 
         metadata = enricher._extract_metadata(html, "https://example.com")
 
@@ -365,13 +366,13 @@ class TestMetadataExtraction:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
 
         enricher = LinkExpansionEnricher()
-        html = '''
+        html = """
         <html>
         <head>
             <meta property="og:image" content="https://example.com/image.jpg">
         </head>
         </html>
-        '''
+        """
 
         metadata = enricher._extract_metadata(html, "https://example.com")
 
@@ -382,13 +383,13 @@ class TestMetadataExtraction:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
 
         enricher = LinkExpansionEnricher()
-        html = '''
+        html = """
         <html>
         <head>
             <meta name="author" content="John Doe">
         </head>
         </html>
-        '''
+        """
 
         metadata = enricher._extract_metadata(html, "https://example.com")
 
@@ -399,13 +400,13 @@ class TestMetadataExtraction:
         from smartmemory.plugins.enrichers.link_expansion import LinkExpansionEnricher
 
         enricher = LinkExpansionEnricher()
-        html = '''
+        html = """
         <html>
         <head>
             <link rel="canonical" href="https://example.com/canonical">
         </head>
         </html>
-        '''
+        """
 
         metadata = enricher._extract_metadata(html, "https://example.com/page?ref=123")
 
@@ -454,13 +455,13 @@ class TestEntityExtraction:
             "@type": "Person",
             "name": "Jane Smith",
         }
-        html = f'''
+        html = f"""
         <html>
         <head>
             <script type="application/ld+json">{json.dumps(jsonld)}</script>
         </head>
         </html>
-        '''
+        """
 
         entities = enricher._extract_entities_heuristic(html, {})
 
@@ -481,13 +482,13 @@ class TestEntityExtraction:
             "@type": "Organization",
             "name": "Acme Corp",
         }
-        html = f'''
+        html = f"""
         <html>
         <head>
             <script type="application/ld+json">{json.dumps(jsonld)}</script>
         </head>
         </html>
-        '''
+        """
 
         entities = enricher._extract_entities_heuristic(html, {})
 
@@ -507,13 +508,13 @@ class TestEntityExtraction:
             "@type": "Article",
             "author": {"@type": "Person", "name": "Bob Writer"},
         }
-        html = f'''
+        html = f"""
         <html>
         <head>
             <script type="application/ld+json">{json.dumps(jsonld)}</script>
         </head>
         </html>
-        '''
+        """
 
         entities = enricher._extract_entities_heuristic(html, {})
 
@@ -529,14 +530,14 @@ class TestEntityExtraction:
 
         enricher = LinkExpansionEnricher()
         jsonld = {"@type": "Person", "name": "John Doe"}
-        html = f'''
+        html = f"""
         <html>
         <head>
             <meta name="author" content="John Doe">
             <script type="application/ld+json">{json.dumps(jsonld)}</script>
         </head>
         </html>
-        '''
+        """
         metadata = {"author": "John Doe"}
 
         entities = enricher._extract_entities_heuristic(html, metadata)
@@ -580,14 +581,14 @@ class TestEnrichMethod:
 
         with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
             mock_response = Mock()
-            mock_response.text = '''
+            mock_response.text = """
             <html>
             <head>
                 <title>Test Page</title>
                 <meta name="author" content="Test Author">
             </head>
             </html>
-            '''
+            """
             mock_response.url = "https://example.com"
             mock_response.headers = {"content-type": "text/html"}
             mock_response.raise_for_status = Mock()
@@ -660,13 +661,13 @@ class TestEnrichMethod:
 
         with patch("smartmemory.plugins.enrichers.link_expansion.httpx") as mock_httpx:
             mock_response = Mock()
-            mock_response.text = f'''
+            mock_response.text = f"""
             <html>
             <head>
                 <script type="application/ld+json">{json.dumps(jsonld)}</script>
             </head>
             </html>
-            '''
+            """
             mock_response.url = "https://example.com"
             mock_response.headers = {}
             mock_response.raise_for_status = Mock()
@@ -705,14 +706,17 @@ class TestLLMAnalysis:
 
             with patch("smartmemory.plugins.enrichers.link_expansion.openai") as mock_openai:
                 mock_completion = Mock()
+                mock_completion.usage = None  # prevent _track_usage from doing arithmetic on Mocks
                 mock_completion.choices = [
                     Mock(
                         message=Mock(
-                            content=json.dumps({
-                                "summary": "This is a summary.",
-                                "entities": [{"name": "LLM Entity", "type": "TOPIC"}],
-                                "topics": ["AI", "Technology"],
-                            })
+                            content=json.dumps(
+                                {
+                                    "summary": "This is a summary.",
+                                    "entities": [{"name": "LLM Entity", "type": "TOPIC"}],
+                                    "topics": ["AI", "Technology"],
+                                }
+                            )
                         )
                     )
                 ]
