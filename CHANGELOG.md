@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### `is_global` Support for Bulk Graph Methods (CORE-BULK-2)
 
-- `add_nodes_bulk()` now accepts `is_global: bool = False` parameter
-- When `True`, workspace scoping is skipped — nodes are visible across all workspaces
+- `add_nodes_bulk()` and `add_edges_bulk()` now accept `is_global: bool = False` parameter
+- When `True`, workspace scoping is skipped — nodes/edges are visible across all workspaces
+- For edges, `is_global=True` also removes workspace filtering from MATCH clauses so global nodes can be linked
 - Propagated through ABC (`SmartGraphBackend`), `FalkorDBBackend`, and `SmartGraph` delegation
 - Use for bulk loading shared reference data (ontology types, Wikipedia entities)
 
