@@ -151,6 +151,9 @@ class FalkorDBBackend(SmartGraphBackend):
     ) -> int:
         """Bulk upsert edges using UNWIND Cypher, grouped by edge type.
 
+        When ``is_global=False`` (default), all edges receive write context
+        and MATCH clauses are scoped to the workspace for tenant isolation.
+
         When ``is_global=True``, workspace scoping is skipped for both edge
         properties and MATCH clauses — use when connecting global nodes that
         have no ``workspace_id``.

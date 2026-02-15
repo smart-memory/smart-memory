@@ -87,7 +87,12 @@ class SmartGraphBackend(ABC):
     def add_edges_bulk(
         self, edges: List[Tuple[str, str, str, Dict[str, Any]]], batch_size: int = 500, is_global: bool = False
     ) -> int:
-        """Bulk upsert edges. Default: loop over add_edge(). Override for performance."""
+        """Bulk upsert edges. Default: loop over add_edge(). Override for performance.
+
+        Note: the default fallback does NOT forward ``is_global`` to
+        ``add_edge()`` (which has no ``is_global`` parameter).  Backends
+        that need global edge support must override this method.
+        """
         count = 0
         for src, tgt, etype, props in edges:
             self.add_edge(src, tgt, etype, props)

@@ -42,7 +42,7 @@ SmartMemory is a multi-layered AI memory system using FalkorDB (graph + vectors)
 ### Core Components
 
 - **SmartMemory** (`smartmemory/smart_memory.py`): Unified API entry point
-- **SmartGraph** (`smartmemory/graph/smartgraph.py`): FalkorDB graph interface (includes `add_nodes_bulk`/`add_edges_bulk` with UNWIND Cypher batching). `add_nodes_bulk` supports `is_global=True` to skip workspace scoping for shared reference data.
+- **SmartGraph** (`smartmemory/graph/smartgraph.py`): FalkorDB graph interface (includes `add_nodes_bulk`/`add_edges_bulk` with UNWIND Cypher batching). Both support `is_global=True` to skip workspace scoping for shared reference data; for edges this also removes workspace filtering from MATCH clauses.
 - **MemoryItem** (`smartmemory/models/memory_item.py`): Core data structure
 - **ScopeProvider** (`smartmemory/scope_provider.py`): Multi-tenancy & security scoping
 
