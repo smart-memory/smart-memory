@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from smartmemory.observability.instrumentation import emit_ctx
+from smartmemory.observability.tracing import trace_span
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class SmartGraphEdges:
         valid_time: Optional[Tuple] = None,
         transaction_time: Optional[Tuple] = None,
         memory_type: Optional[str] = None,
+        is_global: bool = False,
     ):
         """Add an edge to the graph."""
         # Structural validation only (no ontology enforcement)
@@ -71,7 +72,14 @@ class SmartGraphEdges:
             }
 
         result = self.backend.add_edge(
-            source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
+            source_id,
+            target_id,
+            edge_type,
+            properties,
+            valid_time,
+            transaction_time,
+            memory_type,
+            is_global=is_global,
         )
 
         # Invalidate neighbor caches
@@ -237,7 +245,8 @@ class SmartGraphEdges:
                 "delta_edges": delta_edges,
                 "details": details or {},
             }
-            emit_ctx("graph_stats_update", component="graph", operation=operation, data=data)
+            with trace_span("graph.stats_update", attributes={**data, "operation": operation}):
+                pass
         except Exception:
             # Observability must never break graph operations
             pass

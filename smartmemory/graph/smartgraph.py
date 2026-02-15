@@ -160,10 +160,18 @@ class SmartGraph:
         valid_time: Optional[Tuple] = None,
         transaction_time: Optional[Tuple] = None,
         memory_type: Optional[str] = None,
+        is_global: bool = False,
     ):
         """Add an edge to the graph."""
         return self.edges.add_edge(
-            source_id, target_id, edge_type, properties, valid_time, transaction_time, memory_type
+            source_id,
+            target_id,
+            edge_type,
+            properties,
+            valid_time,
+            transaction_time,
+            memory_type,
+            is_global=is_global,
         )
 
     def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500, is_global: bool = False) -> int:
