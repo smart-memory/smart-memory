@@ -25,9 +25,11 @@ class FakeGraph:
 
     def query(self, cypher: str, params: dict | None = None):
         self.calls.append((cypher, params))
-        # Return count = len(batch) so tests can verify totals.
+        # For bulk UNWIND queries: return count = len(batch).
+        # For single add_edge() queries (no batch param): return 1 so the
+        # verify check succeeds.
         batch = (params or {}).get("batch", [])
-        return FakeResultSet(len(batch))
+        return FakeResultSet(len(batch) if batch else 1)
 
 
 class FakeScopeProvider:
@@ -247,3 +249,39 @@ class TestAddEdgesBulk:
         props = params["batch"][0]["props"]
         assert props["workspace_id"] == "ws_test"
         assert props["user_id"] == "u_test"
+
+
+# ---------------------------------------------------------------------------
+# TestAddEdgeSingle
+# ---------------------------------------------------------------------------
+
+
+class TestAddEdgeSingle:
+    """Tests for FalkorDBBackend.add_edge() is_global support."""
+
+    def test_is_global_skips_write_context(self):
+        b, g = _make_backend()
+        b.add_edge("src", "tgt", "RELATED", {"weight": 1}, is_global=True)
+        # First call is the MERGE query — check props have no workspace_id
+        cypher, params = g.calls[0]
+        assert "workspace_id" not in params.get("props", {})
+        assert "user_id" not in params.get("props", {})
+
+    def test_is_global_skips_match_scoping(self):
+        b, g = _make_backend()
+        b.add_edge("src", "tgt", "RELATED", {}, is_global=True)
+        cypher, _ = g.calls[0]
+        assert "workspace_id" not in cypher
+
+    def test_is_global_false_injects_write_context(self):
+        b, g = _make_backend()
+        b.add_edge("src", "tgt", "RELATED", {}, is_global=False)
+        cypher, params = g.calls[0]
+        assert params.get("props", {}).get("workspace_id") == "ws_test"
+        assert "workspace_id" in cypher
+
+    def test_default_injects_write_context(self):
+        b, g = _make_backend()
+        b.add_edge("src", "tgt", "RELATED", {})
+        cypher, params = g.calls[0]
+        assert params.get("props", {}).get("workspace_id") == "ws_test"
