@@ -1,15 +1,15 @@
 # Copyright (C) 2025 SmartMemory
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
@@ -41,15 +41,12 @@ class ConfigManager:
 
     def __init__(self, config_path: Optional[str] = None):
         """Initialize configuration manager
-        
+
         Args:
             config_path: Path to configuration file (optional)
         """
-        # Load secrets automatically (composable secrets or .env)
-        EnvironmentHandler.load_secrets()
-
         # Resolve config path (param > env > default) and propagate to process env
-        candidate_path = config_path or os.environ.get('SMARTMEMORY_CONFIG', 'config.json')
+        candidate_path = config_path or os.environ.get("SMARTMEMORY_CONFIG", "config.json")
         self._config_path = EnvironmentHandler.resolve_config_path(candidate_path)
         EnvironmentHandler.set_config_path_env(self._config_path)
 
@@ -81,7 +78,7 @@ class ConfigManager:
             try:
                 if os.path.exists(self._config_path):
                     # Physical read will only happen if we didn't early-return above
-                    with open(self._config_path, 'r') as f:
+                    with open(self._config_path, "r") as f:
                         config_dict = json.load(f)
                     logger.debug(f"Loaded config from: {self._config_path}")
                     self._last_mtime = current_mtime or 0.0
@@ -102,10 +99,10 @@ class ConfigManager:
 
     def _handle_namespaces(self, processed: Dict[str, Any]) -> Dict[str, Any]:
         """Handle namespace selection and deep merging
-        
+
         Args:
             processed: Processed configuration dictionary
-            
+
         Returns:
             Configuration with namespace overlay applied
         """
@@ -146,12 +143,12 @@ class ConfigManager:
                 merged = {k: v for k, v in processed.items() if k != "namespaces"}
 
         # Store active namespace for introspection
-        merged['_active_namespace'] = active_ns
+        merged["_active_namespace"] = active_ns
         return merged
 
     def reload_if_stale(self, force: bool = False) -> None:
         """Reload the config if the source file's mtime has changed or if forced.
-        
+
         Args:
             force: Force reload even if file hasn't changed
         """
@@ -166,7 +163,7 @@ class ConfigManager:
 
     def get_config(self) -> Dict[str, Any]:
         """Get the current configuration dictionary
-        
+
         Returns:
             Current configuration dictionary
         """
@@ -174,7 +171,7 @@ class ConfigManager:
 
     def get_validated_config(self) -> ValidatedConfigDict:
         """Get configuration wrapped in ValidatedConfigDict for fail-fast access
-        
+
         Returns:
             ValidatedConfigDict instance
         """
@@ -182,11 +179,11 @@ class ConfigManager:
 
     def get_section(self, section_name: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get a specific configuration section
-        
+
         Args:
             section_name: Name of the configuration section
             default: Default value if section doesn't exist
-            
+
         Returns:
             Configuration section dictionary
         """
@@ -194,10 +191,10 @@ class ConfigManager:
 
     def get_store_config(self, store_name: str) -> Dict[str, Any]:
         """Get store configuration, falling back to graph_db if store config is empty
-        
+
         Args:
             store_name: Name of the store
-            
+
         Returns:
             Store configuration dictionary
         """
@@ -208,7 +205,7 @@ class ConfigManager:
 
     def validate_config(self) -> None:
         """Validate the current configuration using ConfigValidator
-        
+
         Raises:
             KeyError: If required keys are missing
             ValueError: If configuration values are invalid
@@ -224,9 +221,7 @@ class ConfigManager:
                 if isinstance(service_config, dict) and service_config:
                     try:
                         ConfigValidator.validate_connection_config(
-                            service_config,
-                            service,
-                            required_keys=["host"] if service != "mongodb" else None
+                            service_config, service, required_keys=["host"] if service != "mongodb" else None
                         )
                     except (KeyError, ValueError) as e:
                         logger.warning(f"Configuration validation warning for {service}: {e}")
@@ -241,4 +236,4 @@ class ConfigManager:
     @property
     def active_namespace(self) -> Optional[str]:
         """Get the currently active namespace"""
-        return self._config.get('_active_namespace')
+        return self._config.get("_active_namespace")

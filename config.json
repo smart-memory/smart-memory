@@ -1,9 +1,9 @@
 {
   "graph_db": {
     "backend_class": "FalkorDBBackend",
-    "host": "${FALKORDB_HOST:-localhost}",
-    "port": "${FALKORDB_PORT:-9010}",
-    "graph_name": "${GRAPH_NAME:-ontology}"
+    "host": "localhost",
+    "port": 9010,
+    "graph_name": "ontology"
   },
   "semantic": {},
   "episodic": {},
@@ -11,169 +11,174 @@
   "working": {},
   "zettelkasten": {},
   "working_memory": {
-    "persist": "${WORKING_MEMORY_PERSIST:-true}",
-    "vectorize": "${WORKING_MEMORY_VECTORIZE:-false}",
-    "retention_days": "${WORKING_MEMORY_RETENTION_DAYS:-14}",
-    "bypass_pipeline": "${WORKING_MEMORY_BYPASS_PIPELINE:-true}"
+    "persist": true,
+    "vectorize": false,
+    "retention_days": 14,
+    "bypass_pipeline": true
   },
   "vector": {
-    "default": "${VECTOR_DEFAULT:-falkordb}",
-    "type": "${VECTOR_TYPE:-falkordb}",
-    "backend": "${VECTOR_BACKEND:-falkordb}",
-    "dimension": "${VECTOR_DIMENSION:-1536}",
-    "metric": "${VECTOR_METRIC:-cosine}",
-    "hnsw_m": "${VECTOR_HNSW_M:-16}",
-    "hnsw_ef_construction": "${VECTOR_HNSW_EF_CONSTRUCTION:-200}",
-    "hnsw_ef_runtime": "${VECTOR_HNSW_EF_RUNTIME:-64}",
-    "host": "${FALKORDB_HOST:-localhost}",
-    "port": "${FALKORDB_PORT:-9010}",
+    "default": "falkordb",
+    "type": "falkordb",
+    "backend": "falkordb",
+    "dimension": 1536,
+    "metric": "cosine",
+    "hnsw_m": 16,
+    "hnsw_ef_construction": 200,
+    "hnsw_ef_runtime": 64,
+    "host": "localhost",
+    "port": 9010,
     "embedding": {
-      "provider": "${EMBEDDING_PROVIDER:-openai}",
-      "model": "${EMBEDDING_MODEL:-text-embedding-ada-002}",
-      "openai_api_key": "${OPENAI_API_KEY:-}",
-      "huggingface_api_key": "${HUGGINGFACE_API_KEY:-}",
-      "huggingface_model": "${HUGGINGFACE_MODEL:-sentence-transformers/all-MiniLM-L6-v2}"
+      "provider": "openai",
+      "model": "text-embedding-ada-002",
+      "openai_api_key": "",
+      "huggingface_api_key": "",
+      "huggingface_model": "sentence-transformers/all-MiniLM-L6-v2"
     }
   },
   "ontology": {
-    "enabled": "${ONTOLOGY_ENABLED:-false}",
+    "enabled": false,
     "inference": {
-      "engine": "${ONTOLOGY_INFERENCE_ENGINE:-basic}",
+      "engine": "basic",
       "ontogpt": {
-        "enabled": "${ONTOLOGY_ONTOGPT_ENABLED:-false}",
-        "provider": "${ONTOGPT_PROVIDER:-openai}",
-        "model": "${ONTOGPT_MODEL:-gpt-5-mini}",
-        "api_base": "${ONTOGPT_API_BASE:-}",
-        "api_version": "${ONTOGPT_API_VERSION:-}",
-        "template": "${ONTOGPT_TEMPLATE:-}",
-        "template_dir": "${ONTOGPT_TEMPLATE_DIR:-}",
-        "confidence_threshold": "${ONTOLOGY_CONFIDENCE_THRESHOLD:-0.6}"
+        "enabled": false,
+        "provider": "openai",
+        "model": "gpt-5-mini",
+        "api_base": "",
+        "api_version": "",
+        "template": "",
+        "template_dir": "",
+        "confidence_threshold": 0.6
       }
     }
   },
   "extractor": {
-    "default": "${EXTRACTOR_DEFAULT:-groq}",
+    "default": "llm",
     "gliner2": {
-      "model_name": "${GLINER2_MODEL:-fastino/gliner2-base-v1}",
-      "confidence_threshold": "${GLINER2_CONFIDENCE:-0.5}"
+      "model_name": "fastino/gliner2-base-v1",
+      "confidence_threshold": 0.5
     },
     "relik": {
-      "model_name": "${RELIK_MODEL:-relik-ie/relik-relation-extraction-small-wikipedia-ner}"
+      "model_name": "relik-ie/relik-relation-extraction-small-wikipedia-ner"
     },
     "gliner": {
-      "model_name": "${GLINER_MODEL:-urchade/gliner_base}"
+      "model_name": "urchade/gliner_base"
     },
     "llm": {
-      "model_name": "${EXTRACTOR_LLM_MODEL:-gpt-5-mini}",
-      "openai_api_key": "${OPENAI_API_KEY:-}"
+      "model_name": "gpt-5-mini",
+      "openai_api_key": ""
     },
     "spacy": {
-      "model_name": "${SPACY_MODEL:-en_core_web_sm}"
+      "model_name": "en_core_web_sm"
     },
     "rebel": {
-      "model_name": "${REBEL_MODEL:-Babelscape/rebel-large}"
+      "model_name": "Babelscape/rebel-large"
     },
     "gpt4o_triple": {
       "model_name": "gpt-5-mini",
-      "openai_api_key": "${OPENAI_API_KEY:-}"
+      "openai_api_key": ""
     }
   },
   "enricher": {
     "default": "default",
     "temporal": {
-      "model_name": "${ENRICHER_TEMPORAL_MODEL:-gpt-5-mini}",
-      "openai_api_key": "${OPENAI_API_KEY:-}"
+      "model_name": "gpt-5-mini",
+      "openai_api_key": ""
     }
   },
   "cache": {
-    "host": "${REDIS_HOST:-localhost}",
+    "host": "localhost",
     "redis": {
-      "host": "${REDIS_HOST:-localhost}",
-      "port": "${REDIS_PORT:-9012}",
-      "db": "${REDIS_DB:-0}",
-      "password": "${REDIS_PASSWORD:-null}",
-      "socket_timeout": "${REDIS_SOCKET_TIMEOUT:-5}",
-      "socket_connect_timeout": "${REDIS_SOCKET_CONNECT_TIMEOUT:-5}",
-      "retry_on_timeout": "${REDIS_RETRY_ON_TIMEOUT:-true}",
-      "health_check_interval": "${REDIS_HEALTH_CHECK_INTERVAL:-30}"
+      "host": "localhost",
+      "port": 9012,
+      "db": 0,
+      "password": "",
+      "socket_timeout": 5,
+      "socket_connect_timeout": 5,
+      "retry_on_timeout": true,
+      "health_check_interval": 30
     },
     "ttl": {
-      "embedding_ttl": "${EMBEDDING_TTL:-86400}",
-      "search_ttl": "${SEARCH_TTL:-900}",
-      "entity_extraction_ttl": "${ENTITY_EXTRACTION_TTL:-3600}",
-      "similarity_ttl": "${SIMILARITY_TTL:-1800}"
+      "embedding_ttl": 86400,
+      "search_ttl": 900,
+      "entity_extraction_ttl": 3600,
+      "similarity_ttl": 1800
     }
+  },
+  "mongodb": {
+    "host": "localhost",
+    "port": 9013,
+    "database": "smartmemory"
   },
   "background": {
     "mode": "redis"
   },
   "adapter": {
-    "default": "${ADAPTER_DEFAULT:-default}"
+    "default": "default"
   },
   "converter": {
-    "default": "${CONVERTER_DEFAULT:-default}"
+    "default": "default"
   },
   "observability": {
     "enabled": true,
     "unified_keys": true
   },
   "auth": {
-    "provider": "${AUTH_PROVIDER:-jwt}",
+    "provider": "jwt",
     "jwt": {
-      "secret_key": "${JWT_SECRET_KEY:-}",
-      "algorithm": "${AUTH_JWT_ALGORITHM:-HS256}",
-      "access_token_expire_minutes": "${AUTH_JWT_EXPIRE_MINUTES:-30}",
-      "issuer": "${AUTH_JWT_ISSUER:-smart-memory}"
+      "secret_key": "",
+      "algorithm": "HS256",
+      "access_token_expire_minutes": 1440,
+      "issuer": "smart-memory"
     },
     "oauth": {
       "google": {
-        "client_id": "${AUTH_GOOGLE_CLIENT_ID:-}",
-        "client_secret": "${AUTH_GOOGLE_CLIENT_SECRET:-}"
+        "client_id": "",
+        "client_secret": ""
       }
     },
     "database": {
-      "user_table": "${AUTH_DB_USER_TABLE:-users}",
-      "connection_string": "${AUTH_DB_CONNECTION:-}"
+      "user_table": "users",
+      "connection_string": ""
     }
   },
   "analytics": {
     "sentiment": {
-      "enabled": "${ANALYTICS_SENTIMENT_ENABLED:-true}",
-      "backend": "${ANALYTICS_SENTIMENT_BACKEND:-vader}"
+      "enabled": true,
+      "backend": "vader"
     },
     "topic": {
-      "enabled": "${ANALYTICS_TOPIC_ENABLED:-true}",
-      "model": "${ANALYTICS_TOPIC_MODEL:-lda}",
-      "n_topics": "${ANALYTICS_TOPIC_K:-15}",
-      "min_df": "${ANALYTICS_MIN_DF:-2}",
-      "max_features": "${ANALYTICS_MAX_FEATURES:-20000}",
-      "min_docs": "${ANALYTICS_MIN_DOCS:-10}"
+      "enabled": true,
+      "model": "lda",
+      "n_topics": 15,
+      "min_df": 2,
+      "max_features": 20000,
+      "min_docs": 10
     },
     "bias": {
-      "js_alert_threshold": "${ANALYTICS_JS_THRESHOLD:-0.3}",
-      "protected_attributes_default": "${ANALYTICS_PROTECTED_ATTRS:-gender,race,age_group,nationality,religion}"
+      "js_alert_threshold": 0.3,
+      "protected_attributes_default": "gender,race,age_group,nationality,religion"
     }
   },
   "ssg": {
-    "enabled": "${SSG_ENABLED:-true}",
-    "default_algorithm": "${SSG_DEFAULT_ALGORITHM:-query_traversal}",
-    "max_results": "${SSG_MAX_RESULTS:-15}",
-    "min_results_before_early_stop": "${SSG_MIN_BEFORE_EARLY_STOP:-8}",
+    "enabled": true,
+    "default_algorithm": "query_traversal",
+    "max_results": 15,
+    "min_results_before_early_stop": 8,
     "neighbor_candidates": {
-      "graph_neighbors": "${SSG_GRAPH_NEIGHBORS:-10}",
-      "vector_neighbors": "${SSG_VECTOR_NEIGHBORS:-10}",
-      "max_total": "${SSG_MAX_TOTAL_NEIGHBORS:-20}"
+      "graph_neighbors": 10,
+      "vector_neighbors": 10,
+      "max_total": 20
     },
     "caching": {
-      "similarity_cache_ttl": "${SSG_SIMILARITY_CACHE_TTL:-1800}",
-      "traversal_path_cache_ttl": "${SSG_TRAVERSAL_PATH_CACHE_TTL:-900}"
+      "similarity_cache_ttl": 1800,
+      "traversal_path_cache_ttl": 900
     },
     "algorithms": {
       "query_traversal": {
-        "enabled": "${SSG_QUERY_TRAVERSAL_ENABLED:-true}"
+        "enabled": true
       },
       "triangulation_fulldim": {
-        "enabled": "${SSG_TRIANGULATION_FULLDIM_ENABLED:-true}"
+        "enabled": true
       }
     }
   }

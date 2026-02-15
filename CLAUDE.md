@@ -9,8 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pip install -e ".[dev]"
 python -m spacy download en_core_web_sm
 
-# Start infrastructure (FalkorDB on 9010, Redis on 9012)
-docker-compose up -d
+# Start infrastructure (FalkorDB on 9010, Redis on 9012, MongoDB on 9013)
+# Run from SmartMemory root directory:
+docker compose up -d
 
 # Run all tests
 PYTHONPATH=. pytest -v tests/
