@@ -135,9 +135,7 @@ class TestFindConfigDir:
         with patch.dict(os.environ, {"SMARTMEMORY_CONFIG_DIR": ""}, clear=False):
             with patch("smartmemory.configuration.loader.Path.cwd", return_value=Path("/nonexistent")):
                 with patch("smartmemory.configuration.loader.Path.home", return_value=Path("/nonexistent")):
-                    result = _find_config_dir()
-                    # May or may not be None depending on actual filesystem
-                    # The point is it doesn't crash
+                    _find_config_dir()  # Should not crash even if nothing found
 
 
 class TestLoadConfig:
