@@ -1,8 +1,9 @@
 """
 Logging filter that injects whitelisted observability context into every log record.
 
-Reads context from smartmemory.observability.instrumentation.get_obs_context()
-so logs, metrics, and traces share the same identifiers (run_id, pipeline_id, etc.).
+Reads legacy context from smartmemory.observability.instrumentation._obs_context
+and trace IDs from smartmemory.observability.tracing.current_span() so logs,
+metrics, and traces share the same identifiers (run_id, pipeline_id, trace_id, etc.).
 
 Usage:
     from smartmemory.observability.logging_filter import install_log_context_filter
@@ -11,12 +12,14 @@ Usage:
 Ensure your formatter includes %(context)s to render the injected context. For JSON
 formatters, emit the record.__dict__["context"] map.
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Dict, Any
 
-from smartmemory.observability.instrumentation import get_obs_context
+from smartmemory.observability.instrumentation import _obs_context
+from smartmemory.observability.tracing import current_span
 
 # Whitelist of safe keys to include in logs
 _ALLOWED_KEYS = {
@@ -69,7 +72,7 @@ class LogContextFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
         try:
-            ctx = get_obs_context() or {}
+            ctx = dict(_obs_context.get() or {})
             if not isinstance(ctx, dict):
                 record.context = {}
                 return True
@@ -77,6 +80,13 @@ class LogContextFilter(logging.Filter):
             for k, v in ctx.items():
                 if k in _ALLOWED_KEYS:
                     out[k] = _redact(k, v)
+            # Inject trace context from the new tracing system
+            span = current_span()
+            if span:
+                out["trace_id"] = span.trace_id
+                out["span_id"] = span.span_id
+                if span.parent_span_id:
+                    out["parent_span_id"] = span.parent_span_id
             record.context = out
         except Exception:
             # do not fail logging; just omit context

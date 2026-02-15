@@ -35,13 +35,13 @@ class EventSpooler:
     """
 
     def __init__(
-            self,
-            redis_host: Optional[str] = None,
-            redis_port: Optional[int] = None,
-            session_id: Optional[str] = None,
-            *,
-            stream_name: str = STREAM_NAME,
-            db: int = REDIS_DB_EVENTS,
+        self,
+        redis_host: Optional[str] = None,
+        redis_port: Optional[int] = None,
+        session_id: Optional[str] = None,
+        *,
+        stream_name: str = STREAM_NAME,
+        db: int = REDIS_DB_EVENTS,
     ):
         config = get_config()
 
@@ -103,12 +103,28 @@ class EventSpooler:
         # Static tags to enrich events
         self.static_tags = obs_config.get("tags") or {} if "tags" in obs_config else {}
 
-    def emit_event(self, event_type: str, component: str, operation: str, data: Optional[Dict[str, Any]] = None, metadata: Optional[Dict[str, Any]] = None):
+    def emit_event(
+        self,
+        event_type: str,
+        component: str,
+        operation: str,
+        data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        *,
+        name: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        span_id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        duration_ms: Optional[float] = None,
+    ):
         """Emit an event to the configured Redis Stream.
 
         Backward compatible fields preserved: event_type, component, operation, data
         Enriched envelope fields added: event_version, timestamp (UTC), namespace, host, pid, tags
         Honors config-driven enabled flag, per-event sampling, and MAXLEN trimming.
+
+        CORE-OBS-2: trace field kwargs become top-level Redis Stream fields when
+        provided. Existing callers that don't pass them are unaffected.
         """
         if not self.obs_enabled:
             return
@@ -142,6 +158,17 @@ class EventSpooler:
             "host": socket.gethostname(),
             "pid": os.getpid(),
         }
+        # CORE-OBS-2: promote trace fields to top-level Stream fields
+        if name is not None:
+            event_data["name"] = name
+        if trace_id is not None:
+            event_data["trace_id"] = trace_id
+        if span_id is not None:
+            event_data["span_id"] = span_id
+        if parent_span_id is not None:
+            event_data["parent_span_id"] = str(parent_span_id)
+        if duration_ms is not None:
+            event_data["duration_ms"] = str(round(duration_ms, 2))
         # Optionally include hierarchical fields when enabled and provided
         if self.unified_keys and isinstance(metadata, dict):
             try:
@@ -173,19 +200,24 @@ class EventSpooler:
 
 
 def emit_event(
-        event_type: str,
-        component: str,
-        operation: str,
-        data: Optional[Dict[str, Any]] = None,
-        *,
-        session_id: Optional[str] = None,
-        redis_host: Optional[str] = None,
-        redis_port: Optional[int] = None,
-        stream_name: str = STREAM_NAME,
-        db: int = REDIS_DB_EVENTS,
-        metadata: Optional[Dict[str, Any]] = None,
+    event_type: str,
+    component: str,
+    operation: str,
+    data: Optional[Dict[str, Any]] = None,
+    *,
+    session_id: Optional[str] = None,
+    redis_host: Optional[str] = None,
+    redis_port: Optional[int] = None,
+    stream_name: str = STREAM_NAME,
+    db: int = REDIS_DB_EVENTS,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Functional helper to emit a single event without managing an EventSpooler instance."""
+    """Functional helper to emit a single event without managing an EventSpooler instance.
+
+    Note: Does not support CORE-OBS-2 trace field kwargs (name, trace_id, span_id,
+    parent_span_id, duration_ms). For span emission, use EventSpooler.emit_event() directly
+    or trace_span() from smartmemory.observability.tracing.
+    """
     if not _OBSERVABILITY_ENABLED:
         return
     EventSpooler(
@@ -203,12 +235,12 @@ class EventStream:
     """
 
     def __init__(
-            self,
-            redis_host: Optional[str] = None,
-            redis_port: Optional[int] = None,
-            *,
-            stream_name: str = STREAM_NAME,
-            db: int = REDIS_DB_EVENTS,
+        self,
+        redis_host: Optional[str] = None,
+        redis_port: Optional[int] = None,
+        *,
+        stream_name: str = STREAM_NAME,
+        db: int = REDIS_DB_EVENTS,
     ):
         config = get_config()
 
@@ -267,7 +299,7 @@ class EventStream:
     def read_all(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Read all events, optionally limited to the most recent N."""
         try:
-            messages = self.redis_client.xrange(self.stream_name, min='-', max='+')
+            messages = self.redis_client.xrange(self.stream_name, min="-", max="+")
             events = [self._parse_event(mid, fields) for mid, fields in messages]
             return events[-limit:] if limit else events
         except Exception:
@@ -276,12 +308,12 @@ class EventStream:
     def read_since(self, last_id: str) -> List[Dict[str, Any]]:
         """Read events strictly after the provided message id."""
         try:
-            messages = self.redis_client.xrange(self.stream_name, min=f"({last_id}", max='+')
+            messages = self.redis_client.xrange(self.stream_name, min=f"({last_id}", max="+")
             return [self._parse_event(mid, fields) for mid, fields in messages]
         except Exception:
             return []
 
-    def stream_new(self, last_id: str = '$', block_ms: int = 1000, count: int = 10) -> Iterator[Dict[str, Any]]:
+    def stream_new(self, last_id: str = "$", block_ms: int = 1000, count: int = 10) -> Iterator[Dict[str, Any]]:
         """Yield new events as they arrive. Use last_id to resume from a position.
         Note: '$' starts from only new messages.
         """
@@ -317,14 +349,14 @@ class RedisStreamQueue:
     """
 
     def __init__(
-            self,
-            *,
-            stream_name: Optional[str] = None,
-            group: Optional[str] = None,
-            consumer: Optional[str] = None,
-            redis_host: Optional[str] = None,
-            redis_port: Optional[int] = None,
-            db: Optional[int] = None,
+        self,
+        *,
+        stream_name: Optional[str] = None,
+        group: Optional[str] = None,
+        consumer: Optional[str] = None,
+        redis_host: Optional[str] = None,
+        redis_port: Optional[int] = None,
+        db: Optional[int] = None,
     ) -> None:
         config = get_config()
 

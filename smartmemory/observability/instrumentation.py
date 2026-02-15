@@ -16,6 +16,7 @@ Notes:
 import contextvars
 import functools
 import os
+import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 # Feature toggle: observability disabled by default in core library
@@ -23,20 +24,36 @@ _OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "false").lower()
 
 # ---- Global context -------------------------------------------------------
 
-_obs_context: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "obs_context", default={}
-)
+_obs_context: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar("obs_context", default={})
 
 
 def set_obs_context(ctx: Dict[str, Any]) -> None:
-    """Replace the current observability context with ctx."""
+    """Replace the current observability context with ctx.
+
+    .. deprecated::
+        Use ``trace_span`` attributes from ``smartmemory.observability.tracing`` instead.
+    """
+    warnings.warn(
+        "set_obs_context is deprecated, use trace_span attributes from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not isinstance(ctx, dict):
         return
     _obs_context.set(dict(ctx))
 
 
 def update_obs_context(values: Dict[str, Any]) -> None:
-    """Merge values into the current observability context."""
+    """Merge values into the current observability context.
+
+    .. deprecated::
+        Use ``trace_span`` attributes from ``smartmemory.observability.tracing`` instead.
+    """
+    warnings.warn(
+        "update_obs_context is deprecated, use trace_span attributes from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not isinstance(values, dict):
         return
     current = dict(_obs_context.get() or {})
@@ -45,21 +62,40 @@ def update_obs_context(values: Dict[str, Any]) -> None:
 
 
 def get_obs_context() -> Dict[str, Any]:
-    """Get a shallow copy of the current observability context."""
+    """Get a shallow copy of the current observability context.
+
+    .. deprecated::
+        Use ``trace_span`` attributes from ``smartmemory.observability.tracing`` instead.
+    """
+    warnings.warn(
+        "get_obs_context is deprecated, use trace_span attributes from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return dict(_obs_context.get() or {})
 
 
 def clear_obs_context() -> None:
-    """Clear the current observability context."""
+    """Clear the current observability context.
+
+    .. deprecated::
+        Use ``trace_span`` attributes from ``smartmemory.observability.tracing`` instead.
+    """
+    warnings.warn(
+        "clear_obs_context is deprecated, use trace_span attributes from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     _obs_context.set({})
 
 
 # ---- Context decorator ---------------------------------------------------
 
+
 def with_obs_context(
-        ctx_or_fn: Optional[Union[Dict[str, Any], Callable[..., Optional[Dict[str, Any]]]]] = None,
-        *,
-        merge: bool = True,
+    ctx_or_fn: Optional[Union[Dict[str, Any], Callable[..., Optional[Dict[str, Any]]]]] = None,
+    *,
+    merge: bool = True,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to run a function with an updated observability context.
 
@@ -71,7 +107,15 @@ def with_obs_context(
 
     Works with both synchronous and asynchronous functions and always restores
     the previous context state.
+
+    .. deprecated::
+        Use ``trace_span`` attributes from ``smartmemory.observability.tracing`` instead.
     """
+    warnings.warn(
+        "with_obs_context is deprecated, use trace_span attributes from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     def _resolve(args: tuple, kwargs: dict) -> Dict[str, Any]:
         try:
@@ -107,14 +151,15 @@ def with_obs_context(
 
 # ---- Concise emit helpers -------------------------------------------------
 
+
 def emit_ctx(
-        event_type: str,
-        *,
-        component: str,
-        operation: Optional[str] = None,
-        data: Optional[Dict[str, Any]] = None,
-        include_context: bool = True,
-        key: Optional[str] = None,
+    event_type: str,
+    *,
+    component: str,
+    operation: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
+    include_context: bool = True,
+    key: Optional[str] = None,
 ) -> None:
     """Emit an event with optional automatic context merging.
 
@@ -126,7 +171,15 @@ def emit_ctx(
     Usage:
         emit_ctx("vector_operation", component="vector_store", operation="add", data={"count": 3})
         emit_ctx("vector_operation", component="vector_store", operation="add", data={"count": 3}, key="vector.operation.add")
+
+    .. deprecated::
+        Use ``trace_span`` from ``smartmemory.observability.tracing`` instead.
     """
+    warnings.warn(
+        "emit_ctx is deprecated, use trace_span from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     payload: Dict[str, Any] = dict(data or {})
     if include_context:
         ctx = get_obs_context()
@@ -145,6 +198,7 @@ def emit_ctx(
         return
     try:
         from smartmemory.observability.events import emit_event
+
         emit_event(event_type=event_type, component=component, operation=operation, data=payload, metadata=metadata)
     except Exception:
         # best-effort; never raise
@@ -152,12 +206,12 @@ def emit_ctx(
 
 
 def make_emitter(
-        *,
-        component: str,
-        default_type: Optional[str] = None,
-        default_operation: Optional[str] = None,
-        include_context: bool = True,
-        default_key: Optional[str] = None,
+    *,
+    component: str,
+    default_type: Optional[str] = None,
+    default_operation: Optional[str] = None,
+    include_context: bool = True,
+    default_key: Optional[str] = None,
 ) -> Callable[[Optional[str], Optional[str], Optional[Dict[str, Any]], Optional[str]], None]:
     """Create a pre-configured emitter to reduce repetition at call sites.
 
@@ -166,12 +220,32 @@ def make_emitter(
         vec_emit("vector_op", "upsert", {"count": 1})
         # or rely on defaults:
         vec_emit(None, None, {"count": 1})
-    """
 
-    def _emit(et: Optional[str] = None, op: Optional[str] = None, data: Optional[Dict[str, Any]] = None, key: Optional[str] = None) -> None:
+    .. deprecated::
+        Use ``trace_span`` from ``smartmemory.observability.tracing`` instead.
+    """
+    warnings.warn(
+        "make_emitter is deprecated, use trace_span from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    def _emit(
+        et: Optional[str] = None,
+        op: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+        key: Optional[str] = None,
+    ) -> None:
         et_final = et or default_type or "custom_event"
         op_final = op or default_operation
-        emit_ctx(et_final, component=component, operation=op_final, data=data, include_context=include_context, key=(key or default_key))
+        emit_ctx(
+            et_final,
+            component=component,
+            operation=op_final,
+            data=data,
+            include_context=include_context,
+            key=(key or default_key),
+        )
 
     return _emit
 
@@ -222,14 +296,14 @@ def emit_system_health(operation: str, *, data: Optional[Dict[str, Any]] = None,
 
 
 def emit_after(
-        event_type: str,
-        *,
-        component: str,
-        operation: Optional[str] = None,
-        payload_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[Dict[str, Any]]]] = None,
-        measure_time: bool = False,
-        duration_key: str = "duration_ms",
-        operation_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[str]]] = None,
+    event_type: str,
+    *,
+    component: str,
+    operation: Optional[str] = None,
+    payload_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[Dict[str, Any]]]] = None,
+    measure_time: bool = False,
+    duration_key: str = "duration_ms",
+    operation_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[str]]] = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to emit an event after a function completes successfully.
 
@@ -238,7 +312,15 @@ def emit_after(
     - payload_fn: optional callable (self_or_none, args, kwargs, result) -> dict to extend payload
 
     Works with sync/async functions and includes global context automatically.
+
+    .. deprecated::
+        Use ``trace_span`` from ``smartmemory.observability.tracing`` instead.
     """
+    warnings.warn(
+        "emit_after is deprecated, use trace_span from smartmemory.observability.tracing instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     def _decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         # Since we're now fully synchronous, we only need the sync wrapper
@@ -248,6 +330,7 @@ def emit_after(
             if measure_time:
                 try:
                     from time import perf_counter as _pc
+
                     _start = _pc()
                 except Exception:
                     _start = None
@@ -262,6 +345,7 @@ def emit_after(
                 if measure_time and duration_key:
                     try:
                         from time import perf_counter as _pc
+
                         if _start is not None:
                             extra[duration_key] = (_pc() - _start) * 1000.0
                     except Exception:
@@ -286,6 +370,7 @@ def emit_after(
 
 # ---- Graph stats decorator ------------------------------------------------
 
+
 def _safe_get_counts(graph_self: Any) -> Tuple[int, int]:
     """Return (node_count, edge_count) best-effort from a SmartGraph-like instance.
 
@@ -301,8 +386,8 @@ def _safe_get_counts(graph_self: Any) -> Tuple[int, int]:
                 if isinstance(counts, dict):
                     return int(counts.get("nodes", 0)), int(counts.get("edges", 0))
             # Fallback to individual fast getters
-            nodes = int(getattr(backend, "get_node_count")()) if hasattr(backend, "get_node_count") else None
-            edges = int(getattr(backend, "get_edge_count")()) if hasattr(backend, "get_edge_count") else None
+            nodes = int(backend.get_node_count()) if hasattr(backend, "get_node_count") else None
+            edges = int(backend.get_edge_count()) if hasattr(backend, "get_edge_count") else None
             if nodes is not None and edges is not None:
                 return nodes, edges
     except Exception:
@@ -334,10 +419,10 @@ def _safe_get_counts(graph_self: Any) -> Tuple[int, int]:
 
 
 def emit_graph_stats(
-        operation: str,
-        *,
-        component: str = "graph",
-        extra_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[Dict[str, Any]]]] = None,
+    operation: str,
+    *,
+    component: str = "graph",
+    extra_fn: Optional[Callable[[Any, tuple, dict, Any], Optional[Dict[str, Any]]]] = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for SmartGraph mutation methods to emit graph_stats_update concisely.
 
@@ -368,7 +453,9 @@ def emit_graph_stats(
                 delta_edges = after_edges - before_edges
 
                 data: Dict[str, Any] = {
-                    "backend": type(getattr(self, "_backend", None)).__name__ if hasattr(self, "_backend") else "UnknownBackend",
+                    "backend": type(getattr(self, "_backend", None)).__name__
+                    if hasattr(self, "_backend")
+                    else "UnknownBackend",
                     "node_count": after_nodes,
                     "edge_count": after_edges,
                     "delta_nodes": delta_nodes,

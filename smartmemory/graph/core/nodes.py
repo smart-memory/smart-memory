@@ -3,14 +3,14 @@ SmartGraph Node Operations Module
 
 Handles all node-related operations for the SmartGraph system.
 """
+
 import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from smartmemory.graph.models.schema_validator import get_validator
-from smartmemory.models.compat.dataclass_model import get_field_names
-from smartmemory.observability.instrumentation import emit_ctx
-from smartmemory.utils import unflatten_dict, flatten_dict
+from smartmemory.observability.tracing import trace_span
+from smartmemory.utils import flatten_dict
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +27,22 @@ class SmartGraphNodes:
         self._cache_hits = 0
         self._cache_misses = 0
 
-    def add_node(self,
-                 item_id: Optional[str],
-                 properties: Dict[str, Any],
-                 valid_time: Optional[Tuple] = None,
-                 transaction_time: Optional[Tuple] = None,
-                 memory_type: Optional[str] = None,
-                 is_global: bool = False):
+    def add_node(
+        self,
+        item_id: Optional[str],
+        properties: Dict[str, Any],
+        valid_time: Optional[Tuple] = None,
+        transaction_time: Optional[Tuple] = None,
+        memory_type: Optional[str] = None,
+        is_global: bool = False,
+    ):
         """Add a node to the graph."""
         if item_id is None:
             item_id = str(uuid.uuid4())
 
         # Use mapping logic to ensure properties are flat and complete
         node_dict = dict(properties)
-        node_dict['item_id'] = item_id
+        node_dict["item_id"] = item_id
 
         # Schema validation
         validator = get_validator()
@@ -71,21 +73,28 @@ class SmartGraphNodes:
             return result
         return {"item_id": item_id, "properties": node_dict}
 
-    def add_dual_node(self, item_id: str, memory_properties: Dict[str, Any], memory_type: str, entity_nodes: List[Dict[str, Any]] = None, is_global: bool = False):
+    def add_dual_node(
+        self,
+        item_id: str,
+        memory_properties: Dict[str, Any],
+        memory_type: str,
+        entity_nodes: List[Dict[str, Any]] = None,
+        is_global: bool = False,
+    ):
         """Add a dual-node structure through the backend.
-        
+
         Returns a dict containing at least:
           - memory_node_id: str
           - entity_node_ids: List[str]
         """
         # Check if backend supports dual-node architecture
-        if hasattr(self.backend, 'add_dual_node'):
+        if hasattr(self.backend, "add_dual_node"):
             result = self.backend.add_dual_node(
                 item_id=item_id,
                 memory_properties=memory_properties,
                 memory_type=memory_type,
                 entity_nodes=entity_nodes,
-                is_global=is_global
+                is_global=is_global,
             )
 
             # Invalidate cache for affected nodes
@@ -96,8 +105,8 @@ class SmartGraphNodes:
                     del self._node_cache[memory_cache_key]
 
                 # Clear entity node caches
-                if result and 'entity_node_ids' in result:
-                    for entity_id in result['entity_node_ids']:
+                if result and "entity_node_ids" in result:
+                    for entity_id in result["entity_node_ids"]:
                         entity_cache_key = f"{entity_id}:current"
                         if entity_cache_key in self._node_cache:
                             del self._node_cache[entity_cache_key]
@@ -107,7 +116,7 @@ class SmartGraphNodes:
                 # Compute deltas based on provided entity_nodes and relationships
                 entity_count = 0
                 if isinstance(result, dict):
-                    entity_count = int(result.get('entity_count') or 0)
+                    entity_count = int(result.get("entity_count") or 0)
                 if not entity_count and entity_nodes is not None:
                     try:
                         entity_count = len(entity_nodes)
@@ -117,7 +126,7 @@ class SmartGraphNodes:
                 try:
                     if entity_nodes:
                         for en in entity_nodes:
-                            rels = en.get('relations', []) if isinstance(en, dict) else []
+                            rels = en.get("relations", []) if isinstance(en, dict) else []
                             try:
                                 sem_rel_count += len(rels)
                             except Exception:
@@ -146,7 +155,7 @@ class SmartGraphNodes:
             node_result = self.add_node(item_id, memory_properties, memory_type=memory_type)
             mem_id = item_id
             if isinstance(node_result, dict):
-                mem_id = node_result.get('item_id', item_id)
+                mem_id = node_result.get("item_id", item_id)
             return {"memory_node_id": mem_id, "entity_node_ids": []}
 
     def get_node(self, item_id: str, as_of_time: Optional[str] = None):
@@ -192,7 +201,7 @@ class SmartGraphNodes:
         # Estimate number of incident edges for delta, best-effort
         incident_edges = None
         try:
-            if hasattr(self.backend, 'get_edges_for_node'):
+            if hasattr(self.backend, "get_edges_for_node"):
                 edges = self.backend.get_edges_for_node(item_id)  # type: ignore[attr-defined]
                 try:
                     incident_edges = len(edges) if edges is not None else 0
@@ -215,9 +224,9 @@ class SmartGraphNodes:
 
     def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
         """Execute a raw query against the backend."""
-        if hasattr(self.backend, 'execute_cypher'):
+        if hasattr(self.backend, "execute_cypher"):
             return self.backend.execute_cypher(query, params)
-        elif hasattr(self.backend, 'execute_query'):
+        elif hasattr(self.backend, "execute_query"):
             return self.backend.execute_query(query, params)
         else:
             raise NotImplementedError("Backend does not support raw queries")
@@ -225,15 +234,15 @@ class SmartGraphNodes:
     def nodes(self):
         """Return all node IDs for compatibility with memory store iteration."""
         try:
-            if hasattr(self.backend, 'get_all_node_ids'):
+            if hasattr(self.backend, "get_all_node_ids"):
                 return self.backend.get_all_node_ids()
-            elif hasattr(self.backend, 'get_all_nodes'):
+            elif hasattr(self.backend, "get_all_nodes"):
                 nodes = self.backend.get_all_nodes()
-                return [node.get('item_id', node.get('id', '')) for node in nodes]
+                return [node.get("item_id", node.get("id", "")) for node in nodes]
             else:
                 # Fallback: try to search for all nodes and extract IDs
                 results = self.backend.search_nodes({})
-                return [node.get('item_id', node.get('id', '')) for node in results]
+                return [node.get("item_id", node.get("id", "")) for node in results]
         except Exception:
             return []
 
@@ -241,16 +250,16 @@ class SmartGraphNodes:
     def _to_node_dict(obj):
         """
         Convert object to node dictionary using MemoryItemSerializer.
-        
+
         This is the central serialization path for graph storage.
         """
         from smartmemory.utils.serialization import MemoryItemSerializer
-        
+
         # Supports MemoryItem/Serializable objects
         if hasattr(obj, "to_dict") or hasattr(obj, "to_storage"):
             return MemoryItemSerializer.to_storage(obj)
         elif isinstance(obj, dict):
-            return flatten_dict(obj, sep='__')
+            return flatten_dict(obj, sep="__")
         else:
             raise TypeError(f"Unsupported type for _to_node_dict: {type(obj)}")
 
@@ -258,21 +267,27 @@ class SmartGraphNodes:
     def _from_node_dict(item_cls, node):
         """
         Convert node dictionary to object using MemoryItemSerializer.
-        
+
         Uses the centralized hydration logic to ensure consistency.
         """
         from smartmemory.utils.serialization import MemoryItemSerializer
-        
+
         # Handles both flat and nested dicts (Neo4j sometimes nests under 'properties')
         props = node.get("properties") or {} if "properties" in node else node
-        
+
         # Use the serializer to rehydrate
         # The serializer expects a flat dict (which backends should now return)
         # If properties are already partially unflattened (unlikely with new backend logic but possible in transition),
         # the serializer should still handle public fields correctly.
         return MemoryItemSerializer.from_storage(item_cls, props)
 
-    def _emit_graph_stats(self, operation: str, details: Dict[str, Any], delta_nodes: Optional[int] = None, delta_edges: Optional[int] = None) -> None:
+    def _emit_graph_stats(
+        self,
+        operation: str,
+        details: Dict[str, Any],
+        delta_nodes: Optional[int] = None,
+        delta_edges: Optional[int] = None,
+    ) -> None:
         """Best-effort emission of graph stats update events."""
         try:
             backend_name = type(self.backend).__name__
@@ -280,20 +295,20 @@ class SmartGraphNodes:
             edge_count: Optional[int] = None
 
             # Prefer explicit fast counters if backend provides them
-            if hasattr(self.backend, 'get_counts'):
+            if hasattr(self.backend, "get_counts"):
                 try:
                     counts = self.backend.get_counts()  # type: ignore[attr-defined]
                     if isinstance(counts, dict):
-                        node_count = counts.get('node_count')
-                        edge_count = counts.get('edge_count')
+                        node_count = counts.get("node_count")
+                        edge_count = counts.get("edge_count")
                 except Exception:
                     pass
             else:
                 # Fallbacks
                 try:
-                    if hasattr(self.backend, 'get_node_count'):
+                    if hasattr(self.backend, "get_node_count"):
                         node_count = self.backend.get_node_count()  # type: ignore[attr-defined]
-                    elif hasattr(self.backend, 'get_all_nodes'):
+                    elif hasattr(self.backend, "get_all_nodes"):
                         nodes = self.backend.get_all_nodes()  # type: ignore[attr-defined]
                         try:
                             node_count = len(nodes) if nodes is not None else None
@@ -302,7 +317,7 @@ class SmartGraphNodes:
                 except Exception:
                     node_count = None
                 try:
-                    if hasattr(self.backend, 'get_edge_count'):
+                    if hasattr(self.backend, "get_edge_count"):
                         edge_count = self.backend.get_edge_count()  # type: ignore[attr-defined]
                 except Exception:
                     edge_count = None
@@ -315,7 +330,8 @@ class SmartGraphNodes:
                 "delta_edges": delta_edges,
                 "details": details or {},
             }
-            emit_ctx("graph_stats_update", component="graph", operation=operation, data=data)
+            with trace_span("graph.stats_update", attributes={**data, "operation": operation}):
+                pass
         except Exception:
             # Observability must never break graph operations
             pass
@@ -354,5 +370,5 @@ class SmartGraphNodes:
             "cache_misses": self._cache_misses,
             "hit_rate": hit_rate,
             "node_cache_size": len(self._node_cache),
-            "max_cache_size": self.cache_size
+            "max_cache_size": self.cache_size,
         }

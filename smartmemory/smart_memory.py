@@ -1,10 +1,9 @@
 import logging
-from time import perf_counter
 from typing import Optional, Union, Any, Dict, List
 
 from smartmemory.conversation.context import ConversationContext
 from smartmemory.memory.pipeline.config import PipelineConfigBundle
-from smartmemory.observability.instrumentation import make_emitter
+from smartmemory.observability.tracing import trace_span
 from smartmemory.graph.smartgraph import SmartGraph
 from smartmemory.integration.archive.archive_provider import get_archive_provider
 from smartmemory.memory.base import MemoryBase
@@ -48,9 +47,6 @@ class SmartMemory(MemoryBase):
     All linking operations should be accessed via SmartMemory methods only.
     Do not use Linking directly; it is an internal implementation detail.
     """
-
-    # Preconfigured emitter for memory operations
-    _MEM_EMIT = make_emitter(component="smart_memory", default_type="memory_operation")
 
     def __init__(
         self,
@@ -624,21 +620,16 @@ class SmartMemory(MemoryBase):
                 return item.item_id
         else:
             # For other memory types, use the standard CRUD
-            t0 = perf_counter()
-            result = self._crud.add(item, **kwargs)
-            # Emit memory_store event for observability
-            # noinspection PyArgumentList
-            SmartMemory._MEM_EMIT(
-                "memory_store",
-                "add",
+            with trace_span(
+                "memory.add",
                 {
-                    "item_id": result,
                     "memory_type": memory_type,
                     "content_length": len(getattr(item, "content", "") or ""),
-                    "duration_ms": (perf_counter() - t0) * 1000.0,
                 },
-            )
-            return result
+            ) as span:
+                result = self._crud.add(item, **kwargs)
+                span.attributes["item_id"] = result
+                return result
 
     def _add_impl(self, item, **kwargs) -> str:
         """Implement abstract method from MemoryBase."""
@@ -652,16 +643,10 @@ class SmartMemory(MemoryBase):
         return self._crud.update(item, **kwargs)
 
     def get(self, item_id: str, **kwargs):
-        t0 = perf_counter()
-        result = self._crud.get(item_id)
-        # Emit memory_retrieve event for observability
-        # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT(
-            "memory_retrieve",
-            "get",
-            {"item_id": item_id, "found": result is not None, "duration_ms": (perf_counter() - t0) * 1000.0},
-        )
-        return result
+        with trace_span("memory.get", {"item_id": item_id}) as span:
+            result = self._crud.get(item_id)
+            span.attributes["found"] = result is not None
+            return result
 
     # Archive facades (provider hidden behind SmartMemory interface)
     def archive_put(
@@ -777,16 +762,10 @@ class SmartMemory(MemoryBase):
         return item_id
 
     def delete(self, item_id: str, **kwargs) -> bool:
-        t0 = perf_counter()
-        result = self._crud.delete(item_id)
-        # Emit memory_delete event for observability
-        # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT(
-            "memory_delete",
-            "delete",
-            {"item_id": item_id, "success": result, "duration_ms": (perf_counter() - t0) * 1000.0},
-        )
-        return result
+        with trace_span("memory.delete", {"item_id": item_id}) as span:
+            result = self._crud.delete(item_id)
+            span.attributes["success"] = result
+            return result
 
     def search(
         self,
@@ -877,24 +856,17 @@ class SmartMemory(MemoryBase):
 
         # Use canonical search component directly
         # ScopeProvider handles all tenant/workspace/user filtering automatically
-        t0 = perf_counter()
-        results = self._search.search(query, top_k=top_k, memory_type=memory_type, **kwargs)
-
-        # Emit memory_retrieve event for observability
-        # noinspection PyArgumentList
-        SmartMemory._MEM_EMIT(
-            "memory_retrieve",
-            "search",
+        with trace_span(
+            "memory.search",
             {
                 "query_length": len(query) if query else 0,
                 "top_k": top_k,
                 "memory_type": memory_type,
-                "results_count": len(results) if results else 0,
-                "duration_ms": (perf_counter() - t0) * 1000.0,
             },
-        )
-
-        return results[:top_k]
+        ) as span:
+            results = self._search.search(query, top_k=top_k, memory_type=memory_type, **kwargs)
+            span.attributes["results_count"] = len(results) if results else 0
+            return results[:top_k]
 
     # Linking
     def link(self, source_id: str, target_id: str, link_type: Union[str, "LinkType"] = "RELATED") -> str:

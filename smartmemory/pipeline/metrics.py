@@ -10,6 +10,7 @@ import logging
 import uuid
 from typing import Any, Dict, Optional
 
+from smartmemory.observability.tracing import current_span
 from smartmemory.pipeline.state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,10 @@ class PipelineMetricsEmitter:
             "entity_count": entity_count,
             "relation_count": relation_count,
         }
+        span = current_span()
+        if span:
+            data["trace_id"] = span.trace_id
+            data["span_id"] = span.span_id
         if error:
             data["error"] = str(error)[:200]
 
@@ -101,6 +106,10 @@ class PipelineMetricsEmitter:
             "workspace_id": self._workspace_id or "",
             "pipeline_id": self._pipeline_id,
         }
+        span = current_span()
+        if span:
+            data["trace_id"] = span.trace_id
+            data["span_id"] = span.span_id
 
         try:
             spooler.emit_event(

@@ -114,6 +114,6 @@ class WikipediaGrounder(GrounderPlugin):
     def _ensure_edge(graph, entity_item, wiki_id: str) -> None:
         """Create GROUNDED_IN edge from entity to Wikipedia node if possible."""
         if entity_item and hasattr(entity_item, "item_id") and entity_item.item_id:
-            graph.add_edge(entity_item.item_id, wiki_id, edge_type="GROUNDED_IN", properties={})
+            graph.add_edge(entity_item.item_id, wiki_id, edge_type="GROUNDED_IN", properties={}, is_global=True)
         else:
             logger.warning("No entity item_id for Wikipedia node %s, skipping edge", wiki_id)

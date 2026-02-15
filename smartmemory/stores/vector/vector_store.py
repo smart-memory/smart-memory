@@ -3,7 +3,7 @@ from datetime import datetime
 from time import perf_counter
 from typing import Optional
 
-from smartmemory.observability.instrumentation import make_emitter
+from smartmemory.observability.tracing import trace_span
 from smartmemory.stores.vector.backends.base import create_backend
 from smartmemory.utils import get_config
 from smartmemory.interfaces import ScopeProvider
@@ -16,7 +16,7 @@ class VectorStore:
     Supports add, upsert, search, delete, get, and clear operations with metadata.
 
     Each instance is independent - no singleton pattern for better testability and isolation.
-    
+
     Example usage:
         vector_store = VectorStore(collection_name="my_collection")
         vector_store.upsert(
@@ -29,19 +29,18 @@ class VectorStore:
         vector_store.clear()  # Deletes all vectors from the collection
     """
 
-    # Preconfigured emitter for vector operations
-    VEC_EMIT = make_emitter(component="vector_store", default_type="vector_operation")
+    # trace_span replaces the old VEC_EMIT = make_emitter(...) pattern
 
     def _vec_data(
-            self,
-            *,
-            item_id=None,
-            embedding=None,
-            meta=None,
-            top_k=None,
-            returned=None,
-            deleted_count=None,
-            t0=None,
+        self,
+        *,
+        item_id=None,
+        embedding=None,
+        meta=None,
+        top_k=None,
+        returned=None,
+        deleted_count=None,
+        t0=None,
     ):
         """Build a standard payload for vector operations, omitting None values.
 
@@ -82,14 +81,14 @@ class VectorStore:
     def __init__(self, collection_name=None, persist_directory=None, scope_provider: Optional[ScopeProvider] = None):
         """Construct a VectorStore that delegates to a configured backend."""
         self.scope_provider = scope_provider or DefaultScopeProvider()
-        
-        vector_cfg = get_config('vector') or {}
+
+        vector_cfg = get_config("vector") or {}
         full_cfg = get_config()
 
         # Resolve effective collection name with namespace support
-        ns = full_cfg.get('active_namespace') if isinstance(full_cfg, dict) else None
+        ns = full_cfg.get("active_namespace") if isinstance(full_cfg, dict) else None
         use_ws_ns = bool(vector_cfg.get("use_workspace_namespace", False))
-        
+
         # Use scope provider to get workspace context if needed for namespacing
         ws = None
         if use_ws_ns:
@@ -107,7 +106,7 @@ class VectorStore:
         if persist_directory is None:
             persist_directory = vector_cfg.get("persist_directory")
 
-        backend_name = (vector_cfg.get('backend') or 'falkordb').lower()
+        backend_name = (vector_cfg.get("backend") or "falkordb").lower()
         self._backend = create_backend(backend_name, eff_collection, persist_directory)
         self._collection_name = eff_collection
         # Expose collection for compatibility with _vec_data method
@@ -122,22 +121,22 @@ class VectorStore:
         - node_ids: single string or list of graph node IDs
         - chunk_ids: single string or list of chunk IDs
         - is_global: if True, skip scope_provider context injection
-        
+
         Filtering is handled automatically by ScopeProvider.
         All IDs are stored in metadata as lists for robust cross-referencing.
         """
         meta = metadata.copy() if metadata else {}
         meta["item_id"] = str(item_id)
-        
+
         # Inject write context from provider
         if not is_global:
             write_ctx = self.scope_provider.get_write_context()
             meta.update(write_ctx)
-        
+
         # Flatten 'properties' dict if present
         node = meta.pop("_node", None)
         if node:
-            properties = node.pop('properties', None)
+            properties = node.pop("properties", None)
             if properties and isinstance(properties, dict):
                 for k, v in properties.items():
                     if isinstance(v, (str, int, float, bool)):
@@ -162,27 +161,26 @@ class VectorStore:
 
         meta = {k: storage_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
-        
+
         t0 = perf_counter()
         self._backend.add(item_id=str(item_id), embedding=embedding, metadata=meta)
-        # Best-effort emit with automatic context
-        # noinspection PyArgumentList
-        VectorStore.VEC_EMIT(None, "add", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
+        with trace_span("vector.add", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0)):
+            pass
 
     def upsert(self, item_id, embedding, metadata=None, node_ids=None, chunk_ids=None, is_global=False):
         """
         Upsert an embedding to the vector store. Overwrites if the id exists, inserts if not.
         - is_global: if True, skip scope_provider context injection
-        
+
         Filtering is handled automatically by ScopeProvider.
         """
         meta = metadata.copy() if metadata else {}
-        
+
         # Inject write context from provider
         if not is_global:
             write_ctx = self.scope_provider.get_write_context()
             meta.update(write_ctx)
-            
+
         if node_ids is not None:
             meta["node_ids"] = node_ids if isinstance(node_ids, list) else [node_ids]
         if chunk_ids is not None:
@@ -198,11 +196,11 @@ class VectorStore:
 
         meta = {k: storage_safe(v) for k, v in meta.items() if v is not None}
         meta = {k: v for k, v in meta.items() if v is not None}
-        
+
         t0 = perf_counter()
         self._backend.upsert(item_id=str(item_id), embedding=embedding, metadata=meta)
-        # noinspection PyArgumentList
-        VectorStore.VEC_EMIT(None, "upsert", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0))
+        with trace_span("vector.upsert", self._vec_data(item_id=item_id, embedding=embedding, meta=meta, t0=t0)):
+            pass
 
     def get(self, item_id, include_metadata: bool = True):
         """
@@ -234,8 +232,8 @@ class VectorStore:
         if callable(deleter):
             try:
                 deleter(item_id)
-                # noinspection PyArgumentList
-                VectorStore.VEC_EMIT(None, "delete", self._vec_data(item_id=item_id))
+                with trace_span("vector.delete", self._vec_data(item_id=item_id)):
+                    pass
                 return True
             except Exception as e:
                 print(f"Warning: Vector backend delete failed: {e}")
@@ -246,7 +244,7 @@ class VectorStore:
         """
         Search the vector store with automatic scope filtering.
         Supports hybrid retrieval if query_text is provided.
-        
+
         Args:
             query_embedding: query vector
             top_k: number of results to return
@@ -255,53 +253,53 @@ class VectorStore:
             rrf_k: constant for Reciprocal Rank Fusion (default 60)
         """
         t0 = perf_counter()
-        
+
         # 1. Vector Search
         vector_results = self._backend.search(query_embedding=query_embedding, top_k=top_k * 2)
-        
+
         backend_results = vector_results
-        
+
         # 2. Hybrid Search (if query_text provided)
-        if query_text and hasattr(self._backend, 'search_by_text'):
+        if query_text and hasattr(self._backend, "search_by_text"):
             text_results = self._backend.search_by_text(query_text=query_text, top_k=top_k * 2)
-            
+
             # Perform Reciprocal Rank Fusion (RRF)
             # score = 1 / (k + rank)
             rrf_scores = {}
             doc_map = {}  # Keep track of full doc objects
-            
+
             for rank, res in enumerate(vector_results):
-                doc_id = res['id']
+                doc_id = res["id"]
                 rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank + 1))
                 doc_map[doc_id] = res
-                
+
             for rank, res in enumerate(text_results):
-                doc_id = res['id']
+                doc_id = res["id"]
                 rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank + 1))
                 if doc_id not in doc_map:
                     doc_map[doc_id] = res
-            
+
             # Sort by RRF score
             sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
-            
+
             # Reconstruct backend_results
             backend_results = []
             for doc_id in sorted_ids:
                 doc = doc_map[doc_id]
-                doc['score'] = rrf_scores[doc_id] # Replace score with RRF score
+                doc["score"] = rrf_scores[doc_id]  # Replace score with RRF score
                 backend_results.append(doc)
-                
+
         hits = []
         count = 0
-        
+
         # Get isolation filters from provider (single source of truth)
         # Provider returns field names and values without core library knowing what they mean
         filters = {} if is_global else self.scope_provider.get_isolation_filters()
-        
+
         for i, res in enumerate(backend_results):
             id_ = res.get("id")
             meta = res.get("metadata", {})
-            
+
             # Apply all isolation filters generically
             skip = False
             for filter_key, filter_value in filters.items():
@@ -310,7 +308,7 @@ class VectorStore:
                     break
             if skip:
                 continue
-                
+
             hit = {"id": id_}
             hit["metadata"] = self.deserialize_metadata(meta)
             if "score" in res:
@@ -319,8 +317,8 @@ class VectorStore:
             count += 1
             if count >= top_k:
                 break
-        # noinspection PyArgumentList
-        VectorStore.VEC_EMIT(None, "search", self._vec_data(top_k=top_k, returned=len(hits), t0=t0))
+        with trace_span("vector.search", self._vec_data(top_k=top_k, returned=len(hits), t0=t0)):
+            pass
         return hits
 
     def clear(self):
@@ -332,8 +330,8 @@ class VectorStore:
             t0 = perf_counter()
             # Delegate to backend; not all backends return a count
             self._backend.clear()
-            # noinspection PyArgumentList
-            VectorStore.VEC_EMIT(None, "clear", self._vec_data(deleted_count=None, t0=t0))
+            with trace_span("vector.clear", self._vec_data(deleted_count=None, t0=t0)):
+                pass
         except Exception as e:
             print(f"Warning: Vector store clear encountered error: {e}")
 
@@ -345,6 +343,7 @@ class VectorStore:
         """
         import json
         from dateutil.parser import parse as parse_date
+
         def try_load(val):
             if isinstance(val, str):
                 try:
