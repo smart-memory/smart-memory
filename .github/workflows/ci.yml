@@ -16,19 +16,18 @@ jobs:
       - name: Checkout smart-memory
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
-          python -m spacy download en_core_web_sm
+          uv venv --python 3.11
+          uv pip install --python .venv/bin/python -e ".[dev]"
+          .venv/bin/python -m spacy download en_core_web_sm
 
       - name: Run CI-tier tests
         run: |
-          PYTHONPATH=. pytest tests/ -v -m "not (integration or e2e or golden or harness or slow)" --cov=smartmemory --cov-report=xml
+          PYTHONPATH=. .venv/bin/python -m pytest tests/ -v -m "not (integration or e2e or golden or harness or slow or smoke)" --cov=smartmemory --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
