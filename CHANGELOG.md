@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Admin Console Completion (PLAT-ADMIN-1)
+
+- **smart-memory-admin:** Fixed 3 critical bugs (OAuth token key mismatch, impersonation console.log leak, hardcoded metric fallbacks), setup Vitest + CI pipeline, removed Deployments page, redesigned System page with confirmation dialogs for destructive ops
+- **smart-memory-service:** Rewrote `superadmin.py` (735 lines, 17 endpoints with `require_superadmin`): dashboard stats, user/tenant CRUD, feature flags in MongoDB, activity logging with 90-day TTL, system health, billing overview, database maintenance. Added 5 cross-tenant Tier 2 endpoints (orphaned-notes, prune, old-notes, summary, reflect) via `_get_tenant_smart_memory()` with audit trail. Fixed missing `require_admin` on reflect/summarize routes
+- **smart-memory-admin:** Wired all 7 pages (Dashboard, Users, Tenants, System, FeatureFlags, Activity, Billing) to real API data. Added Data Management tab in Tenants dialog with scan/preview/execute workflow. Token refresh mutex for concurrent 401s
+- **smart-memory-e2e:** Added admin project to Playwright config with superadmin auth fixture, 13 E2E tests (auth, pages, users)
+- **Tests:** 60 Vitest tests (api, api-contract, AuthContext, utils, Users, Tenants) + 13 Playwright E2E tests + API contract drift detector (method count assertion)
+- **Review fixes:** Removed `updateTenant` method (no backend endpoint), replaced console.log/error/warn with errorTracker in AuthCallback, fixed inconsistent `|| 0` vs `N/A` fallbacks in Billing, added logger.warning to activity log catch block
+- **Scope:** `smart-memory-admin`, `smart-memory-service`, `smart-memory-e2e`
+
+#### Flatten Event Emission (CORE-OBS-2)
+
+- `EventSpooler.emit_event()` now accepts trace field kwargs: `name`, `trace_id`, `span_id`, `parent_span_id`, `duration_ms`
+- When provided, these are written as top-level Redis Stream fields (not buried in the `data` JSON blob)
+- `_emit_span()` updated to forward trace fields as explicit kwargs
+- Existing callers unaffected — new kwargs default to `None`, no fields added unless provided
+- Insights: removed `normalize_span_event()` shim (INS-SPAN-1); all 4 read paths now extract trace fields directly from top-level Stream fields with backward-compatible fallback to data blob for legacy events
+- 9 new core unit tests for trace field emission; 26 new Insights invariant tests for inline extraction (both read paths + backward compat); 15 INS-SPAN-1 shim tests removed
+- **Scope:** `smart-memory` (core), `smart-memory-insights` (consumer cleanup)
+
 #### `is_global` Support for Bulk Graph Methods (CORE-BULK-2)
 
 - `add_nodes_bulk()` and `add_edges_bulk()` now accept `is_global: bool = False` parameter
@@ -27,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EventData.session_id` now Optional; 6 new trace fields added to model
 - Frontend: 21 span name → description mappings, trace context in hover card and expanded view
 - 15 invariant tests for the normalization function (100% branch coverage)
-- **Scope:** `smart-memory-insights` only (forward-compatible patch; CORE-OBS-2 will eliminate the shim)
+- **Scope:** `smart-memory-insights` only (forward-compatible patch; shim removed by CORE-OBS-2)
 
 ### Fixed
 
