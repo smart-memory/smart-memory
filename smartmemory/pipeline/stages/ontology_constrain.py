@@ -210,7 +210,12 @@ class OntologyConstrainStage:
         ruler_entities: List[Any],
         llm_entities: List[Any],
     ) -> List[Dict[str, Any]]:
-        """Merge ruler and LLM entities by name. Higher confidence wins."""
+        """Merge ruler and LLM entities by name. Higher confidence wins.
+
+        When merging, preserve ``item_id`` from the LLM entity so that
+        downstream relation filtering can match ``source_id`` / ``target_id``
+        (SHA256 hashes assigned by the LLM extractor) to accepted entities.
+        """
         merged: Dict[str, Dict[str, Any]] = {}
 
         # Index ruler entities first (preferred type source)
@@ -223,10 +228,13 @@ class OntologyConstrainStage:
             name = self._get_entity_name(entity).lower()
             normalized = self._normalize_entity(entity, source="llm")
             if name in merged:
-                # Keep ruler type, but take higher confidence
                 existing = merged[name]
+                # Keep ruler type, but take higher confidence
                 if normalized.get("confidence", 0) > existing.get("confidence", 0):
                     existing["confidence"] = normalized["confidence"]
+                # Always preserve the LLM item_id — needed for relation ID resolution
+                if normalized.get("item_id") and not existing.get("item_id"):
+                    existing["item_id"] = normalized["item_id"]
             else:
                 merged[name] = normalized
 
@@ -288,8 +296,11 @@ class OntologyConstrainStage:
         for rel in relations:
             if not isinstance(rel, dict):
                 continue
-            source = rel.get("source_id", "")
-            target = rel.get("target_id", "")
+            source = rel.get("source_id")
+            target = rel.get("target_id")
+            if not source or not target:
+                logger.debug("Skipping relation with missing IDs: %s", rel)
+                continue
             if source in accepted_ids and target in accepted_ids:
                 valid.append(rel)
         return valid

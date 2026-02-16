@@ -71,13 +71,21 @@ class StoragePipeline:
     def process_extracted_relations(self, context: Dict[str, Any], item_id: str, relations: List[Any]):
         """
         Process extracted relations to create relationships in the graph.
-        This method is always active regardless of ontology settings.
+
+        Relations may arrive with pre-resolved graph node IDs (from flow.py's
+        extraction_id_to_graph_id mapping) or with entity names.  Pre-resolved
+        IDs are used directly; unresolved names go through ``ensure_entity_node``.
         """
         if not relations:
             return
 
         # Use SmartGraph API for relationship creation (handles validation/caching)
         graph = self.memory._graph
+
+        # Set of known graph node IDs for quick "already resolved?" checks
+        known_graph_ids = set()
+        entity_ids = context.get('entity_ids') or {}
+        known_graph_ids.update(entity_ids.values())
 
         for relation in relations:
             try:
@@ -97,9 +105,18 @@ class StoragePipeline:
                 # Sanitize relationship type
                 predicate = ingestion_utils.sanitize_relation_type(predicate)
 
-                # Create nodes for subject and object if they don't exist
-                subject_id = self.ensure_entity_node(subject, context)
-                object_id = self.ensure_entity_node(object_node, context)
+                # Resolve IDs: if the value is already a known graph node ID, use
+                # it directly; otherwise treat it as an entity name and ensure the
+                # node exists.
+                if subject in known_graph_ids:
+                    subject_id = subject
+                else:
+                    subject_id = self.ensure_entity_node(subject, context)
+
+                if object_node in known_graph_ids:
+                    object_id = object_node
+                else:
+                    object_id = self.ensure_entity_node(object_node, context)
 
                 # Emit edge creation event
                 self.observer.emit_edge_creation_start(

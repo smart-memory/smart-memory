@@ -289,37 +289,57 @@ class MemoryIngestionFlow:
         entity_ids = self._process_add_result(add_result, entities, item)
         context['entity_ids'] = entity_ids
 
+        # Build extraction-time hash → graph node ID map for relation resolution.
+        # Extractors assign SHA256 hashes as entity item_ids; these differ from the
+        # graph node IDs assigned by add_dual_node. Relations reference the SHA256
+        # hashes, so we need to translate them to real graph IDs.
+        extraction_id_to_graph_id = {}
+        for i, entity in enumerate(entities):
+            if isinstance(entity, MemoryItem) and entity.item_id:
+                ename = entity.metadata.get('name', f'entity_{i}') if entity.metadata else f'entity_{i}'
+                graph_id = entity_ids.get(ename)
+                if graph_id:
+                    extraction_id_to_graph_id[entity.item_id] = graph_id
+        context['extraction_id_to_graph_id'] = extraction_id_to_graph_id
+
         # Stage 4: Relationship processing (delegated to storage pipeline)
-        if relations and len(relations) > 0:
+        # Note: add_dual_node creates semantic edges between entities via the
+        # EntityNodeSpec.relations path. We additionally process relations here
+        # to handle cases where entities were resolved (deduplicated) — the
+        # dual-node path may not cover all edges. MERGE semantics in both paths
+        # prevent duplicate edges.
+        if relations:
             try:
-                # Filter out internal relations already handled by add_dual_node
-                # Internal relations are those where both source and target are in the extracted entities list
-                internal_entity_ids = set()
-                for e in entities:
-                    if isinstance(e, MemoryItem):
-                        if e.item_id: internal_entity_ids.add(e.item_id)
-                    elif isinstance(e, dict):
-                        eid = e.get('item_id') or e.get('id')
-                        if eid: internal_entity_ids.add(eid)
-
-                external_relations = []
+                # Resolve extraction-time SHA256 IDs to actual graph node IDs
+                resolved_relations = []
+                unresolved_count = 0
                 for r in relations:
-                    # Handle various relation formats
-                    src = r.get('source_id') or r.get('subject') or r.get('source')
-                    tgt = r.get('target_id') or r.get('object') or r.get('target')
-                    
-                    # If both src and tgt are in internal_entity_ids, it's internal and already created
-                    if src and tgt and src in internal_entity_ids and tgt in internal_entity_ids:
-                        continue
-                    external_relations.append(r)
+                    src_hash = r.get('source_id')
+                    tgt_hash = r.get('target_id')
+                    src_id = extraction_id_to_graph_id.get(src_hash)
+                    tgt_id = extraction_id_to_graph_id.get(tgt_hash)
 
-                if external_relations:
-                    self.storage_pipeline.process_extracted_relations(context, item.item_id, external_relations)
-                    print(f"✅ Processed {len(external_relations)} external relationships for item: {item.item_id}")
-                
-                if len(relations) > len(external_relations):
-                    print(f"ℹ️  Skipped {len(relations) - len(external_relations)} internal relationships (handled by dual-node creation)")
-                    
+                    if src_id and tgt_id:
+                        resolved_relations.append({
+                            'source_id': src_id,
+                            'target_id': tgt_id,
+                            'relation_type': r.get('relation_type', 'RELATED'),
+                        })
+                    else:
+                        unresolved_count += 1
+                        logger.warning(
+                            f"Could not resolve relation IDs: "
+                            f"src={src_hash} (resolved={src_id}), "
+                            f"tgt={tgt_hash} (resolved={tgt_id})"
+                        )
+
+                if resolved_relations:
+                    self.storage_pipeline.process_extracted_relations(context, item.item_id, resolved_relations)
+                    print(f"✅ Processed {len(resolved_relations)} semantic relationships for item: {item.item_id}")
+
+                if unresolved_count > 0:
+                    logger.warning(f"Skipped {unresolved_count} relations with unresolvable entity IDs")
+
             except Exception as e:
                 print(f"⚠️  Failed to process relationships: {e}")
                 raise
@@ -417,39 +437,29 @@ class MemoryIngestionFlow:
         return list(types)
 
     def _process_add_result(self, add_result, entities, item):
-        """Process the add result and create entity ID mappings."""
+        """Process the add result and create entity ID mappings.
+
+        ``add_result`` is always a dict from ``CRUD.add()`` containing
+        ``memory_node_id`` and ``entity_node_ids``.  Returns a dict mapping
+        entity *name* → graph node ID.
+        """
         entity_ids = {}
 
-        if isinstance(add_result, dict):
-            item_id = add_result.get('memory_node_id')
-            created_entity_ids = add_result.get('entity_node_ids', []) or []
+        item_id = add_result.get('memory_node_id')
+        created_entity_ids = add_result.get('entity_node_ids', []) or []
 
-            for i, entity in enumerate(entities):
-                # Extract name from either MemoryItem or dict
-                if hasattr(entity, 'metadata') and entity.metadata and 'name' in entity.metadata:
-                    entity_name = entity.metadata['name']
-                elif isinstance(entity, dict):
-                    metadata = entity.get('metadata', {})
-                    entity_name = metadata.get('name') or entity.get('name', f'entity_{i}')
-                else:
-                    entity_name = f'entity_{i}'
+        for i, entity in enumerate(entities):
+            # Extract name from either MemoryItem or dict
+            if hasattr(entity, 'metadata') and entity.metadata and 'name' in entity.metadata:
+                entity_name = entity.metadata['name']
+            elif isinstance(entity, dict):
+                metadata = entity.get('metadata', {})
+                entity_name = metadata.get('name') or entity.get('name', f'entity_{i}')
+            else:
+                entity_name = f'entity_{i}'
 
-                real_id = created_entity_ids[i] if i < len(created_entity_ids) else f"{item_id}_entity_{i}"
-                entity_ids[entity_name] = real_id
-        else:
-            # Legacy return (string item_id)
-            item_id = add_result
-            for i, entity in enumerate(entities):
-                # Extract name from either MemoryItem or dict
-                if hasattr(entity, 'metadata') and entity.metadata and 'name' in entity.metadata:
-                    entity_name = entity.metadata['name']
-                elif isinstance(entity, dict):
-                    metadata = entity.get('metadata', {})
-                    entity_name = metadata.get('name') or entity.get('name', f'entity_{i}')
-                else:
-                    entity_name = f'entity_{i}'
-
-                entity_ids[entity_name] = f"{item_id}_entity_{i}"
+            real_id = created_entity_ids[i] if i < len(created_entity_ids) else f"{item_id}_entity_{i}"
+            entity_ids[entity_name] = real_id
 
         item.item_id = item_id
         item.update_status('created', notes='Item ingested')

@@ -107,6 +107,8 @@ class SmartMemory(MemoryBase):
         # SecureSmartMemory creates a per-request instance, satisfying this requirement.
         self._last_token_summary: dict | None = None
         # OL-2/OL-3/OL-4: Ontology pipeline results from the most recent ingest() call.
+        self._last_entities: list = []
+        self._last_relations: list = []
         self._last_ontology_version: str = ""
         self._last_ontology_registry_id: str = ""
         self._last_unresolved_entities: list = []
@@ -242,6 +244,16 @@ class SmartMemory(MemoryBase):
         return self._last_procedure_match
 
     @property
+    def last_entities(self) -> list:
+        """Extracted entities from the most recent ``ingest()`` call."""
+        return self._last_entities
+
+    @property
+    def last_relations(self) -> list:
+        """Extracted relations from the most recent ``ingest()`` call."""
+        return self._last_relations
+
+    @property
     def last_ontology_version(self) -> str:
         """Ontology version from the most recent ``ingest()`` call."""
         return self._last_ontology_version
@@ -371,6 +383,11 @@ class SmartMemory(MemoryBase):
         # Async path: quick persist + queue for background processing
         if not sync:
             normalized_item = self._crud.normalize_item(item)
+            # Apply memory_type from context before storing
+            if context and "memory_type" in context:
+                current_type = getattr(normalized_item, "memory_type", "semantic")
+                if current_type == "semantic":
+                    normalized_item.memory_type = context["memory_type"]
             add_result = self._crud.add(normalized_item)
             if isinstance(add_result, dict):
                 item_id = add_result.get("memory_node_id")
@@ -387,6 +404,13 @@ class SmartMemory(MemoryBase):
             return {"item_id": item_id, "queued": queued}
         # Normalize item using CRUD component (eliminates mixed abstraction)
         normalized_item = self._crud.normalize_item(item)
+
+        # Apply memory_type from context if the item has the default type
+        # (happens when ingest() receives a raw string + context={"memory_type": "decision"})
+        if context and "memory_type" in context:
+            current_type = getattr(normalized_item, "memory_type", "semantic")
+            if current_type == "semantic":
+                normalized_item.memory_type = context["memory_type"]
 
         # Annotate with conversation metadata if provided (non-invasive)
         try:
@@ -505,8 +529,11 @@ class SmartMemory(MemoryBase):
             sync=True,
         )
 
-        # Build metadata dict for the pipeline
+        # Build metadata dict for the pipeline — merge context so memory_type flows through
         meta = dict(normalized_item.metadata or {})
+        if context:
+            for k, v in context.items():
+                meta.setdefault(k, v)
         if conversation_context is not None:
             try:
                 if isinstance(conversation_context, ConversationContext):
@@ -527,6 +554,10 @@ class SmartMemory(MemoryBase):
             self._last_token_summary = state.token_tracker.summary()
         else:
             self._last_token_summary = None
+
+        # Save extraction results for retrieval by service layer (/ingest/full)
+        self._last_entities = list(state.entities or [])
+        self._last_relations = list(state.relations or [])
 
         # Save ontology pipeline results for retrieval by service layer (OL-2/3/4)
         self._last_ontology_version = state.ontology_version
@@ -609,7 +640,8 @@ class SmartMemory(MemoryBase):
                         item.metadata["provenance"].setdefault("source", "working_memory")
                 except Exception as e:
                     logger.warning(f"Failed to set default working memory metadata: {e}")
-                return self._crud.add(item, **kwargs)
+                result = self._crud.add(item, **kwargs)
+                return result['memory_node_id']
             else:
                 # Fallback: in-memory buffer with NO hard max length
                 if not hasattr(self, "_working_buffer"):
@@ -628,12 +660,14 @@ class SmartMemory(MemoryBase):
                 },
             ) as span:
                 result = self._crud.add(item, **kwargs)
-                span.attributes["item_id"] = result
-                return result
+                item_id = result['memory_node_id']
+                span.attributes["item_id"] = item_id
+                return item_id
 
     def _add_impl(self, item, **kwargs) -> str:
         """Implement abstract method from MemoryBase."""
-        return self._crud.add(item, **kwargs)
+        result = self._crud.add(item, **kwargs)
+        return result['memory_node_id']
 
     def _get_impl(self, key: str):
         return self._crud.get(key)

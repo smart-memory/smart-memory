@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Union, Any, Dict, List
 
-from smartmemory.graph.models.node_types import NodeTypeProcessor, MemoryNodeType, EntityNodeType
+from smartmemory.graph.models.node_types import NodeTypeProcessor, EntityNodeType
 from smartmemory.models.memory_item import MemoryItem
 from smartmemory.stores.base import BaseHandler
 from smartmemory.utils import get_config
@@ -59,26 +59,20 @@ class CRUD(BaseHandler):
                 pass
         return item
 
-    def add(self, item: Union[MemoryItem, dict, Any], **kwargs) -> str:
+    def add(self, item: Union[MemoryItem, dict, Any], **kwargs) -> Dict[str, Any]:
         """Add item using dual-node architecture with selective embedding generation.
-        
+
         Behavior:
         - Always create via dual-node path. If no ontology_extraction is provided,
           we still create a memory node (entities=[]).
         - Generate embeddings for memory nodes (semantic, episodic, procedural)
         - Skip embeddings for entity/relation nodes (not searchable content)
-        - When crud.return_full_result is true, returns a dict containing
-          memory_node_id and entity_node_ids; otherwise returns memory_node_id.
+
+        Returns:
+            Dict with 'memory_node_id' (str) and 'entity_node_ids' (List[str]).
         """
         normalized_item = self.normalize_item(item)
         item_id = normalized_item.item_id or kwargs.get("key")
-
-        # Config for optional return shape
-        try:
-            crud_cfg = get_config('crud') or {}
-        except Exception:
-            crud_cfg = {}
-        return_full = False if not isinstance(crud_cfg, dict) else crud_cfg.get('return_full_result', False)
 
         ontology_extraction = kwargs.get('ontology_extraction')
 
@@ -88,7 +82,7 @@ class CRUD(BaseHandler):
             ontology_extraction
         )
         result = self.node_processor.create_dual_node_structure(dual_spec)
-        
+
         # Generate embedding for memory nodes (makes them searchable)
         memory_node_id = result['memory_node_id']
         if self._should_generate_embedding(normalized_item):
@@ -97,11 +91,10 @@ class CRUD(BaseHandler):
             except Exception as e:
                 logger.warning(f"Failed to generate embedding for {memory_node_id}: {e}")
                 # Non-fatal: item is still in graph, searchable via text fallback
-        
-        # Optionally return the full creation result (including entity_node_ids)
-        if return_full and isinstance(result, dict):
-            return result  # type: ignore[return-value]
-        return result['memory_node_id']
+
+        # Always return the full creation result (including entity_node_ids)
+        # so that flow.py can map extraction-time entity IDs to graph node IDs
+        return result
     
     def _should_generate_embedding(self, item: MemoryItem) -> bool:
         """Determine if item needs embedding based on node type and memory type."""
@@ -280,13 +273,9 @@ class CRUD(BaseHandler):
         return True
 
     def search_memory_nodes(self, memory_type: str = None, **filters) -> List[Dict[str, Any]]:
-        """Search memory nodes (dual-node architecture only)."""
+        """Search memory nodes (dual-node architecture only). Supports core and extended types."""
         if memory_type:
-            try:
-                mem_type = MemoryNodeType(memory_type.lower())
-                return self.node_processor.query_memory_nodes(mem_type, **filters)
-            except ValueError:
-                return []
+            return self.node_processor.query_memory_nodes(memory_type.lower(), **filters)
         return self.node_processor.query_memory_nodes(**filters)
 
     # Legacy search removed

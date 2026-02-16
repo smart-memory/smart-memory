@@ -113,32 +113,49 @@ class StoreStage:
         return entity_ids
 
     def _process_relations(self, state, item_id, entities, relations):
-        """Filter and process external relations."""
-        internal_ids = set()
-        for e in entities:
-            if hasattr(e, "item_id") and e.item_id:
-                internal_ids.add(e.item_id)
-            elif isinstance(e, dict):
-                eid = e.get("item_id") or e.get("id")
-                if eid:
-                    internal_ids.add(eid)
+        """Resolve extraction-time entity IDs and create semantic edges.
 
-        external = []
+        Builds a map from extraction-time SHA256 entity hashes to actual graph
+        node IDs, then passes resolved relations to StoragePipeline. MERGE
+        semantics in the graph layer prevent duplicates if add_dual_node already
+        created some of these edges.
+        """
+        entity_ids = state.entity_ids or {}
+
+        # Build extraction hash → graph ID map
+        extraction_id_to_graph_id = {}
+        for i, entity in enumerate(entities):
+            if hasattr(entity, "item_id") and entity.item_id:
+                ename = _entity_name(entity, i)
+                graph_id = entity_ids.get(ename)
+                if graph_id:
+                    extraction_id_to_graph_id[entity.item_id] = graph_id
+
+        # Resolve relation IDs
+        resolved = []
         for r in relations:
-            src = r.get("source_id") or r.get("subject") or r.get("source")
-            tgt = r.get("target_id") or r.get("object") or r.get("target")
-            if src and tgt and src in internal_ids and tgt in internal_ids:
-                continue
-            external.append(r)
+            src_hash = r.get("source_id")
+            tgt_hash = r.get("target_id")
+            src_id = extraction_id_to_graph_id.get(src_hash)
+            tgt_id = extraction_id_to_graph_id.get(tgt_hash)
+            if src_id and tgt_id:
+                resolved.append({
+                    "source_id": src_id,
+                    "target_id": tgt_id,
+                    "relation_type": r.get("relation_type", "RELATED"),
+                })
+            else:
+                logger.warning("Unresolvable relation: src=%s tgt=%s", src_hash, tgt_hash)
 
-        if external:
+        if resolved:
             try:
                 from smartmemory.memory.ingestion.storage import StoragePipeline
                 from smartmemory.memory.ingestion.observer import IngestionObserver
 
                 context = dict(state._context)
+                context["entity_ids"] = entity_ids
                 storage = StoragePipeline(self._memory, IngestionObserver())
-                storage.process_extracted_relations(context, item_id, external)
+                storage.process_extracted_relations(context, item_id, resolved)
             except Exception as e:
                 logger.warning("Failed to process relations: %s", e)
 

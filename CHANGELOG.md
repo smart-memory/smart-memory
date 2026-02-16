@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+#### Semantic Relation Pipeline — 5 Cascading Bug Fix (CORE-REL-1)
+
+- **crud.py:** Always return full dict from `add_dual_node` (entity_node_ids were silently discarded)
+- **falkordb.py:** Create semantic edges for ALL entity pairs, not just both-new-entities; CREATE → MERGE prevents duplicates
+- **flow.py:** Removed internal relation filter that dropped 100% of semantic relations; added SHA256→graph-ID resolution map
+- **store.py (pipeline v2):** Same internal filter bug fix; proper ID resolution via `extraction_id_to_graph_id` map
+- **ontology_constrain.py:** Preserve LLM `item_id` during ruler+LLM entity merge so relation endpoint matching works
+- **smart_memory.py:** Fixed 3 callers of `crud.add()` that expected string return; removed dead `isinstance` defensive branches
+- **Integration tests:** 4 tests covering happy path, all-relations, empty-entities, unresolvable-target edge cases
+
 #### Graph Edge Global Scope Support (CORE-GRAPH-1)
 
 - Added `is_global: bool = False` to `add_edge()` across the full propagation chain (ABC → FalkorDB → SmartGraphEdges → SmartGraph)

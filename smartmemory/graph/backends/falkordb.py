@@ -81,6 +81,16 @@ class FalkorDBBackend(SmartGraphBackend):
         """Execute a raw Cypher query."""
         return self._query(cypher, params)
 
+    def query(self, cypher: str, params: Optional[Dict[str, Any]] = None, **kwargs) -> List[Any]:
+        """Public Cypher query interface.
+
+        Accepts optional ``graph_name`` kwarg for API compatibility with
+        callers like ``OntologyGraph`` that were initialised with a dedicated
+        graph — the kwarg is accepted but ignored because this backend is
+        already bound to its graph at construction time.
+        """
+        return self._query(cypher, params)
+
     def _query(self, cypher: str, params: Optional[Dict[str, Any]] = None):
         """Run a Cypher query and return raw records list."""
         res = self.graph.query(cypher, params or {})
@@ -1051,26 +1061,45 @@ class FalkorDBBackend(SmartGraphBackend):
                         entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}})"
                     queries.append(entity_query)
 
-                    # Create bidirectional relationships
-                    queries.append(f"CREATE (m)-[:CONTAINS_ENTITY]->(e{i})")
-                    queries.append(f"CREATE (e{i})-[:MENTIONED_IN]->(m)")
+                    # Create bidirectional relationships using MATCH to find the
+                    # already-created nodes.  Bare CREATE (m)-[:R]->(e) in a
+                    # standalone query would create *new* anonymous nodes because
+                    # variable bindings don't persist across separate query() calls.
+                    queries.append(
+                        f"MATCH (m:{memory_label} {{item_id: $memory_id}}), "
+                        f"(e {{item_id: $entity_id_{i}}}) "
+                        f"CREATE (m)-[:CONTAINS_ENTITY]->(e)"
+                    )
+                    queries.append(
+                        f"MATCH (e {{item_id: $entity_id_{i}}}), "
+                        f"(m:{memory_label} {{item_id: $memory_id}}) "
+                        f"CREATE (e)-[:MENTIONED_IN]->(m)"
+                    )
 
                 # Store relationships for later (after all entities processed)
                 entity_node["_relationships"] = entity_relationships
                 entity_node["_index"] = i
 
-            # Create semantic relationships between entities (using resolved IDs)
+            # Create semantic relationships between entities (using resolved IDs).
+            # Use MERGE to safely handle both new and resolved (deduplicated) entities —
+            # resolved entities may already have this edge from a prior ingestion.
             for entity_node in entity_nodes:
                 i = entity_node.get("_index", 0)
                 for rel in entity_node.get("_relationships", []):
                     target_idx = rel.get("target_index")
                     rel_type = rel.get("relation_type", "RELATED")
                     if target_idx is not None and target_idx in entity_id_map:
-                        # Only create if both are new entities (resolved entities already have relationships)
-                        source_resolved = any(e["index"] == i and e["resolved"] for e in resolved_entities)
-                        target_resolved = any(e["index"] == target_idx and e["resolved"] for e in resolved_entities)
-                        if not source_resolved and not target_resolved:
-                            queries.append(f"CREATE (e{i})-[:{rel_type}]->(e{target_idx})")
+                        source_eid = entity_id_map[i]
+                        target_eid = entity_id_map[target_idx]
+                        rel_param_src = f"rel_src_{i}_{target_idx}"
+                        rel_param_tgt = f"rel_tgt_{i}_{target_idx}"
+                        params[rel_param_src] = source_eid
+                        params[rel_param_tgt] = target_eid
+                        queries.append(
+                            f"MATCH (a {{item_id: ${rel_param_src}}}), "
+                            f"(b {{item_id: ${rel_param_tgt}}}) "
+                            f"MERGE (a)-[:{rel_type}]->(b)"
+                        )
 
         # Create memory node first with all properties
         # Note: The logic below duplicates the queries list building above.
