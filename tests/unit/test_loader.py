@@ -76,6 +76,16 @@ class TestParseEnvFile:
         result = _parse_env_file(env_file)
         assert result == {"GOOD": "value"}
 
+    def test_inline_comments(self, tmp_path):
+        env_file = tmp_path / "comments.env"
+        env_file.write_text(
+            'PORT=9012           # Redis cache\nHOST=localhost # also a comment\nQUOTED="has # inside"\n'
+        )
+        result = _parse_env_file(env_file)
+        assert result["PORT"] == "9012"
+        assert result["HOST"] == "localhost"
+        assert result["QUOTED"] == "has # inside"  # Quoted values preserve #
+
 
 class TestLoadEnvironment:
     def test_setdefault_semantics(self, tmp_config_dir):

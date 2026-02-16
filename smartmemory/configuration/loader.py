@@ -128,5 +128,8 @@ def _parse_env_file(filepath: Path) -> dict[str, str]:
             # Strip surrounding quotes
             if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
                 value = value[1:-1]
+            elif " #" in value:
+                # Strip inline comments (only for unquoted values)
+                value = value[: value.index(" #")].rstrip()
             result[key] = value
     return result
