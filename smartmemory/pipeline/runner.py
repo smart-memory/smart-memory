@@ -12,6 +12,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from smartmemory.observability.tracing import trace_span
 from smartmemory.pipeline.config import PipelineConfig
 from smartmemory.pipeline.protocol import StageCommand
 from smartmemory.pipeline.state import PipelineState
@@ -51,17 +52,19 @@ class PipelineRunner:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> PipelineState:
         """Execute the full pipeline."""
+        meta = metadata or {}
         tracker = PipelineTokenTracker(
             workspace_id=config.workspace_id,
-            profile_name=metadata.get("profile_name") if metadata else None,
+            profile_name=meta.get("profile_name"),
         )
         state = PipelineState(
             text=text,
-            raw_metadata=metadata or {},
+            raw_metadata=meta,
             mode=config.mode,
             workspace_id=config.workspace_id,
             started_at=datetime.now(timezone.utc),
             token_tracker=tracker,
+            memory_type=meta.get("memory_type") or None,
         )
         return self._run_stages(state, config, self.stages)
 
@@ -73,17 +76,19 @@ class PipelineRunner:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> PipelineState:
         """Execute until (and including) the named stage, then stop."""
+        meta = metadata or {}
         tracker = PipelineTokenTracker(
             workspace_id=config.workspace_id,
-            profile_name=metadata.get("profile_name") if metadata else None,
+            profile_name=meta.get("profile_name"),
         )
         state = PipelineState(
             text=text,
-            raw_metadata=metadata or {},
+            raw_metadata=meta,
             mode=config.mode,
             workspace_id=config.workspace_id,
             started_at=datetime.now(timezone.utc),
             token_tracker=tracker,
+            memory_type=meta.get("memory_type") or None,
         )
         stages = self._stages_up_to(stop_after)
         return self._run_stages(state, config, stages)
@@ -185,9 +190,17 @@ class PipelineRunner:
         last_exc: Optional[Exception] = None
         for attempt in range(max_retries + 1):
             try:
-                t0 = time.perf_counter()
-                new_state = self.transport.execute(stage, state, config)
-                elapsed = (time.perf_counter() - t0) * 1000.0
+                span_attrs = {
+                    "memory_id": getattr(state, "item_id", None) or state.raw_metadata.get("run_id", ""),
+                    "attempt": attempt + 1,
+                }
+                with trace_span(f"pipeline.{stage.name}", span_attrs) as span:
+                    t0 = time.perf_counter()
+                    new_state = self.transport.execute(stage, state, config)
+                    elapsed = (time.perf_counter() - t0) * 1000.0
+                    span.attributes["duration_ms"] = elapsed
+                    span.attributes["entity_count"] = len(getattr(new_state, "entities", []) or [])
+                    span.attributes["relation_count"] = len(getattr(new_state, "relations", []) or [])
 
                 new_state = replace(
                     new_state,

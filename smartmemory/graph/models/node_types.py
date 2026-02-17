@@ -42,7 +42,7 @@ class EntityNodeType(Enum):
 class MemoryNodeSpec:
     """Specification for creating a memory node."""
     item_id: str
-    node_type: MemoryNodeType
+    node_type: str  # Memory type as string — core or extended (e.g. "semantic", "decision")
     properties: Dict[str, Any]
     content: str
     metadata: Dict[str, Any]
@@ -89,7 +89,7 @@ class NodeTypeProcessor:
         result = self.graph.add_dual_node(
             item_id=spec.memory_node.item_id,
             memory_properties=memory_properties,
-            memory_type=spec.memory_node.node_type.value,
+            memory_type=spec.memory_node.node_type,
             entity_nodes=entity_nodes
         )
 
@@ -101,7 +101,7 @@ class NodeTypeProcessor:
         properties.update({
             'content': memory_spec.content,
             'node_category': NodeCategory.MEMORY.value,
-            'memory_type': memory_spec.node_type.value,
+            'memory_type': memory_spec.node_type,
         })
 
         # Merge metadata
@@ -197,7 +197,7 @@ class NodeTypeProcessor:
                 elif isinstance(entity, dict):
                     entity_metadata = entity.get('metadata', {}) or {}
                     entity_name = entity_metadata.get('name') or entity.get('name', f'entity_{i}')
-                    entity_memory_type = entity.get('memory_type')
+                    entity_memory_type = entity.get('memory_type') or entity.get('type') or entity.get('entity_type')
                     entity_id = entity.get('item_id') or entity.get('id')
                 else:
                     # Fallback for other types
@@ -257,33 +257,32 @@ class NodeTypeProcessor:
             entity_nodes=entity_specs
         )
 
-    def _determine_memory_type(self, item: MemoryItem) -> MemoryNodeType:
-        """Determine the memory type for a MemoryItem."""
+    def _determine_memory_type(self, item: MemoryItem) -> str:
+        """Determine the memory type for a MemoryItem.
+
+        Returns the memory type as a plain string for both core types
+        (semantic, episodic, etc.) and extended types (decision, opinion, etc.).
+        """
         # Check item's type field first
-        if hasattr(item, 'type') and item.memory_type:
-            try:
-                return MemoryNodeType(item.memory_type.lower())
-            except ValueError:
-                pass
+        raw_type = getattr(item, "memory_type", None)
+        if raw_type:
+            return raw_type.lower()
 
         # Check metadata
-        if item.metadata and 'memory_type' in item.metadata:
-            try:
-                return MemoryNodeType(item.metadata['memory_type'].lower())
-            except ValueError:
-                pass
+        if item.metadata and "memory_type" in item.metadata:
+            return item.metadata["memory_type"].lower()
 
         # Default to semantic
-        return MemoryNodeType.SEMANTIC
+        return "semantic"
 
-    def query_memory_nodes(self, memory_type: MemoryNodeType = None, **filters) -> List[Dict[str, Any]]:
+    def query_memory_nodes(self, memory_type: str = None, **filters) -> List[Dict[str, Any]]:
         """Query memory nodes with optional filtering using supported backend API (no raw Cypher)."""
         # Build property-based query to preserve encapsulation and avoid label-dependent Cypher
         query: Dict[str, Any] = {
             'node_category': NodeCategory.MEMORY.value,
         }
         if memory_type:
-            query['memory_type'] = memory_type.value
+            query['memory_type'] = memory_type
         if filters:
             query.update(filters)
         try:

@@ -229,9 +229,10 @@ class OntologyConstrainStage:
             normalized = self._normalize_entity(entity, source="llm")
             if name in merged:
                 existing = merged[name]
-                # Keep ruler type, but take higher confidence
+                # Higher confidence wins — including entity_type
                 if normalized.get("confidence", 0) > existing.get("confidence", 0):
                     existing["confidence"] = normalized["confidence"]
+                    existing["entity_type"] = normalized.get("entity_type", existing.get("entity_type", "concept"))
                 # Always preserve the LLM item_id — needed for relation ID resolution
                 if normalized.get("item_id") and not existing.get("item_id"):
                     existing["item_id"] = normalized["item_id"]

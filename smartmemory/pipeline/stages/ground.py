@@ -59,16 +59,22 @@ class GroundStage:
             # Update entity item_ids from stored mapping
             entity_ids = state.entity_ids
             for entity in entities:
-                if hasattr(entity, "metadata") and entity.metadata:
+                ename = None
+                if isinstance(entity, dict):
+                    ename = entity.get("name") or (entity.get("metadata") or {}).get("name")
+                elif hasattr(entity, "metadata") and entity.metadata:
                     ename = entity.metadata.get("name")
-                    if ename and ename in entity_ids:
+                if ename and ename in entity_ids:
+                    if isinstance(entity, dict):
+                        entity["item_id"] = entity_ids[ename]
+                    else:
                         entity.item_id = entity_ids[ename]
 
             grounder = WikipediaGrounder()
 
             # Count entities before grounding to detect graph-gated skips
             entity_count = len(
-                [e for e in entities if hasattr(e, "metadata") and e.metadata and e.metadata.get("name")]
+                [e for e in entities if (isinstance(e, dict) and e.get("name")) or (hasattr(e, "metadata") and e.metadata and e.metadata.get("name"))]
             )
 
             provenance = grounder.ground(item, entities, self._memory._graph)
@@ -88,14 +94,15 @@ class GroundStage:
                         reason="graph_lookup",
                     )
 
-            # Create GROUNDED_IN edges
-            if provenance:
-                context = {
-                    "provenance_candidates": provenance,
-                    "entity_ids": entity_ids,
-                    "item": item,
-                }
-                self._memory._grounding.ground(context)
+            # Create GROUNDED_IN edges from memory item to Wikipedia nodes
+            if provenance and state.item_id:
+                for wiki_id in provenance:
+                    try:
+                        self._memory._graph.add_edge(
+                            state.item_id, wiki_id, edge_type="GROUNDED_IN", properties={}, is_global=True,
+                        )
+                    except Exception as e:
+                        logger.debug("Failed to create memory→Wikipedia edge: %s", e)
 
             ctx = dict(state._context)
             ctx["provenance_candidates"] = provenance or []

@@ -21,8 +21,8 @@ from typing import Any, Dict, Optional, Iterator, List
 
 from smartmemory.utils import get_config, now
 
-# Feature toggle: observability disabled by default in core library
-_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "false").lower() in ("true", "1", "yes", "on")
+# Feature toggle: observability enabled by default. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
 
 # Defaults for observability stream
 STREAM_NAME = "smartmemory:events"
@@ -214,19 +214,25 @@ def emit_event(
 ) -> None:
     """Functional helper to emit a single event without managing an EventSpooler instance.
 
-    Note: Does not support CORE-OBS-2 trace field kwargs (name, trace_id, span_id,
-    parent_span_id, duration_ms). For span emission, use EventSpooler.emit_event() directly
-    or trace_span() from smartmemory.observability.tracing.
+    Auto-attaches the current trace_id from the active span context (if any)
+    so that all events emitted within a pipeline trace are groupable.
     """
     if not _OBSERVABILITY_ENABLED:
         return
-    EventSpooler(
+    # Import here to avoid circular dependency (tracing imports events)
+    from smartmemory.observability.tracing import current_trace_id
+
+    spooler = EventSpooler(
         redis_host=redis_host,
         redis_port=redis_port,
         session_id=session_id,
         stream_name=stream_name,
         db=db,
-    ).emit_event(event_type, component, operation, data, metadata)
+    )
+    spooler.emit_event(
+        event_type, component, operation, data, metadata,
+        trace_id=current_trace_id(),
+    )
 
 
 class EventStream:

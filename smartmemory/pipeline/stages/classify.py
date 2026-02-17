@@ -42,10 +42,19 @@ class ClassifyStage:
 
         types = self._flow.classify_item(item, legacy_conf)
 
+        # Determine memory_type for storage.  classified_types is a routing set
+        # (e.g. ["semantic", "zettel"]) — "zettel" is a universal processing route,
+        # not a meaningful storage label, so exclude it when picking memory_type.
+        if state.memory_type:
+            mt = state.memory_type
+        else:
+            non_zettel = [t for t in types if t != "zettel"]
+            mt = non_zettel[0] if non_zettel else (types[0] if types else "semantic")
+
         return replace(
             state,
             classified_types=types,
-            memory_type=state.memory_type or (types[0] if types else "semantic"),
+            memory_type=mt,
         )
 
     def undo(self, state: PipelineState) -> PipelineState:

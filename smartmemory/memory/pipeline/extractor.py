@@ -271,9 +271,10 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                     converted_entities.append(ent)
                 elif isinstance(ent, dict):
                     entity_content = ent.get('name', ent.get('text', f'entity_{i}'))
-                    entity_type = ent.get('type', ent.get('label', 'entity'))
+                    entity_type = ent.get('type', ent.get('entity_type', ent.get('label', 'entity')))
                     metadata = {
                         'name': ent.get('name', entity_content),
+                        'entity_type': entity_type,
                         'confidence': ent.get('confidence', 1.0),
                         'source': 'legacy_extractor'
                     }
@@ -383,6 +384,7 @@ class ExtractorPipeline(PipelineComponent[ExtractionConfig]):
                 entity_type = ent.get('type', ent.get('entity_type', 'entity'))
                 metadata = {
                     'name': ent.get('name', entity_content),
+                    'entity_type': entity_type,
                     'confidence': ent.get('confidence', 1.0),
                     'source': 'chunked_extraction'
                 }

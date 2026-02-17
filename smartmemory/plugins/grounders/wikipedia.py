@@ -54,14 +54,17 @@ class WikipediaGrounder(GrounderPlugin):
         provenance_candidates = []
 
         try:
-            entity_map: dict = {}  # Map entity name -> MemoryItem
+            entity_map: dict = {}  # Map entity name -> MemoryItem or dict
             needs_lookup: list[str] = []  # Entity names not yet grounded
 
             for entity in entities:
-                if hasattr(entity, "metadata") and entity.metadata:
+                name = None
+                if isinstance(entity, dict):
+                    name = entity.get("name") or (entity.get("metadata") or {}).get("name")
+                elif hasattr(entity, "metadata") and entity.metadata:
                     name = entity.metadata.get("name")
-                    if name:
-                        entity_map[name] = entity
+                if name:
+                    entity_map[name] = entity
 
             if not entity_map:
                 return []
@@ -113,7 +116,12 @@ class WikipediaGrounder(GrounderPlugin):
     @staticmethod
     def _ensure_edge(graph, entity_item, wiki_id: str) -> None:
         """Create GROUNDED_IN edge from entity to Wikipedia node if possible."""
-        if entity_item and hasattr(entity_item, "item_id") and entity_item.item_id:
-            graph.add_edge(entity_item.item_id, wiki_id, edge_type="GROUNDED_IN", properties={}, is_global=True)
+        eid = None
+        if isinstance(entity_item, dict):
+            eid = entity_item.get("item_id")
+        elif entity_item and hasattr(entity_item, "item_id"):
+            eid = entity_item.item_id
+        if eid:
+            graph.add_edge(eid, wiki_id, edge_type="GROUNDED_IN", properties={}, is_global=True)
         else:
             logger.warning("No entity item_id for Wikipedia node %s, skipping edge", wiki_id)

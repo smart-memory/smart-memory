@@ -93,10 +93,11 @@ class StorageEngine(PipelineComponent[StorageConfig]):
             ontology_entities = []
             for entity in entities:
                 if isinstance(entity, MemoryItem):
+                    entity_type_val = entity.memory_type
                     ontology_entities.append({
                         'id': getattr(entity, 'item_id', ''),
                         'name': entity.metadata.get('name', entity.content),
-                        'type': entity.memory_type,
+                        'type': entity_type_val,
                         'content': entity.content,
                         'metadata': entity.metadata
                     })

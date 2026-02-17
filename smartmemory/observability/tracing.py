@@ -27,8 +27,9 @@ class SpanContext:
 
 _current_span: ContextVar[Optional[SpanContext]] = ContextVar("_current_span", default=None)
 
-# Evaluate once at module load (env var doesn't change at runtime)
-_ENABLED = os.environ.get("SMARTMEMORY_OBSERVABILITY", "false").strip().lower() not in (
+# Evaluate once at module load (env var doesn't change at runtime).
+# Default: enabled. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+_ENABLED = os.environ.get("SMARTMEMORY_OBSERVABILITY", "true").strip().lower() not in (
     "false",
     "0",
     "no",

@@ -89,7 +89,7 @@ with trace_span("pipeline.classify", {"memory_type": "semantic"}):
 - Spans nest automatically via Python contextvars
 - OTel-compatible fields: `trace_id`, `span_id`, `parent_span_id`
 - Events emitted to Redis Stream `smartmemory:events` on span close
-- Disabled via `SMARTMEMORY_OBSERVABILITY=false` (default)
+- Enabled by default; disable via `SMARTMEMORY_OBSERVABILITY=false`
 - **Deprecated:** `emit_ctx()`, `make_emitter()`, `emit_after()` — use `trace_span()` instead
 
 ### Key Directories

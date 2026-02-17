@@ -109,8 +109,29 @@ class LLMExtractStage:
         # don't record anything rather than producing a false "cache_hit".
 
     def _create_extractor(self, llm_cfg):
-        """Build an LLMSingleExtractor from config."""
+        """Build an LLMSingleExtractor from config.
+
+        When no model is explicitly configured and ``GROQ_API_KEY`` is set,
+        automatically uses the higher-quality GroqExtractor (Llama-3.3-70b,
+        97.7% E-F1 at 878ms) instead of defaulting to gpt-4o-mini.
+        """
+        import os
+
         from smartmemory.plugins.extractors.llm_single import LLMSingleExtractor, LLMSingleExtractorConfig
+
+        # Auto-detect Groq when no model explicitly configured
+        if not llm_cfg.model and os.getenv("GROQ_API_KEY"):
+            try:
+                from smartmemory.plugins.extractors.llm_single import GroqExtractor
+
+                extractor = GroqExtractor()
+                if llm_cfg.temperature is not None:
+                    extractor.cfg.temperature = llm_cfg.temperature
+                if llm_cfg.max_tokens is not None:
+                    extractor.cfg.max_tokens = llm_cfg.max_tokens
+                return extractor
+            except Exception:
+                logger.debug("GroqExtractor init failed, falling back to default")
 
         ext_config = LLMSingleExtractorConfig()
         if llm_cfg.model:

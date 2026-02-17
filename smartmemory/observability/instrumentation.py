@@ -19,8 +19,8 @@ import os
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-# Feature toggle: observability disabled by default in core library
-_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "false").lower() in ("true", "1", "yes", "on")
+# Feature toggle: observability enabled by default. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
 
 # ---- Global context -------------------------------------------------------
 

@@ -45,6 +45,11 @@ TYPE_NORMALIZATION = {
     'product': 'product',
     'technology': 'technology',
     'tech': 'technology',
+    'nationality': 'nationality',
+    'language': 'language',
+    'award': 'award',
+    'work_of_art': 'work_of_art',
+    'temporal': 'temporal',
 }
 
 
