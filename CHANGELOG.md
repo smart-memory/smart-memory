@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Enricher & Evolver Event Emission for Live Graph Viewer (CORE-OBS-3)
+
+- **smartgraph.py:** `add_node()`, `add_edge()`, `add_nodes_bulk()`, `add_edges_bulk()`, and `remove_node()` now emit `graph_mutation` events to the Redis Stream. Enrichers and evolvers that create graph mutations are now visible in the Graph Viewer's live operations feed in real-time.
+- **evolve.py (service):** Evolution trigger, dream phase, opinion synthesis, observation synthesis, and opinion reinforcement routes now emit `emit_graph_event()` after successful operations.
+- **Tests:** 10 unit tests verify event emission, failure resilience, and no double-emission from `add_dual_node`.
+
 ### Changed
 
 #### Auth Model Simplification — Teams+Users Only (SVC-6)

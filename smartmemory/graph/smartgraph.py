@@ -146,6 +146,15 @@ class SmartGraph:
             "content": properties.get("content", "")[:200] if properties else "",
         }):
             result = self.nodes.add_node(item_id, properties, valid_time, transaction_time, memory_type, is_global)
+        try:
+            emit_event("graph_mutation", "graph", "add_node", {
+                "memory_id": result.get("item_id") if isinstance(result, dict) else item_id,
+                "memory_type": memory_type or (properties.get("memory_type", "") if properties else ""),
+                "label": (properties.get("title", properties.get("content", ""))[:40] if properties else ""),
+                "content": (properties.get("content", "")[:200] if properties else ""),
+            })
+        except Exception:
+            pass
         return result
 
     def add_dual_node(
@@ -305,6 +314,14 @@ class SmartGraph:
                 memory_type,
                 is_global=is_global,
             )
+        try:
+            emit_event("graph_mutation", "graph", "add_edge", {
+                "source_id": source_id,
+                "target_id": target_id,
+                "edge_type": edge_type,
+            })
+        except Exception:
+            pass
         return result
 
     def add_nodes_bulk(self, nodes: List[Dict[str, Any]], batch_size: int = 500, is_global: bool = False) -> int:
@@ -323,6 +340,10 @@ class SmartGraph:
         with trace_span("graph.add_nodes_bulk", {"node_count": len(nodes)}):
             count = self.backend.add_nodes_bulk(nodes, batch_size=batch_size, is_global=is_global)
         self.nodes.clear_cache()
+        try:
+            emit_event("graph_mutation", "graph", "add_nodes_bulk", {"count": count})
+        except Exception:
+            pass
         return count
 
     def add_edges_bulk(
@@ -346,6 +367,10 @@ class SmartGraph:
         with trace_span("graph.add_edges_bulk", {"edge_count": len(edges)}):
             count = self.backend.add_edges_bulk(edges, batch_size=batch_size, is_global=is_global)
         self.edges.clear_cache()
+        try:
+            emit_event("graph_mutation", "graph", "add_edges_bulk", {"count": count})
+        except Exception:
+            pass
         return count
 
     def get_scope_filters(self) -> Dict[str, Any]:
@@ -449,6 +474,10 @@ class SmartGraph:
         """Remove a node from the graph."""
         with trace_span("graph.delete_node", {"memory_id": item_id}):
             result = self.nodes.remove_node(item_id)
+        try:
+            emit_event("graph_mutation", "graph", "delete_node", {"memory_id": item_id})
+        except Exception:
+            pass
         return result
 
     def remove_edge(self, source_id: str, target_id: str, edge_type: Optional[str] = None):
