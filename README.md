@@ -5,7 +5,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**[Read the docs](https://docs.smartmemory.ai/smartmemory/intro)**
+**[Read the docs](https://docs.smartmemory.ai/smartmemory/intro)** | **[Maya sample app](https://docs.smartmemory.ai/maya)**
 
 SmartMemory is a comprehensive AI memory system that provides persistent, multi-layered memory storage and retrieval for AI applications. It combines graph databases, vector stores, and intelligent processing pipelines to create a unified memory architecture.
 
