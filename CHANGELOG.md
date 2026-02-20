@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### SSO Migration — Clerk-Based IdP, Legacy Auth Routes Removed (PLAT-SSO-IDP-1)
+
+- **smart-memory-service:** Removed `/auth/login`, `/auth/signup`, `/auth/google/*`, `/auth/password-reset/*` routes. Canonical auth surface is now: `/auth/clerk/session`, `/auth/onboarding/{start,complete,retry}`, `/auth/me`, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`.
+- **smart-memory-common:** Added `ClerkSSOService` adapter; OIDC callback wired to `OnboardingService` (Clerk-backed). `sso_subject` field added to `UserModel` for IdP identity linking. JIT provisioning on first Clerk login.
+- **All apps (web, studio, insights, maya, admin, viewer):** Switched from email/password login forms to Clerk-hosted IdP. Auth state bootstrapped via `GET /auth/me` (cookie-based, `credentials: 'include'`). Token-URL-param cross-app bridge (`VITE_LEGACY_CROSS_APP_TOKEN_REDIRECT`) deleted.
+- **smart-memory-sdk-js:** All frontends switched to `mode: 'sso'`. Removed `endpoints.login`, `AuthCore.login()`, `AuthCore.signup()`. Session bootstrapped via `bootstrapSession()` → `/auth/me` on mount.
+- **E2E fixtures:** Replaced localStorage injection with `context.addCookies()` per-app origin. `SM_E2E_TOKEN` + `SM_E2E_TEAM_ID` env vars replace HTTP signup provisioning.
+- **Tests:** Rewrote `test_auth.py` (service integration), 8 SDK JS test files, `test_client_full_coverage.py`, and all 6 per-app auth E2E specs for SSO mode.
+
 ### Added
 
 #### Enricher & Evolver Event Emission for Live Graph Viewer (CORE-OBS-3)
