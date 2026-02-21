@@ -21,14 +21,22 @@ class SmartGraph:
     """
 
     def __init__(
-        self, item_cls=None, enable_caching=True, cache_size=1000, scope_provider: Optional[ScopeProvider] = None
+        self,
+        item_cls=None,
+        enable_caching=True,
+        cache_size=1000,
+        scope_provider: Optional[ScopeProvider] = None,
+        backend=None,
     ):
         if item_cls is None:
             item_cls = MemoryItem
         self.item_cls = item_cls
-        backend_cls = self._get_backend_class()
-        # Inject scope provider into backend
-        self.backend = backend_cls(scope_provider=scope_provider)
+        if backend is not None:
+            self.backend = backend
+        else:
+            backend_cls = self._get_backend_class()
+            # Inject scope provider into backend
+            self.backend = backend_cls(scope_provider=scope_provider)
 
         # Initialize submodules
         self.nodes = SmartGraphNodes(self.backend, item_cls, enable_caching, cache_size)
@@ -51,7 +59,7 @@ class SmartGraph:
         backend_modules = {
             "FalkorDBBackend": "smartmemory.graph.backends.falkordb",
             "Neo4jBackend": "smartmemory.graph.backends.neo4j",
-            # Add other backends as needed
+            "SQLiteBackend": "smartmemory.graph.backends.sqlite",
         }
 
         module_path = backend_modules.get(backend_class_name)

@@ -10,6 +10,9 @@ from smartmemory.interfaces import ScopeProvider
 from smartmemory.scope_provider import DefaultScopeProvider
 
 
+_DEFAULT_BACKEND = None
+
+
 class VectorStore:
     """
     Backend-agnostic vector store for semantic memory.
@@ -30,6 +33,16 @@ class VectorStore:
     """
 
     # trace_span replaces the old VEC_EMIT = make_emitter(...) pattern
+
+    @classmethod
+    def set_default_backend(cls, backend) -> None:
+        """Override the backend for all new VectorStore instances.
+
+        Pass None to restore normal backend resolution from config.
+        Intended for testing (DIST-LITE-1 P0-4) — not for production use.
+        """
+        global _DEFAULT_BACKEND
+        _DEFAULT_BACKEND = backend
 
     def _vec_data(
         self,
@@ -81,6 +94,12 @@ class VectorStore:
     def __init__(self, collection_name=None, persist_directory=None, scope_provider: Optional[ScopeProvider] = None):
         """Construct a VectorStore that delegates to a configured backend."""
         self.scope_provider = scope_provider or DefaultScopeProvider()
+
+        if _DEFAULT_BACKEND is not None:
+            self._backend = _DEFAULT_BACKEND
+            self._collection_name = collection_name or "default"
+            self.collection = self._backend
+            return  # skip all normal resolution
 
         vector_cfg = get_config("vector") or {}
         full_cfg = get_config()

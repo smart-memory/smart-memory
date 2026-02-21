@@ -12,7 +12,25 @@ SmartMemory is a comprehensive AI memory system that provides persistent, multi-
 ## 🚀 Quick Install
 
 ```bash
-pip install smartmemory
+pip install smartmemory          # Full platform (requires Docker — FalkorDB + Redis)
+pip install smartmemory-lite     # Zero-infra local mode (SQLite + usearch, no Docker)
+```
+
+### SmartMemory Lite — No Docker Required
+
+```python
+from smartmemory_lite import create_lite_memory
+
+memory = create_lite_memory()          # defaults to ~/.smartmemory/
+item_id = memory.ingest("Alice leads Project Atlas")
+results = memory.search("who leads Atlas", top_k=5)
+```
+
+Or via CLI:
+```bash
+smartmemory-lite add "Alice leads Project Atlas"
+smartmemory-lite search "who leads Atlas"
+smartmemory-lite mcp   # Start MCP stdio server for Claude Desktop / Claude Code
 ```
 
 ## Architecture Overview

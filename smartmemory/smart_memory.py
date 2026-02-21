@@ -29,6 +29,7 @@ from smartmemory.managers.evolution import EvolutionManager
 from smartmemory.managers.monitoring import MonitoringManager
 from smartmemory.procedure_matcher import ProcedureMatcher
 from smartmemory.drift_detector import DriftDetector, DriftDetectorConfig
+from smartmemory.graph.ontology_graph import OntologyGraph
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,11 @@ class SmartMemory(MemoryBase):
         external_resolver: Optional["ExternalResolver"] = None,
         version_tracker: Optional["VersionTracker"] = None,
         temporal: Optional["TemporalQueries"] = None,
+        enable_ontology: bool = True,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        self._enable_ontology = enable_ontology
 
         # Use DefaultScopeProvider if none provided (for OSS usage)
         # Service layer should always provide a secure ScopeProvider
@@ -152,7 +155,6 @@ class SmartMemory(MemoryBase):
         from smartmemory.pipeline.stages.evolve import EvolveStage
         from smartmemory.memory.ingestion.enrichment import EnrichmentPipeline
         from smartmemory.memory.ingestion.observer import IngestionObserver
-        from smartmemory.graph.ontology_graph import OntologyGraph
 
         # Reuse the existing ingestion flow for classify (it has the logic)
         if self._ingestion_flow is None:
@@ -162,51 +164,65 @@ class SmartMemory(MemoryBase):
         observer = IngestionObserver()
         enrichment_pipeline = EnrichmentPipeline(self, self._enrichment, observer)
 
-        # Build ontology graph for constraint stage
+        # Resolve workspace_id for ontology and metrics
         workspace_id = "default"
         try:
             scope = self.scope_provider.get_scope()
             workspace_id = getattr(scope, "workspace_id", None) or "default"
         except Exception:
             pass
-        ontology_graph = OntologyGraph(workspace_id=workspace_id)
 
-        # OL-2/OL-3: OntologyRegistry for version tracking and constraint validation
-        from smartmemory.ontology.registry import OntologyRegistry
+        # Ontology block: OntologyGraph, registry, pattern manager, entity pair cache, promotion queue.
+        # Skipped entirely when enable_ontology=False (DIST-LITE-1 prerequisite P0-2).
+        ontology_constrain_stage = None
+        pattern_manager = None
+        if self._enable_ontology:
+            ontology_graph = OntologyGraph(workspace_id=workspace_id)
 
-        ontology_registry = None
-        ontology_snapshot = None
-        try:
-            ontology_registry = OntologyRegistry(config=None, scope_provider=self.scope_provider)
-        except Exception:
-            pass
-        if ontology_registry:
+            # OL-2/OL-3: OntologyRegistry for version tracking and constraint validation
+            from smartmemory.ontology.registry import OntologyRegistry
+
+            ontology_registry = None
+            ontology_snapshot = None
             try:
-                snap = ontology_registry.get_snapshot("default")
-                from smartmemory.ontology.models import Ontology
+                ontology_registry = OntologyRegistry(config=None, scope_provider=self.scope_provider)
+            except Exception:
+                pass
+            if ontology_registry:
+                try:
+                    snap = ontology_registry.get_snapshot("default")
+                    from smartmemory.ontology.models import Ontology
 
-                ontology_snapshot = Ontology.from_dict(snap.get("snapshot", {}))
+                    ontology_snapshot = Ontology.from_dict(snap.get("snapshot", {}))
+                except Exception:
+                    pass
+
+            # Phase 4: PatternManager for learned entity pattern dictionary scan
+            from smartmemory.ontology.pattern_manager import PatternManager
+
+            pattern_manager = PatternManager(ontology_graph, workspace_id=workspace_id)
+
+            # Phase 4: EntityPairCache for relation caching
+            from smartmemory.ontology.entity_pair_cache import EntityPairCache
+
+            entity_pair_cache = EntityPairCache()
+
+            # Phase 4: Promotion queue (optional — requires Redis)
+            promotion_queue = None
+            try:
+                from smartmemory.observability.events import RedisStreamQueue
+
+                promotion_queue = RedisStreamQueue.for_promote()
             except Exception:
                 pass
 
-        # Phase 4: PatternManager for learned entity pattern dictionary scan
-        from smartmemory.ontology.pattern_manager import PatternManager
-
-        pattern_manager = PatternManager(ontology_graph, workspace_id=workspace_id)
-
-        # Phase 4: EntityPairCache for relation caching
-        from smartmemory.ontology.entity_pair_cache import EntityPairCache
-
-        entity_pair_cache = EntityPairCache()
-
-        # Phase 4: Promotion queue (optional — requires Redis)
-        promotion_queue = None
-        try:
-            from smartmemory.observability.events import RedisStreamQueue
-
-            promotion_queue = RedisStreamQueue.for_promote()
-        except Exception:
-            pass
+            ontology_constrain_stage = OntologyConstrainStage(
+                ontology_graph,
+                promotion_queue=promotion_queue,
+                entity_pair_cache=entity_pair_cache,
+                ontology_registry=ontology_registry,
+                ontology_model=ontology_snapshot,
+            )
 
         stages = [
             ClassifyStage(self._ingestion_flow),
@@ -214,13 +230,10 @@ class SmartMemory(MemoryBase):
             SimplifyStage(),
             EntityRulerStage(pattern_manager=pattern_manager),
             LLMExtractStage(),
-            OntologyConstrainStage(
-                ontology_graph,
-                promotion_queue=promotion_queue,
-                entity_pair_cache=entity_pair_cache,
-                ontology_registry=ontology_registry,
-                ontology_model=ontology_snapshot,
-            ),
+        ]
+        if ontology_constrain_stage is not None:
+            stages.append(ontology_constrain_stage)
+        stages += [
             StoreStage(self),
             LinkStage(self._linking),
             EnrichStage(enrichment_pipeline),

@@ -98,8 +98,10 @@ class TestGroundStage:
         with self._patch_ground_imports(grounder_mock=mock_grounder_cls):
             result = stage.execute(state, config)
 
+        # GroundStage instantiates WikipediaGrounder directly — it does not delegate
+        # through memory._grounding. Asserting on memory._grounding.ground would be
+        # an implementation-detail check, not a behavioral one. Assert behavior only.
         assert result._context["provenance_candidates"] == provenance_data
-        memory._grounding.ground.assert_called_once()
 
     def test_ground_handles_exception(self):
         """When grounding raises an exception, the original state is returned."""

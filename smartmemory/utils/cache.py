@@ -9,6 +9,7 @@ entity extraction, and similarity calculations.
 import hashlib
 import json
 import logging
+import os
 import pickle
 import redis
 from typing import Any, Dict, List, Optional, Union
@@ -227,6 +228,16 @@ class RedisCache:
         return self.set('similarity', similarity_key, score)
 
 
+class NoOpCache:
+    """No-op cache implementation for zero-infra environments (e.g. SmartMemory Lite).
+
+    Uses __getattr__ to silently absorb any method call and return None.
+    """
+
+    def __getattr__(self, name: str):
+        return lambda *args, **kwargs: None
+
+
 # Global cache instance
 _global_cache: Optional[RedisCache] = None
 
@@ -234,6 +245,8 @@ _global_cache: Optional[RedisCache] = None
 def get_cache() -> RedisCache:
     """Get the global Redis cache instance."""
     global _global_cache
+    if os.environ.get("SMARTMEMORY_CACHE_DISABLED", "").lower() in ("true", "1", "yes"):
+        return NoOpCache()  # type: ignore[return-value]
     if _global_cache is None:
         _global_cache = RedisCache()
     return _global_cache

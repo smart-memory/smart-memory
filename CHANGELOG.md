@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### SmartMemory Lite — Zero-Infrastructure Local Memory (DIST-LITE-1)
+
+- **`smartmemory-lite` package (new):** `pip install smartmemory-lite` provides the full SmartMemory pipeline (classify → extract → store → embed → search) backed by SQLite + usearch. No Docker, FalkorDB, Redis, or MongoDB required.
+- **`SQLiteBackend`** (`smartmemory/graph/backends/sqlite.py`): `SmartGraphBackend` implementation using stdlib `sqlite3`. Adjacency-list model, WAL mode, cascading FK deletes, thread-safe via `threading.Lock`. Full serialize/deserialize for backup/restore. Two-phase `deserialize()` prevents FK violations from rolling back node restores.
+- **`UsearchVectorBackend`** (`smartmemory/stores/vector/backends/usearch.py`): ANN search via `usearch.Index` (cosine similarity) + FTS5 full-text search via SQLite. Persists integer key ↔ item_id maps and metadata to a companion JSON file. Reconstructs index from disk on process restart.
+- **`SmartGraph(backend=x)` injection** (`smartmemory/graph/smartgraph.py`): New `backend` parameter bypasses `_get_backend_class()` entirely, allowing any `SmartGraphBackend` implementation to be injected without config changes.
+- **`SmartMemory(enable_ontology=False)`** (`smartmemory/smart_memory.py`): New flag that skips `OntologyGraph` initialization and replaces `OntologyConstrainStage` with a no-op, preventing FalkorDB connections in Lite mode.
+- **`VectorStore.set_default_backend()`** (`smartmemory/stores/vector/vector_store.py`): Class-level backend override. All `VectorStore()` constructions in the process use the injected backend until reset.
+- **`NoOpCache`** (`smartmemory/utils/cache.py`): Cache implementation that silently discards all ops. Activated via `SMARTMEMORY_CACHE_DISABLED=true` env var.
+- **Non-fatal vector registry** (`smartmemory/stores/vector/backends/base.py`): `_ensure_registry()` no longer raises on `ImportError` for missing backends (e.g. `falkordb` not installed). Logs warning, returns empty registry.
+- **`smartmemory-lite` CLI** (`smartmemory_lite/cli.py`): `smartmemory-lite add`, `search`, `rebuild`, `watch`, `mcp` commands. `watch` ingests markdown files from a vault directory via `watchdog`.
+- **`smartmemory-lite` MCP server** (`smartmemory_lite/mcp_server.py`): JSON-RPC stdio handler (`LiteMCPHandler`) with `ingest`, `add`, `search`, `get`, `delete` methods. Compatible with Claude Desktop and Claude Code MCP configuration.
+- **`smartmemory-lite` markdown writer** (`smartmemory_lite/markdown_writer.py`): Writes `MemoryItem` objects to markdown files with YAML frontmatter (item_id, memory_type, created_at, entities, relations).
+- **166 new tests:** 42 SQLiteBackend + 24 coverage, 6 UsearchVectorBackend + 17 coverage, 3 integration (golden flow, no-network ingest, no-network MCP), 10 factory coverage, 5 prerequisite unit test files (P0-1 through P0-5), 14 markdown writer, 17 MCP server, 28 post-release bug-fix regression tests.
+
+### Fixed
+
+#### SmartMemory Lite — Post-Release Bug Fixes (DIST-LITE-1)
+
+- **FTS cross-collection isolation** (`UsearchVectorBackend`): FTS5 virtual table was shared across all collections sharing the same `fts.db` file. Each collection now owns a dedicated virtual table `fts_{sanitized_collection_name}`. `search_by_text()` and `clear()` are now scoped to their collection; clearing one collection no longer wipes another's text index.
+- **`search_nodes()` generic property filter** (`SQLiteBackend`): Query keys not in the explicit `if` block were silently ignored, returning all nodes regardless of filter. All keys now route to an appropriate SQL clause — top-level columns (`memory_type`, `valid_from`, etc.) via direct equality, `content` via `LIKE`, and all other keys via `json_extract(properties, ?) = ?` (SQL-injection safe parameterized path). Matches FalkorDB equality-filter semantics.
+- **Edge temporal fields data loss** (`SQLiteBackend`): `edges` table had no `valid_from`, `valid_to`, `created_at` columns. `add_edge()` silently discarded those arguments. Schema updated; `_create_tables()` now runs `ALTER TABLE ... ADD COLUMN` migrations for existing databases. `add_edge()`, `serialize()`, and `deserialize()` all updated to persist and restore temporal fields.
+- **`get_neighbors()` outgoing-only divergence** (`SQLiteBackend`): Returned only outgoing neighbors (`WHERE source_id=?`), while FalkorDB uses undirected `MATCH (n)-[r]-(m)`. Fixed via `UNION` of both edge legs: outgoing (`source_id=?`) and incoming (`target_id=?`). Now matches FalkorDB bidirectional semantics.
+- **`scope_provider` silent isolation gap** (`SQLiteBackend`): Constructor accepted `scope_provider` but never stored or applied it, silently allowing misuse in multi-tenant contexts. Now raises `ValueError` immediately when non-None — hard refusal so the contract violation is impossible to miss.
+- **`rebuild` graph mutation** (`smartmemory-lite` CLI): `rebuild` called `memory.add(MemoryItem(...))` which routes through CRUD graph writes, dropping all metadata not explicitly preserved in the `MemoryItem` constructor (labels, source, custom fields). Rewritten to bypass the graph entirely: `create_embeddings(content)` → `VectorStore().upsert(item_id=..., embedding=..., metadata=properties)` where `properties` is the full serialized node properties dict.
+- **Backend registry catches too-broad exceptions** (`VectorStore` registry): `except (ImportError, Exception)` narrowed to `except ImportError`. Real backend code bugs (syntax errors, broken imports) now propagate instead of being silently logged as "backend unavailable."
+- **`GroundStage` test implementation-detail assertion** (`pipeline_v2/stages/test_ground.py`): `memory._grounding.ground.assert_called_once()` tested mechanism rather than behavior. `GroundStage` uses `WikipediaGrounder` directly and never calls `memory._grounding`. Assertion removed; behavioral assertion (`provenance_candidates` stored in `_context`) is sufficient and passes.
+
 ### Changed
 
 #### SSO Migration — Clerk-Based IdP, Legacy Auth Routes Removed (PLAT-SSO-IDP-1)

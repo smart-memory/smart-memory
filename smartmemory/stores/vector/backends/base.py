@@ -1,5 +1,8 @@
+import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Type, Optional, Union
+from typing import Dict, List, Optional, Type
+
+logger = logging.getLogger(__name__)
 
 
 class VectorBackend(ABC):
@@ -39,12 +42,20 @@ def _ensure_registry() -> None:
     
     _BACKENDS = {}
     
-    # FalkorDB is the only supported vector backend
+    # Register available backends; missing deps are skipped gracefully.
     try:
         from .falkor import FalkorVectorBackend
+
         _BACKENDS["falkordb"] = FalkorVectorBackend
     except ImportError as e:
-        raise RuntimeError(f"FalkorDB backend is required but could not be loaded: {e}")
+        logger.debug("FalkorDB vector backend not available (skipping): %s", e)
+
+    try:
+        from .usearch import UsearchVectorBackend
+
+        _BACKENDS["usearch"] = UsearchVectorBackend
+    except ImportError as e:
+        logger.debug("usearch vector backend not available (skipping): %s", e)
 
 
 def create_backend(name: str, collection_name: str, persist_directory: Optional[str]) -> VectorBackend:
