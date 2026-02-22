@@ -974,9 +974,9 @@ class FalkorDBBackend(SmartGraphBackend):
                 params[param_key] = self._serialize_value(value)
 
         if memory_set_clauses:
-            memory_query = f"CREATE (m:{memory_label} {{item_id: $memory_id}}) SET {', '.join(memory_set_clauses)}"
+            memory_query = f"MERGE (m:{memory_label} {{item_id: $memory_id}}) SET {', '.join(memory_set_clauses)}"
         else:
-            memory_query = f"CREATE (m:{memory_label} {{item_id: $memory_id}})"
+            memory_query = f"MERGE (m:{memory_label} {{item_id: $memory_id}})"
         queries.append(memory_query)
 
         # 2. Process entity nodes with cross-memory resolution
@@ -1056,9 +1056,9 @@ class FalkorDBBackend(SmartGraphBackend):
                     params[f"entity_id_{i}"] = entity_id
 
                     if entity_set_clauses:
-                        entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}}) SET {', '.join(entity_set_clauses)}"
+                        entity_query = f"MERGE (e{i}:{entity_label} {{item_id: $entity_id_{i}}}) SET {', '.join(entity_set_clauses)}"
                     else:
-                        entity_query = f"CREATE (e{i}:{entity_label} {{item_id: $entity_id_{i}}})"
+                        entity_query = f"MERGE (e{i}:{entity_label} {{item_id: $entity_id_{i}}})"
                     queries.append(entity_query)
 
                     # Create bidirectional relationships using MATCH to find the

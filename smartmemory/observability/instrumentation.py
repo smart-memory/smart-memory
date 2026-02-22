@@ -19,8 +19,16 @@ import os
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-# Feature toggle: observability enabled by default. Set SMARTMEMORY_OBSERVABILITY=false to disable.
-_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
+
+def _is_observability_enabled() -> bool:
+    """Read observability toggle from env at call time.
+
+    Default: enabled. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+    Reading at call time allows SmartMemory(observability=False) to set the env var
+    after import and have it take effect immediately.
+    """
+    return os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
+
 
 # ---- Global context -------------------------------------------------------
 
@@ -194,7 +202,7 @@ def emit_ctx(
                 metadata = {"domain": domain, "category": category, "action": action}
         except Exception:
             metadata = None
-    if not _OBSERVABILITY_ENABLED:
+    if not _is_observability_enabled():
         return
     try:
         from smartmemory.observability.events import emit_event

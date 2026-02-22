@@ -5,6 +5,7 @@ Consolidates all LLM client implementations across SmartMemory into a single,
 maintainable client supporting multiple providers with consistent interfaces.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,48 +15,60 @@ from smartmemory.configuration import MemoryConfig
 from .providers import OpenAIProvider, AnthropicProvider, AzureOpenAIProvider, BaseLLMProvider
 from .response_parser import ResponseParser, StructuredResponse
 
-# Import Claude CLI from external package (optional)
+# Import Claude Agent SDK (optional — replaces legacy claude_cli package)
 try:
-    from claude_cli import Claude as ClaudeCLI
-    CLAUDE_CLI_AVAILABLE = True
+    from claude_agent_sdk import query as _claude_agent_query, ClaudeAgentOptions, AssistantMessage, TextBlock
+    CLAUDE_AGENT_SDK_AVAILABLE = True
 except ImportError:
-    ClaudeCLI = None  # type: ignore
-    CLAUDE_CLI_AVAILABLE = False
+    _claude_agent_query = None  # type: ignore
+    ClaudeAgentOptions = None  # type: ignore
+    AssistantMessage = None  # type: ignore
+    TextBlock = None  # type: ignore
+    CLAUDE_AGENT_SDK_AVAILABLE = False
 
 
-class ClaudeCLIProviderAdapter(BaseLLMProvider):
-    """Adapter to use claude_cli package with LLMClient interface.
+def _run_async(coro):
+    """Run an async coroutine synchronously, handling nested event loops."""
+    try:
+        asyncio.get_running_loop()
+        # Already in an async context — run in a new thread to avoid nesting
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result(timeout=300)
+    except RuntimeError:
+        # No event loop running — safe to use asyncio.run()
+        return asyncio.run(coro)
+
+
+class ClaudeAgentSDKProvider(BaseLLMProvider):
+    """Provider adapter using the official Claude Agent SDK (claude-agent-sdk).
+
+    Uses Claude Code CLI under the hood. No API key needed — authentication
+    is handled by the Claude Code installation.
 
     Args:
-        model: Default model (haiku, sonnet, opus). Default: haiku
-        timeout: Request timeout in seconds. Default: 120
-        command: CLI command to use. Default: claude
+        max_turns: Maximum agent turns per query. Default: 1 (single response)
+        system_prompt: Optional default system prompt
+        cwd: Working directory for Claude Code
 
     Examples:
-        client = LLMClient(provider='claude-cli', model='opus')
-        client = LLMClient(provider='claude-cli', model='sonnet', timeout=300)
+        client = LLMClient(provider='claude-agent')
+        client = LLMClient(provider='claude-agent', max_turns=1)
     """
 
     def __init__(self, config=None, **kwargs):
-        if not CLAUDE_CLI_AVAILABLE:
+        if not CLAUDE_AGENT_SDK_AVAILABLE:
             raise ImportError(
-                "claude-cli package not installed. Install with: "
-                "pip install git+ssh://git@github.com/regression-io/claude-cli.git"
+                "claude-agent-sdk package not installed. Install with: "
+                "pip install claude-agent-sdk"
             )
         self.config = config
-        self.provider = "claude-cli"
+        self.provider = "claude-agent"
         self.api_key = None
-        self.logger = logging.getLogger(f"{__name__}.ClaudeCLIProviderAdapter")
-
-        # Support both 'model' and 'default_model' for flexibility
-        model = kwargs.get("model") or kwargs.get("default_model", "haiku")
-        timeout = kwargs.get("timeout") or kwargs.get("timeout_seconds", 120)
-
-        self._claude = ClaudeCLI(
-            model=model,
-            timeout=timeout,
-            command=kwargs.get("command", "claude"),
-        )
+        self.logger = logging.getLogger(f"{__name__}.ClaudeAgentSDKProvider")
+        self._max_turns = kwargs.get("max_turns", 1)
+        self._system_prompt = kwargs.get("system_prompt")
+        self._cwd = kwargs.get("cwd")
 
     def _initialize_client(self, **_kwargs):
         pass
@@ -64,27 +77,45 @@ class ClaudeCLIProviderAdapter(BaseLLMProvider):
         return None
 
     def chat_completion(self, messages: List[Dict[str, str]], **kwargs) -> Dict[str, Any]:
-        response = self._claude.chat(
-            messages,
-            model=kwargs.get("model"),
-            timeout=kwargs.get("timeout"),
-        )
+        """Generate completion via Claude Agent SDK."""
+        system_prompt = self._system_prompt
+        user_parts = []
+
+        for msg in messages:
+            if msg["role"] == "system":
+                system_prompt = msg["content"]
+            else:
+                user_parts.append(msg["content"])
+
+        prompt = "\n\n".join(user_parts)
+
+        async def _do_query():
+            options = ClaudeAgentOptions(
+                system_prompt=system_prompt,
+                max_turns=kwargs.get("max_turns", self._max_turns),
+            )
+            if self._cwd:
+                options.cwd = self._cwd
+
+            text_parts = []
+            async for message in _claude_agent_query(prompt=prompt, options=options):
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            text_parts.append(block.text)
+            return "\n".join(text_parts)
+
+        content = _run_async(_do_query())
+
         return {
-            "content": response.content,
-            "models": response.model,
-            "usage": {
-                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                "total_tokens": response.usage.total_tokens if response.usage else 0,
-            },
-            "metadata": {
-                "finish_reason": response.stop_reason or "stop",
-                "response_id": response.session_id or "",
-            },
+            "content": content,
+            "models": "claude-agent-sdk",
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "metadata": {"finish_reason": "stop", "response_id": ""},
         }
 
     def structured_completion(self, messages, response_model, **kwargs):  # noqa: ARG002
-        del messages, response_model, kwargs  # Unused - falls back to JSON parsing
+        del messages, response_model, kwargs
         return None
 
     def get_supported_features(self):
@@ -150,16 +181,19 @@ class LLMClient:
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
             "azure_openai": AzureOpenAIProvider,
-            "claude-cli": ClaudeCLIProviderAdapter,
-            "claude_cli": ClaudeCLIProviderAdapter,
+            "claude-agent": ClaudeAgentSDKProvider,
+            "claude_agent": ClaudeAgentSDKProvider,
+            # Legacy aliases — map to new Agent SDK provider
+            "claude-cli": ClaudeAgentSDKProvider,
+            "claude_cli": ClaudeAgentSDKProvider,
         }
 
         provider_class = provider_classes.get(self.provider_name)
         if not provider_class:
             raise ValueError(f"Unsupported provider: {self.provider_name}")
 
-        # Claude CLI provider doesn't use api_key
-        if self.provider_name in ("claude-cli", "claude_cli"):
+        # Claude Agent SDK provider doesn't use api_key
+        if self.provider_name in ("claude-agent", "claude_agent", "claude-cli", "claude_cli"):
             return provider_class(config=self.config, **kwargs)
 
         return provider_class(

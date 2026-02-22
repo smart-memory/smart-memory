@@ -27,18 +27,20 @@ class SpanContext:
 
 _current_span: ContextVar[Optional[SpanContext]] = ContextVar("_current_span", default=None)
 
-# Evaluate once at module load (env var doesn't change at runtime).
-# Default: enabled. Set SMARTMEMORY_OBSERVABILITY=false to disable.
-_ENABLED = os.environ.get("SMARTMEMORY_OBSERVABILITY", "true").strip().lower() not in (
-    "false",
-    "0",
-    "no",
-    "off",
-)
-
 
 def _is_enabled() -> bool:
-    return _ENABLED
+    """Read observability toggle from env at call time.
+
+    Default: enabled. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+    Reading at call time (instead of module load) allows SmartMemory(observability=False)
+    to set the env var after import and have it take effect immediately.
+    """
+    return os.environ.get("SMARTMEMORY_OBSERVABILITY", "true").strip().lower() not in (
+        "false",
+        "0",
+        "no",
+        "off",
+    )
 
 
 _spooler = None

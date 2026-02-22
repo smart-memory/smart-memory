@@ -250,6 +250,29 @@ class PipelineConfig(MemoryBaseModel):
             evolve=EvolveConfig(run_evolution=False, run_clustering=False),
         )
 
+    @classmethod
+    def lite(cls, workspace_id: Optional[str] = None) -> "PipelineConfig":
+        """Lite mode — disable all network-dependent pipeline stages.
+
+        Suitable for zero-infra environments (SmartMemory Lite / SQLite backend).
+        Disabled stages:
+        - coreference: neural resolver may download models or call external services
+        - llm_extract: makes LLM API calls
+        - enrichers: only basic_enricher runs; others make HTTP calls
+        - wikidata: Wikipedia grounding makes HTTP calls to Wikidata API
+        """
+        return cls(
+            workspace_id=workspace_id,
+            coreference=CoreferenceConfig(enabled=False),
+            extraction=ExtractionConfig(
+                llm_extract=LLMExtractConfig(enabled=False),
+            ),
+            enrich=EnrichConfig(
+                enricher_names=["basic_enricher"],
+                wikidata=WikidataConfig(enabled=False),
+            ),
+        )
+
 
 # ------------------------------------------------------------------ #
 # OntologyConfig (loaded from graph, not part of PipelineConfig)

@@ -75,6 +75,16 @@ cli = [
     "tabulate>=0.9.0"
 ]
 
+# Zero-infra lite mode (SQLite + usearch vector backend)
+lite = [
+    "usearch>=2.0.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+]
+
+# Vault watcher (used by `smartmemory watch`)
+watch = ["watchdog>=3.0.0"]
+
 # Development dependencies
 dev = [
     "pytest>=7.0.0",
@@ -97,7 +107,9 @@ all = [
     "smolagents>=0.1.0",
     "click>=8.0.0",
     "rich>=13.0.0",
-    "tabulate>=0.9.0"
+    "tabulate>=0.9.0",
+    "usearch>=2.0.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.urls]
@@ -160,6 +172,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+asyncio_mode = "auto"
 addopts = "-v --tb=short --cov=smartmemory --cov-report=term-missing"
 markers = [
     "unit: unit tests",

@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### DIST-PLUGIN-1 Prerequisite — `entity_ruler_patterns` Constructor Param
+
+- **`SmartMemory(entity_ruler_patterns=...)` parameter** (`smartmemory/smart_memory.py`): Accepts any object with a `get_patterns() → dict[str, str]` interface (duck-types `PatternManager`). When non-None, overrides the post-ontology-block `pattern_manager` variable so `EntityRulerStage` receives the injected manager. Placement is after the `if self._enable_ontology:` block, so it works in Lite mode where `enable_ontology=False` leaves `pattern_manager=None`. In full mode it overrides the FalkorDB-backed `PatternManager` if explicitly injected. Defaults to `None` (no behaviour change for existing callers).
+- **`create_lite_memory(entity_ruler_patterns=None)` param** (`smartmemory/tools/factory.py`): Threads the new constructor param through, enabling the `smartmemory-cc` plugin to inject `LitePatternManager` for zero-infra entity pattern storage.
+
+#### Delete `smartmemory-lite` Package (DIST-LITE-2)
+
+- **`smartmemory-lite` package deleted**: The separate `smartmemory-lite` PyPI package is retired. All functionality now lives in the core `smartmemory` package under `smartmemory.tools.*` and `smartmemory.cli`.
+- **`smartmemory.tools.factory`** (`smartmemory/tools/factory.py`): `create_lite_memory()` and `lite_context()` migrated from `smartmemory_lite.factory`. Thin wiring with zero monkey-patching via the 4 new `SmartMemory` constructor params.
+- **`smartmemory.tools.markdown_writer`** (`smartmemory/tools/markdown_writer.py`): `_render()` and `write_markdown()` migrated from `smartmemory_lite.markdown_writer`.
+- **`smartmemory.cli`** (`smartmemory/cli.py`): `add`, `search`, `rebuild`, `watch` CLI commands migrated from `smartmemory_lite.cli`. The `mcp` command is dropped — use the MCP server in `smart-memory-service` instead. Entry point: `smartmemory = "smartmemory.cli:main"`.
+- **`lite` optional dep group** (`pyproject.toml`): `pip install smartmemory[lite]` pulls in `usearch` and `click/rich`. `watch` group adds `watchdog`.
+
+#### Absorb Lite Mode into Core SmartMemory Constructor (DIST-LITE-2)
+
+- **`SmartMemory(vector_backend=...)` parameter** (`smartmemory/smart_memory.py`): Injects a custom vector backend by calling `VectorStore.set_default_backend()` at construction time. Eliminates the corresponding monkey-patch in `smartmemory-lite`.
+- **`SmartMemory(cache=...)` parameter** (`smartmemory/smart_memory.py`): Overrides the global cache by calling `set_cache_override()` at construction time. Eliminates the `SMARTMEMORY_CACHE_DISABLED` env-var workaround.
+- **`SmartMemory(observability=...)` parameter** (`smartmemory/smart_memory.py`): Always writes `SMARTMEMORY_OBSERVABILITY` to env (`"true"` or `"false"`) — both branches — so a subsequent `SmartMemory(observability=True)` correctly re-enables tracing after a prior lite instance disabled it. Skips `PipelineMetricsEmitter` when `False`.
+- **`SmartMemory(pipeline_profile=...)` parameter** (`smartmemory/smart_memory.py`): Accepts a `PipelineConfig` instance whose 4 lite-mode flags are applied in `_build_pipeline_config()`. Eliminates the closure-patching approach in `_apply_lite_pipeline_profile`.
+- **`PipelineConfig.lite()` classmethod** (`smartmemory/pipeline/config.py`): Returns a config with coreference, LLM extraction, enrichers (basic only), and Wikidata grounding all disabled. Canonical single source of truth for the lite pipeline profile.
+- **`set_cache_override()` / `_CACHE_OVERRIDE`** (`smartmemory/utils/cache.py`): New mechanism to inject a cache backend (e.g. `NoOpCache()`) that `get_cache()` returns regardless of env vars. Clears `_global_cache` on set to prevent stale instances.
+- **Call-time env reads in observability modules**: Replaced module-load-time `_ENABLED` / `_OBSERVABILITY_ENABLED` constants with `_is_enabled()` / `_is_observability_enabled()` functions that read `SMARTMEMORY_OBSERVABILITY` from `os.environ` on every call. Enables `SmartMemory(observability=False)` to take effect after module import.
+- **`_apply_pipeline_profile()` module helper** (`smartmemory/smart_memory.py`): Pure function that copies 4 lite-mode flags from a profile `PipelineConfig` onto a freshly-built config.
+
 #### SmartMemory Lite — Zero-Infrastructure Local Memory (DIST-LITE-1)
 
 - **`smartmemory-lite` package (new):** `pip install smartmemory-lite` provides the full SmartMemory pipeline (classify → extract → store → embed → search) backed by SQLite + usearch. No Docker, FalkorDB, Redis, or MongoDB required.
@@ -27,6 +51,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **166 new tests:** 42 SQLiteBackend + 24 coverage, 6 UsearchVectorBackend + 17 coverage, 3 integration (golden flow, no-network ingest, no-network MCP), 10 factory coverage, 5 prerequisite unit test files (P0-1 through P0-5), 14 markdown writer, 17 MCP server, 28 post-release bug-fix regression tests.
 
 ### Fixed
+
+#### DIST-LITE-2 — Observability and Resource Cleanup
+
+- **One-way process-global observability** (`smartmemory/smart_memory.py`): `SmartMemory(observability=False)` previously set `SMARTMEMORY_OBSERVABILITY=false` with no symmetric restore path — a later `SmartMemory(observability=True)` left tracing silenced. Fixed by always writing both branches: `os.environ["SMARTMEMORY_OBSERVABILITY"] = "false" if not observability else "true"`. This makes the constructor idempotent and fully reversible.
+- **`lite_context()` observability leak** (`smartmemory/tools/factory.py`): `lite_context()` reset the vector backend and cache override but did not restore `SMARTMEMORY_OBSERVABILITY`. Processes that created and closed a lite context continued to have observability silenced. Fixed by saving the env-var value before `create_lite_memory()` and restoring (or removing) it in the `finally` block.
+- **`lite_context()` SQLite connection leak** (`smartmemory/tools/factory.py`): `lite_context()` exited without closing the underlying `SQLiteBackend` connection. Resource release depended on GC, leaving WAL flush timing non-deterministic in long-lived processes. Fixed by calling `memory._graph.backend.close()` in the `finally` block (`SQLiteBackend.close()` was already implemented; only the call site was missing).
+
+#### DIST-LITE-2 — smartmemory-lite Package Retired
+
+- **Deleted `smartmemory-lite`**: Now that DIST-LITE-2 absorbed all five lite behaviors into the `SmartMemory` constructor, `smartmemory-lite` has no unique code to maintain. The package has been deleted from the monorepo.
+- **CLI migrated to `smartmemory.cli`** (`smartmemory/cli.py`, new): The `add`, `search`, `rebuild`, and `watch` commands from `smartmemory-lite` are now the `smartmemory` CLI entry point. The `mcp` command was dropped — use the MCP server in `smart-memory-service` instead.
+- **`markdown_writer` migrated to `smartmemory.tools`** (`smartmemory/tools/markdown_writer.py`, new): Unchanged logic, updated module path.
+- **`factory` migrated to `smartmemory.tools`** (`smartmemory/tools/factory.py`, new): `create_lite_memory()` and `lite_context()` now live here. Now includes full cleanup (observability env restore + SQLite close).
+- **`lite` optional dep group added** (`pyproject.toml`): `pip install smartmemory[lite]` installs `usearch` and `click`/`rich` for the CLI. `watch` group adds `watchdog`.
 
 #### SmartMemory Lite — Post-Release Bug Fixes (DIST-LITE-1)
 

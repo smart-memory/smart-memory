@@ -21,8 +21,16 @@ from typing import Any, Dict, Optional, Iterator, List
 
 from smartmemory.utils import get_config, now
 
-# Feature toggle: observability enabled by default. Set SMARTMEMORY_OBSERVABILITY=false to disable.
-_OBSERVABILITY_ENABLED = os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
+
+def _is_observability_enabled() -> bool:
+    """Read observability toggle from env at call time.
+
+    Default: enabled. Set SMARTMEMORY_OBSERVABILITY=false to disable.
+    Reading at call time allows SmartMemory(observability=False) to set the env var
+    after import and have it take effect immediately.
+    """
+    return os.getenv("SMARTMEMORY_OBSERVABILITY", "true").lower() in ("true", "1", "yes", "on")
+
 
 # Defaults for observability stream
 STREAM_NAME = "smartmemory:events"
@@ -217,7 +225,7 @@ def emit_event(
     Auto-attaches the current trace_id from the active span context (if any)
     so that all events emitted within a pipeline trace are groupable.
     """
-    if not _OBSERVABILITY_ENABLED:
+    if not _is_observability_enabled():
         return
     # Import here to avoid circular dependency (tracing imports events)
     from smartmemory.observability.tracing import current_trace_id
@@ -230,7 +238,11 @@ def emit_event(
         db=db,
     )
     spooler.emit_event(
-        event_type, component, operation, data, metadata,
+        event_type,
+        component,
+        operation,
+        data,
+        metadata,
         trace_id=current_trace_id(),
     )
 

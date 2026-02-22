@@ -11,9 +11,19 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture(autouse=True)
 def _enable_observability():
-    """Enable observability for all tests in this module."""
-    with patch("smartmemory.observability.tracing._ENABLED", True):
-        yield
+    """Enable observability for all tests in this module.
+
+    Since _is_enabled() now reads from os.environ at call time (DIST-LITE-2),
+    we set the env var rather than patching a module-level flag.
+    """
+    import os
+    old = os.environ.get("SMARTMEMORY_OBSERVABILITY")
+    os.environ["SMARTMEMORY_OBSERVABILITY"] = "true"
+    yield
+    if old is None:
+        os.environ.pop("SMARTMEMORY_OBSERVABILITY", None)
+    else:
+        os.environ["SMARTMEMORY_OBSERVABILITY"] = old
 
 
 # ---------------------------------------------------------------------------

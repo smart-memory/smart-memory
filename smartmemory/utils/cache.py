@@ -2,7 +2,7 @@
 Redis Cache Manager for Agentic Memory
 
 Provides distributed caching for high-performance memory operations.
-Focuses on the highest-impact bottlenecks: embeddings, search results, 
+Focuses on the highest-impact bottlenecks: embeddings, search results,
 entity extraction, and similarity calculations.
 """
 
@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 class RedisCache:
     """
     High-performance Redis cache for agentic memory operations.
-    
+
     Provides caching for:
     - Embedding calculations (highest impact)
-    - Search results 
+    - Search results
     - Entity extraction results
     - Similarity scores
     - Graph query results
@@ -56,25 +56,20 @@ class RedisCache:
                 decode_responses=False,  # We handle encoding ourselves
                 socket_connect_timeout=5,
                 socket_timeout=5,
-                retry_on_timeout=True
+                retry_on_timeout=True,
             )
 
         # Cache TTL settings (in seconds)
         self.ttl_settings = {
-            'embedding': config.cache.get('embedding_ttl', 86400),  # 24 hours
-            'search': config.cache.get('search_ttl', 900),  # 15 minutes
-            'entity_extraction': config.cache.get('extraction_ttl', 3600),  # 1 hour
-            'similarity': config.cache.get('similarity_ttl', 1800),  # 30 minutes
-            'graph_query': config.cache.get('query_ttl', 600),  # 10 minutes
+            "embedding": config.cache.get("embedding_ttl", 86400),  # 24 hours
+            "search": config.cache.get("search_ttl", 900),  # 15 minutes
+            "entity_extraction": config.cache.get("extraction_ttl", 3600),  # 1 hour
+            "similarity": config.cache.get("similarity_ttl", 1800),  # 30 minutes
+            "graph_query": config.cache.get("query_ttl", 600),  # 10 minutes
         }
 
         # Performance tracking
-        self.stats = {
-            'hits': 0,
-            'misses': 0,
-            'sets': 0,
-            'errors': 0
-        }
+        self.stats = {"hits": 0, "misses": 0, "sets": 0, "errors": 0}
 
         # Test connection
         try:
@@ -95,7 +90,7 @@ class RedisCache:
         elif not isinstance(content, str):
             content = str(content)
 
-        return hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
 
     def get(self, cache_type: str, identifier: str) -> Optional[Any]:
         """Get cached value by type and identifier."""
@@ -104,14 +99,14 @@ class RedisCache:
             value = self.redis.get(key)
 
             if value is not None:
-                self.stats['hits'] += 1
+                self.stats["hits"] += 1
                 return pickle.loads(value)
             else:
-                self.stats['misses'] += 1
+                self.stats["misses"] += 1
                 return None
 
         except Exception as e:
-            self.stats['errors'] += 1
+            self.stats["errors"] += 1
             logger.warning(f"Redis cache get error: {e}")
             return None
 
@@ -125,12 +120,12 @@ class RedisCache:
             result = self.redis.setex(key, ttl, serialized)
 
             if result:
-                self.stats['sets'] += 1
+                self.stats["sets"] += 1
                 return True
             return False
 
         except Exception as e:
-            self.stats['errors'] += 1
+            self.stats["errors"] += 1
             logger.warning(f"Redis cache set error: {e}")
             return False
 
@@ -141,7 +136,7 @@ class RedisCache:
             result = self.redis.delete(key)
             return result > 0
         except Exception as e:
-            self.stats['errors'] += 1
+            self.stats["errors"] += 1
             logger.warning(f"Redis cache delete error: {e}")
             return False
 
@@ -154,29 +149,29 @@ class RedisCache:
                 return self.redis.delete(*keys)
             return 0
         except Exception as e:
-            self.stats['errors'] += 1
+            self.stats["errors"] += 1
             logger.warning(f"Redis cache clear error: {e}")
             return 0
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics."""
-        total_requests = self.stats['hits'] + self.stats['misses']
-        hit_rate = (self.stats['hits'] / total_requests) if total_requests > 0 else 0.0
+        total_requests = self.stats["hits"] + self.stats["misses"]
+        hit_rate = (self.stats["hits"] / total_requests) if total_requests > 0 else 0.0
 
         try:
-            info = self.redis.info('memory')
-            memory_usage = info.get('used_memory_human', 'unknown')
+            info = self.redis.info("memory")
+            memory_usage = info.get("used_memory_human", "unknown")
         except Exception:
-            memory_usage = 'unknown'
+            memory_usage = "unknown"
 
         return {
-            'hits': self.stats['hits'],
-            'misses': self.stats['misses'],
-            'sets': self.stats['sets'],
-            'errors': self.stats['errors'],
-            'hit_rate': hit_rate,
-            'memory_usage': memory_usage,
-            'ttl_settings': self.ttl_settings
+            "hits": self.stats["hits"],
+            "misses": self.stats["misses"],
+            "sets": self.stats["sets"],
+            "errors": self.stats["errors"],
+            "hit_rate": hit_rate,
+            "memory_usage": memory_usage,
+            "ttl_settings": self.ttl_settings,
         }
 
     # High-level caching methods for specific use cases
@@ -184,48 +179,48 @@ class RedisCache:
     def get_embedding(self, content: str) -> Optional[List[float]]:
         """Get cached embedding for content."""
         content_hash = self._hash_content(content)
-        return self.get('embedding', content_hash)
+        return self.get("embedding", content_hash)
 
     def set_embedding(self, content: str, embedding: List[float]) -> bool:
         """Cache embedding for content."""
         content_hash = self._hash_content(content)
-        return self.set('embedding', content_hash, embedding)
+        return self.set("embedding", content_hash, embedding)
 
     def get_search_results(self, query: str, top_k: int, memory_type: Optional[str] = None) -> Optional[List]:
         """Get cached search results."""
         search_key = f"{query}:{top_k}:{memory_type or 'all'}"
         search_hash = self._hash_content(search_key)
-        return self.get('search', search_hash)
+        return self.get("search", search_hash)
 
     def set_search_results(self, query: str, top_k: int, results: List, memory_type: Optional[str] = None) -> bool:
         """Cache search results."""
         search_key = f"{query}:{top_k}:{memory_type or 'all'}"
         search_hash = self._hash_content(search_key)
-        return self.set('search', search_hash, results)
+        return self.set("search", search_hash, results)
 
     def get_entity_extraction(self, content: str) -> Optional[Dict]:
         """Get cached entity extraction results."""
         content_hash = self._hash_content(content)
-        return self.get('entity_extraction', content_hash)
+        return self.get("entity_extraction", content_hash)
 
     def set_entity_extraction(self, content: str, extraction_result: Dict) -> bool:
         """Cache entity extraction results."""
         content_hash = self._hash_content(content)
-        return self.set('entity_extraction', content_hash, extraction_result)
+        return self.set("entity_extraction", content_hash, extraction_result)
 
     def get_similarity(self, item1_id: str, item2_id: str) -> Optional[float]:
         """Get cached similarity score."""
         # Ensure consistent ordering for cache key
         ids = sorted([item1_id, item2_id])
         similarity_key = f"{ids[0]}:{ids[1]}"
-        return self.get('similarity', similarity_key)
+        return self.get("similarity", similarity_key)
 
     def set_similarity(self, item1_id: str, item2_id: str, score: float) -> bool:
         """Cache similarity score."""
         # Ensure consistent ordering for cache key
         ids = sorted([item1_id, item2_id])
         similarity_key = f"{ids[0]}:{ids[1]}"
-        return self.set('similarity', similarity_key, score)
+        return self.set("similarity", similarity_key, score)
 
 
 class NoOpCache:
@@ -241,10 +236,29 @@ class NoOpCache:
 # Global cache instance
 _global_cache: Optional[RedisCache] = None
 
+# Optional override: when set, get_cache() returns this object regardless of env vars.
+# Used by SmartMemory(cache=...) constructor parameter to inject a custom backend.
+_CACHE_OVERRIDE: Optional[Any] = None
+
+
+def set_cache_override(cache: Optional[Any]) -> None:
+    """Override the cache returned by get_cache().
+
+    Pass a cache instance (e.g. NoOpCache()) to force all get_cache() calls to
+    return it. Pass None to clear the override and restore env-var-based resolution.
+    """
+    global _CACHE_OVERRIDE, _global_cache
+    _CACHE_OVERRIDE = cache
+    # Clear the global cache so it will be re-evaluated on the next get_cache() call
+    # after the override is removed.
+    _global_cache = None
+
 
 def get_cache() -> RedisCache:
     """Get the global Redis cache instance."""
     global _global_cache
+    if _CACHE_OVERRIDE is not None:
+        return _CACHE_OVERRIDE  # type: ignore[return-value]
     if os.environ.get("SMARTMEMORY_CACHE_DISABLED", "").lower() in ("true", "1", "yes"):
         return NoOpCache()  # type: ignore[return-value]
     if _global_cache is None:

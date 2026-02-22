@@ -118,6 +118,30 @@ results = memory.search("query", top_k=5)
 item = memory.get(item_id)
 ```
 
+### Constructor parameters (DIST-LITE-2 + DIST-PLUGIN-1)
+
+Five optional params enable zero-infra / lite mode without monkey-patching:
+
+```python
+from smartmemory.pipeline.config import PipelineConfig
+from smartmemory.utils.cache import NoOpCache
+
+memory = SmartMemory(
+    vector_backend=usearch_backend,      # Injects via VectorStore.set_default_backend()
+    cache=NoOpCache(),                   # Injects via set_cache_override()
+    observability=False,                 # Sets SMARTMEMORY_OBSERVABILITY=false; skips PipelineMetricsEmitter
+    pipeline_profile=PipelineConfig.lite(),  # Applied in _build_pipeline_config()
+    entity_ruler_patterns=pattern_manager,   # Overrides PatternManager for EntityRulerStage (DIST-PLUGIN-1)
+)
+```
+
+- `vector_backend`: Any `VectorStoreBackend` instance; `None` leaves default behaviour.
+- `cache`: Any cache-compatible object (e.g. `NoOpCache()`); `None` leaves default behaviour.
+- `observability`: If `False`, disables all Redis Streams emission and metrics. Defaults to `True`.
+- `pipeline_profile`: A `PipelineConfig` instance; its 4 lite flags override the built config. `None` leaves default behaviour.
+- `entity_ruler_patterns`: Any object with `get_patterns() → dict[str, str]` interface. Duck-types `PatternManager`. When non-None, overrides the post-ontology-block `pattern_manager` variable passed to `EntityRulerStage`. Used by `smartmemory-cc` to inject `LitePatternManager` (JSONL-backed, zero Docker). `None` leaves default behaviour.
+- `PipelineConfig.lite()`: Pre-built profile disabling coreference, LLM extraction, non-basic enrichers, and Wikidata grounding.
+
 ## Multi-Tenancy
 
 Security handled by `ScopeProvider`/`MemoryScopeProvider`:

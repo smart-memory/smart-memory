@@ -1,5 +1,13 @@
 import logging
+import os
 from typing import Optional, Union, Any, Dict, List
+
+# Saves the SMARTMEMORY_OBSERVABILITY value that existed before the most recent
+# SmartMemory(observability=False) constructor set it to "false".  None means the
+# env var was absent before our write; _SENTINEL means no constructor write is
+# pending (i.e. the env var is currently user-controlled, not constructor-set).
+_SENTINEL = object()
+_obs_pre_disable_value: object = _SENTINEL  # _SENTINEL = no active constructor write
 
 from smartmemory.conversation.context import ConversationContext
 from smartmemory.memory.pipeline.config import PipelineConfigBundle
@@ -32,6 +40,19 @@ from smartmemory.drift_detector import DriftDetector, DriftDetectorConfig
 from smartmemory.graph.ontology_graph import OntologyGraph
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_pipeline_profile(config: Any, profile: Any) -> None:
+    """Copy lite-mode flags from a PipelineConfig profile onto a freshly-built config.
+
+    Copies exactly the four fields that SmartMemory Lite needs to override:
+    coreference.enabled, extraction.llm_extract.enabled, enrich.enricher_names,
+    enrich.wikidata.enabled.
+    """
+    config.coreference.enabled = profile.coreference.enabled
+    config.extraction.llm_extract.enabled = profile.extraction.llm_extract.enabled
+    config.enrich.enricher_names = profile.enrich.enricher_names
+    config.enrich.wikidata.enabled = profile.enrich.wikidata.enabled
 
 
 class SmartMemory(MemoryBase):
@@ -68,10 +89,52 @@ class SmartMemory(MemoryBase):
         version_tracker: Optional["VersionTracker"] = None,
         temporal: Optional["TemporalQueries"] = None,
         enable_ontology: bool = True,
+        vector_backend=None,
+        cache=None,
+        observability: bool = True,
+        pipeline_profile: Optional[Any] = None,
+        entity_ruler_patterns=None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._enable_ontology = enable_ontology
+        self._vector_backend = vector_backend
+        self._cache = cache
+        self._observability = observability
+        self._pipeline_profile = pipeline_profile
+        self._entity_ruler_patterns = entity_ruler_patterns
+
+        # Wire observability toggle.
+        # We save the old env value before overwriting so a later observability=True
+        # instance can restore exactly what was there — not just "pop" — which would
+        # otherwise silently erase a user-set SMARTMEMORY_OBSERVABILITY=false.
+        global _obs_pre_disable_value
+        if not observability:
+            # Only save on the FIRST disable — subsequent False calls must not
+            # overwrite the original env value with our own "false" write.
+            if _obs_pre_disable_value is _SENTINEL:
+                _obs_pre_disable_value = os.environ.get("SMARTMEMORY_OBSERVABILITY")
+            os.environ["SMARTMEMORY_OBSERVABILITY"] = "false"
+        elif _obs_pre_disable_value is not _SENTINEL:
+            # A prior constructor disabled observability; restore the pre-disable value.
+            old = _obs_pre_disable_value
+            _obs_pre_disable_value = _SENTINEL
+            if old is None:
+                os.environ.pop("SMARTMEMORY_OBSERVABILITY", None)
+            else:
+                os.environ["SMARTMEMORY_OBSERVABILITY"] = old  # type: ignore[assignment]
+
+        # Wire vector backend: set class-level default for all VectorStore instances.
+        if vector_backend is not None:
+            from smartmemory.stores.vector.vector_store import VectorStore
+
+            VectorStore.set_default_backend(vector_backend)
+
+        # Wire cache override: redirect all get_cache() calls to the provided instance.
+        if cache is not None:
+            from smartmemory.utils.cache import set_cache_override
+
+            set_cache_override(cache)
 
         # Use DefaultScopeProvider if none provided (for OSS usage)
         # Service layer should always provide a secure ScopeProvider
@@ -224,6 +287,11 @@ class SmartMemory(MemoryBase):
                 ontology_model=ontology_snapshot,
             )
 
+        # Allow injected pattern manager to override (LitePatternManager in Lite mode, where
+        # enable_ontology=False leaves pattern_manager=None after the block above is skipped).
+        if self._entity_ruler_patterns is not None:
+            pattern_manager = self._entity_ruler_patterns
+
         stages = [
             ClassifyStage(self._ingestion_flow),
             CoreferenceStageCommand(),
@@ -241,9 +309,11 @@ class SmartMemory(MemoryBase):
             EvolveStage(self),
         ]
 
-        from smartmemory.pipeline.metrics import PipelineMetricsEmitter
+        emitter = None
+        if self._observability:
+            from smartmemory.pipeline.metrics import PipelineMetricsEmitter
 
-        emitter = PipelineMetricsEmitter(workspace_id=workspace_id)
+            emitter = PipelineMetricsEmitter(workspace_id=workspace_id)
         return PipelineRunner(stages, InProcessTransport(), metrics_emitter=emitter)
 
     @property
@@ -338,6 +408,10 @@ class SmartMemory(MemoryBase):
             config.workspace_id = getattr(scope, "workspace_id", None)
         except Exception:
             pass
+
+        # Apply constructor-injected pipeline profile (e.g. PipelineConfig.lite())
+        if self._pipeline_profile is not None:
+            _apply_pipeline_profile(config, self._pipeline_profile)
 
         return config
 
@@ -654,7 +728,7 @@ class SmartMemory(MemoryBase):
                 except Exception as e:
                     logger.warning(f"Failed to set default working memory metadata: {e}")
                 result = self._crud.add(item, **kwargs)
-                return result['memory_node_id']
+                return result["memory_node_id"]
             else:
                 # Fallback: in-memory buffer with NO hard max length
                 if not hasattr(self, "_working_buffer"):
@@ -673,14 +747,14 @@ class SmartMemory(MemoryBase):
                 },
             ) as span:
                 result = self._crud.add(item, **kwargs)
-                item_id = result['memory_node_id']
+                item_id = result["memory_node_id"]
                 span.attributes["item_id"] = item_id
                 return item_id
 
     def _add_impl(self, item, **kwargs) -> str:
         """Implement abstract method from MemoryBase."""
         result = self._crud.add(item, **kwargs)
-        return result['memory_node_id']
+        return result["memory_node_id"]
 
     def _get_impl(self, key: str):
         return self._crud.get(key)
