@@ -1,0 +1,50 @@
+{"name": "Python", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "TypeScript", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "Rust", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "Go", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "JavaScript", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "SQL", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "Bash", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "Swift", "label": "LANGUAGE", "confidence": 0.99, "frequency": 2}
+{"name": "FastAPI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "React", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Next.js", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "LangChain", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "spaCy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "FastMCP", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Django", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Flask", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Vue", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Docker", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Redis", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "FalkorDB", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "SQLite", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "usearch", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Playwright", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pytest", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "ruff", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "mypy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "uv", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pip", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "npm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pnpm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "vite", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "webpack", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "RAG", "label": "AI_CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "embeddings", "label": "AI_CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "vector store", "label": "AI_CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "knowledge graph", "label": "AI_CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "entity ruler", "label": "AI_CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "MCP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Claude Code", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "SmartMemory", "label": "PRODUCT", "confidence": 0.99, "frequency": 2}
+{"name": "SmartGraph", "label": "COMPONENT", "confidence": 0.99, "frequency": 2}
+{"name": "PipelineConfig", "label": "COMPONENT", "confidence": 0.99, "frequency": 2}
+{"name": "LitePatternManager", "label": "COMPONENT", "confidence": 0.99, "frequency": 2}
+{"name": "GitHub", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "git", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "SSH", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "JWT", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "OAuth", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "MongoDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "PostgreSQL", "label": "DATABASE", "confidence": 0.99, "frequency": 2}

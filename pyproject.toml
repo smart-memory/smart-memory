@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "smartmemory-cc"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "smartmemory[lite]>=0.3.1",
+    "fastmcp>=2.0",
+    "filelock>=3.12",
+    "click>=8.0",
+]
+
+[project.scripts]
+smartmemory-cc = "smartmemory_cc.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["smartmemory_cc"]
+include = ["smartmemory_cc/data/seed_patterns.jsonl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests requiring real filesystem/subprocess (no mocks)",
+]
