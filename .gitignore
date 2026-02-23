@@ -10,3 +10,7 @@ venv/
 *.egg
 MANIFEST
 .DS_Store
+
+# Local secrets
+.secrets
+.act.secrets
