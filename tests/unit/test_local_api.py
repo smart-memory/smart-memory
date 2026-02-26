@@ -314,3 +314,54 @@ class TestDeleteEndpoints:
     def test_delete_entity_node_returns_405(self, client):
         r = client.delete("/graph/nodes/some-entity-id")
         assert r.status_code == 405
+
+
+# ---------------------------------------------------------------------------
+# Unconfigured → HTTP 503 (DIST-LITE-5: _get_mem() conversion)
+# ---------------------------------------------------------------------------
+
+
+class TestUnconfiguredReturns503:
+    """_get_mem() must convert UnconfiguredError → HTTP 503 (not 500).
+
+    Exercises the load-bearing behavior introduced by DIST-LITE-5: FastAPI
+    would otherwise surface RuntimeError as 500 with no actionable message.
+    """
+
+    def test_graph_full_returns_503_when_unconfigured(self, client):
+        from smartmemory_pkg.config import UnconfiguredError
+        with patch(
+            "smartmemory_pkg.local_api.get_memory",
+            side_effect=UnconfiguredError("not configured"),
+        ):
+            r = client.get("/graph/full")
+        assert r.status_code == 503
+        assert "smartmemory setup" in r.json()["detail"].lower()
+
+    def test_graph_edges_returns_503_when_unconfigured(self, client):
+        from smartmemory_pkg.config import UnconfiguredError
+        with patch(
+            "smartmemory_pkg.local_api.get_memory",
+            side_effect=UnconfiguredError("not configured"),
+        ):
+            r = client.post("/graph/edges", json={"node_ids": []})
+        assert r.status_code == 503
+
+    def test_memory_item_returns_503_when_unconfigured(self, client):
+        from smartmemory_pkg.config import UnconfiguredError
+        with patch(
+            "smartmemory_pkg.local_api.get_memory",
+            side_effect=UnconfiguredError("not configured"),
+        ):
+            r = client.get("/some-id")
+        assert r.status_code == 503
+
+    def test_graph_full_returns_400_on_invalid_mode_env_var(self, client):
+        """SMARTMEMORY_MODE=<typo> raises ValueError → _get_mem() converts to HTTP 400."""
+        with patch(
+            "smartmemory_pkg.local_api.get_memory",
+            side_effect=ValueError("Invalid SMARTMEMORY_MODE='remtoe'. Expected one of: local, remote"),
+        ):
+            r = client.get("/graph/full")
+        assert r.status_code == 400
+        assert "misconfigured" in r.json()["detail"].lower()

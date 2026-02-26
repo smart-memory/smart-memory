@@ -1,4 +1,4 @@
-"""DIST-LITE-4: Read-only local graph API backed by SQLite.
+"""DIST-LITE-4/5: Graph API — local SQLite or remote hosted API.
 
 Mounted at /memory by viewer_server.py — routes here are relative to that mount.
 GET  /graph/full         → /memory/graph/full
@@ -8,11 +8,17 @@ GET  /{id}/neighbors     → /memory/{id}/neighbors  (BEFORE /{id} — declarati
 GET  /{id}               → /memory/{id}
 DELETE /{id}             → /memory/{id}            (405 — local viewer is read-only)
 DELETE /graph/nodes/{id} → /memory/graph/nodes/{id} (405 — local viewer is read-only)
+
+DIST-LITE-5: each endpoint dispatches to RemoteMemory graph methods when mode=remote.
+Unconfigured state → HTTP 503 (UnconfiguredError caught by _get_mem()).
 """
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel
+
+from smartmemory_pkg.config import UnconfiguredError
+from smartmemory_pkg.storage import get_memory
 
 api = FastAPI(title="SmartMemory Local API", docs_url=None, redoc_url=None)
 
@@ -26,10 +32,34 @@ _TOP_LEVEL_FIELDS = frozenset({
 })
 
 
+def _get_mem():
+    """Return the active memory backend. Converts config errors → meaningful HTTP responses.
+
+    FastAPI surfaces unhandled exceptions as 500. Two typed exceptions escape get_memory():
+      UnconfiguredError — no config exists; HTTP 503 (run setup to fix)
+      ValueError        — invalid mode value in env var; HTTP 400 (fix the env var)
+    """
+    try:
+        return get_memory()
+    except UnconfiguredError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"SmartMemory not configured. Run: smartmemory setup. ({e})",
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"SmartMemory misconfigured: {e}",
+        )
+
+
 def _get_backend():
-    """Return the SQLiteBackend directly — avoids going through SmartMemory pipeline."""
-    from smartmemory_pkg.storage import get_memory
-    return get_memory()._graph.backend
+    """Return the SQLiteBackend directly — avoids going through SmartMemory pipeline.
+
+    Routes through _get_mem() so UnconfiguredError converts to HTTP 503, not 500.
+    Local mode only — callers must take the remote branch before calling this.
+    """
+    return _get_mem()._graph.backend
 
 
 def _flatten_node(raw: dict) -> dict:
@@ -65,6 +95,10 @@ def _flatten_node(raw: dict) -> dict:
 
 @api.get("/graph/full")
 def get_graph_full() -> dict:
+    mem = _get_mem()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.get_graph_full()
     backend = _get_backend()
     snapshot = backend.serialize()
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
@@ -84,6 +118,10 @@ class EdgesBulkRequest(BaseModel):
 @api.post("/graph/edges")
 def get_edges_bulk(body: EdgesBulkRequest) -> dict:
     """Matches createFetchAdapter.getEdgesBulk — POST with {node_ids} body (fetchAdapter.js:35)."""
+    mem = _get_mem()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.get_edges_bulk(body.node_ids)
     backend = _get_backend()
     seen: set[tuple] = set()
     edges: list[dict] = []
@@ -112,6 +150,14 @@ api.include_router(_graph_router, prefix="/graph")
 
 @api.get("/list")
 def list_memories(limit: int = 200, offset: int = 0) -> dict:
+    mem = _get_mem()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        # Remote graph/full used as source; paginate client-side
+        full = mem.get_graph_full()
+        nodes = full.get("nodes", [])
+        paginated = nodes[offset: offset + limit]
+        return {"items": paginated, "total": len(nodes), "limit": limit, "offset": offset}
     backend = _get_backend()
     snapshot = backend.serialize()
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
@@ -131,6 +177,10 @@ def get_neighbors(memory_id: str) -> dict:
     createFetchAdapter.getNeighbors reads: const neighbors = res?.neighbors || []
     (useGraphInteraction.js:106-107). Returning {"nodes": ...} produces an empty expansion.
     """
+    mem = _get_mem()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.get_neighbors(memory_id)
     backend = _get_backend()
     neighbors = backend.get_neighbors(memory_id)
     edges = backend.get_edges_for_node(memory_id)
@@ -140,6 +190,13 @@ def get_neighbors(memory_id: str) -> dict:
 @api.get("/{memory_id}")
 def get_memory_item(memory_id: str) -> dict[str, Any]:
     """get_node() uses _row_to_node() — output is already flat, no transformation needed."""
+    mem = _get_mem()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        node = mem.get_node(memory_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        return node
     backend = _get_backend()
     node = backend.get_node(memory_id)
     if node is None:

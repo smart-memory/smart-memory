@@ -5,10 +5,11 @@ from unittest.mock import MagicMock, patch
 
 
 def _reset_singleton():
-    """Reset the storage module singleton between tests."""
+    """Reset the storage module singletons between tests."""
     import smartmemory_pkg.storage as storage
 
     storage._memory = None
+    storage._remote_memory = None
 
 
 @pytest.fixture(autouse=True)
@@ -104,21 +105,69 @@ def test_normalize_ingest_result_dict():
     )
 
 
+def test_get_memory_raises_unconfigured_error():
+    """get_memory() raises UnconfiguredError when not configured and migration fails."""
+    import smartmemory_pkg.storage as storage
+    from smartmemory_pkg.config import UnconfiguredError
+
+    with (
+        patch("smartmemory_pkg.storage.is_configured", return_value=False),
+        patch("smartmemory_pkg.storage._detect_and_migrate", return_value=False),
+    ):
+        with pytest.raises(UnconfiguredError, match="smartmemory setup"):
+            storage.get_memory()
+
+
+def test_ingest_remote_branch_skips_lock(tmp_path):
+    """ingest() in remote mode delegates to RemoteMemory without acquiring a lock."""
+    import smartmemory_pkg.storage as storage
+    from smartmemory_pkg.remote_backend import RemoteMemory
+
+    mock_mem = MagicMock(spec=RemoteMemory)
+    mock_mem.ingest.return_value = "remote-item-id"
+
+    with (
+        patch("smartmemory_pkg.storage.get_memory", return_value=mock_mem),
+        patch("smartmemory_pkg.storage._get_lock_file") as mock_lock,
+    ):
+        result = storage.ingest("remote content")
+
+    mock_mem.ingest.assert_called_once_with("remote content", "episodic")
+    mock_lock.assert_not_called()
+    assert result == "remote-item-id"
+
+
+def test_get_remote_memory_singleton(tmp_path):
+    """_get_remote_memory() returns the same RemoteMemory instance on repeated calls."""
+    import smartmemory_pkg.storage as storage
+    from smartmemory_pkg.config import SmartMemoryConfig
+
+    cfg = SmartMemoryConfig(mode="remote", api_url="https://api.example.com", team_id="t1")
+    # RemoteMemory is lazily imported inside _get_remote_memory — patch at source module
+    with patch("smartmemory_pkg.remote_backend.RemoteMemory") as MockRemote:
+        m1 = storage._get_remote_memory(cfg)
+        m2 = storage._get_remote_memory(cfg)
+    assert m1 is m2
+    MockRemote.assert_called_once()  # constructor called only once
+
+
 def test_ingest_acquires_lock(tmp_path):
-    """ingest() acquires FileLock before calling mem.ingest()."""
+    """ingest() acquires FileLock before calling mem.ingest() in local mode."""
     import smartmemory_pkg.storage as storage
 
     mock_mem = MagicMock()
     mock_mem.ingest.return_value = "item-123"
-    storage._memory = mock_mem
 
     mock_lock_instance = MagicMock()
     mock_lock_instance.__enter__ = MagicMock(return_value=None)
     mock_lock_instance.__exit__ = MagicMock(return_value=False)
 
     with (
+        # get_memory() now checks is_configured() — patch it to return mock directly
+        patch("smartmemory_pkg.storage.get_memory", return_value=mock_mem),
         patch("smartmemory_pkg.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_pkg.storage.FileLock", return_value=mock_lock_instance),
+        # _get_lock_file() does the lazy filelock import — patch at that boundary
+        patch("smartmemory_pkg.storage._get_lock_file", return_value=mock_lock_instance),
     ):
         result = storage.ingest("test content")
 

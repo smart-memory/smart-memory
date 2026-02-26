@@ -1,4 +1,12 @@
+"""DIST-LITE-5: Storage — dual-mode dispatch (local SQLite or remote hosted API).
+
+get_memory() returns either a local SmartMemory instance or a RemoteMemory instance
+depending on config. All callers (server.py MCP tools, local_api.py viewer) go through
+this module and duck-type on the result — but each operation has an explicit branch
+because the return types differ (MemoryItem vs dict, sort_by support, etc.).
+"""
 from __future__ import annotations
+
 import atexit
 import logging
 import os
@@ -6,16 +14,29 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from filelock import FileLock  # hard import — fail-closed
+# filelock imported lazily inside ingest() — only available with [local] extra
 
 if TYPE_CHECKING:
     from smartmemory import SmartMemory
+    from smartmemory_pkg.remote_backend import RemoteMemory
+
+from smartmemory_pkg.config import (
+    SmartMemoryConfig,
+    UnconfiguredError,
+    _detect_and_migrate,
+    is_configured,
+    load_config,
+)
 
 log = logging.getLogger(__name__)
 
 _memory: "SmartMemory | None" = None
 _data_path: Path | None = None  # resolved once on first init; reused by ingest()
 _init_lock = threading.Lock()
+
+_remote_memory: "RemoteMemory | None" = None
+_remote_init_lock = threading.Lock()
+
 WRITE_LOCK_TIMEOUT = 5.0  # seconds
 
 
@@ -29,15 +50,16 @@ def _resolve_data_dir(explicit: str | None = None) -> Path:
     return base
 
 
-def _get_lock_file(data_path: Path) -> FileLock:
+def _get_lock_file(data_path: Path):
+    from filelock import FileLock  # lazy — only in [local] extra
     return FileLock(str(data_path / ".write.lock"), timeout=WRITE_LOCK_TIMEOUT)
 
 
 # --- Singleton lifecycle ---------------------------------------------------------
 
 
-def get_memory(data_dir: str | None = None) -> "SmartMemory":
-    """Return the process singleton, initialising on first call.
+def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
+    """Return the local SmartMemory singleton, initialising on first call.
 
     Thread-safe via double-checked locking. Registers atexit shutdown on first init.
     """
@@ -62,6 +84,37 @@ def get_memory(data_dir: str | None = None) -> "SmartMemory":
         )
         atexit.register(_shutdown)
         return _memory
+
+
+def _get_remote_memory(cfg: SmartMemoryConfig) -> "RemoteMemory":
+    """Return the RemoteMemory singleton. Double-checked locking, same pattern as local."""
+    global _remote_memory
+    if _remote_memory is not None:
+        return _remote_memory
+    with _remote_init_lock:
+        if _remote_memory is not None:
+            return _remote_memory
+        from smartmemory_pkg.remote_backend import RemoteMemory
+        _remote_memory = RemoteMemory(api_url=cfg.api_url, team_id=cfg.team_id)
+        return _remote_memory
+
+
+def get_memory(data_dir: str | None = None):
+    """Return the active memory backend (local or remote).
+
+    Raises UnconfiguredError if no config exists and auto-migration fails.
+    Auto-migration: if [local] deps are importable but no config exists, writes
+    a local config automatically (upgrade path for existing installations).
+    """
+    if not is_configured():
+        if not _detect_and_migrate():
+            raise UnconfiguredError(
+                "SmartMemory is not configured. Run: smartmemory setup"
+            )
+    cfg = load_config()
+    if cfg.mode == "remote":
+        return _get_remote_memory(cfg)
+    return _get_local_memory(data_dir)
 
 
 def _shutdown() -> None:
@@ -110,32 +163,46 @@ def _normalize_ingest_result(result) -> str:
 
 
 def ingest(content: str, memory_type: str = "episodic") -> str:
-    """Ingest content. Acquires write lock (filelock) before calling mem.ingest().
+    """Ingest content into the active backend.
 
-    usearch and entity_patterns.jsonl are written during mem.ingest(). Both require
-    cross-process coordination via filelock. Lock is held for the duration of ingest.
-    On Timeout: raises filelock.Timeout — caller decides how to surface (MCP tool
-    returns error string; hook subprocess catches and logs, exits 0).
+    Remote mode: delegates to RemoteMemory.ingest() — no file lock needed.
+    Local mode: acquires filelock before calling SmartMemory.ingest() because
+      usearch and entity_patterns.jsonl require cross-process coordination.
+      On Timeout: raises filelock.Timeout — caller surfaces as error string.
     """
     mem = get_memory()
-    # Reuse the path the singleton was initialised with; fall back to env-var resolution
-    # only when called before get_memory() (should not happen in normal use).
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.ingest(content, memory_type)
+    # Local path — lazy filelock (only available with [local] extra)
     data_path = _data_path if _data_path is not None else _resolve_data_dir()
     lock = _get_lock_file(data_path)
-    with lock:  # Timeout propagates to caller — see lock timeout policy
+    with lock:
         result = mem.ingest(content, memory_type=memory_type)
     return _normalize_ingest_result(result)
 
 
 def search(query: str, top_k: int = 5) -> list[dict]:
+    """Search memories by semantic similarity. Returns list[dict] in both modes."""
     mem = get_memory()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.search(query, top_k)  # already returns list[dict]
     results = mem.search(query, top_k=top_k)
-    return [r.to_dict() for r in results]
+    return [r.to_dict() for r in results]  # MemoryItem objects need .to_dict()
 
 
 def recall(cwd: str | None = None, top_k: int = 10) -> str:
+    """Recall recent and relevant memories. Remote delegates to RemoteMemory.recall().
+
+    Local uses sort_by="recency" which is not supported in the remote search API,
+    so recall() cannot be unified — explicit branch required.
+    """
     mem = get_memory()
-    # Combine recency and semantic relevance
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.recall(cwd, top_k)
+    # Local path unchanged
     recent = mem.search("", top_k=top_k // 2, sort_by="recency")
     semantic = mem.search(cwd or "", top_k=top_k // 2) if cwd else []
     seen: set[str] = set()
@@ -153,6 +220,13 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
 
 
 def get(item_id: str) -> dict:
+    """Get a single memory by item_id. Returns dict in both modes.
+
+    Local returns MemoryItem (needs .to_dict()); remote returns dict | None directly.
+    """
     mem = get_memory()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.get(item_id) or {}  # already a dict
     item = mem.get(item_id)
     return item.to_dict() if item else {}

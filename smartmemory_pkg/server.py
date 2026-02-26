@@ -1,5 +1,5 @@
 from fastmcp import FastMCP
-from smartmemory_pkg.storage import ingest, search, recall, get
+from smartmemory_pkg.storage import get_memory, ingest, search, recall, get
 
 mcp = FastMCP("smartmemory")
 
@@ -38,6 +38,36 @@ def memory_get(item_id: str) -> dict:
         return get(item_id)
     except Exception as e:
         return {"error": str(e)}
+
+
+@mcp.tool()
+def login(api_key: str) -> str:
+    """Authenticate with the SmartMemory hosted API. No-op in local mode."""
+    mem = get_memory()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.login(api_key)
+    return "Local mode — no authentication required"
+
+
+@mcp.tool()
+def whoami() -> str:
+    """Show current session info. No-op in local mode."""
+    mem = get_memory()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.whoami()
+    return "Local mode — no authentication required"
+
+
+@mcp.tool()
+def switch_team(team_id: str) -> str:
+    """Switch to a different team/workspace. No-op in local mode."""
+    mem = get_memory()
+    from smartmemory_pkg.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return mem.switch_team(team_id)
+    return "Local mode — teams not applicable"
 
 
 def main() -> None:

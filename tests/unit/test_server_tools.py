@@ -59,3 +59,61 @@ def test_memory_get_returns_dict():
         result = memory_get.fn("abc")
     assert isinstance(result, dict)
     assert result["item_id"] == "abc"
+
+
+# ---------------------------------------------------------------------------
+# Auth tools — local mode fast-path (DIST-LITE-5, Phase 3b)
+# ---------------------------------------------------------------------------
+
+
+def test_login_local_mode_returns_no_auth_message():
+    """login.fn() returns a 'no authentication' message in local mode."""
+    from unittest.mock import MagicMock
+    from smartmemory_pkg.remote_backend import RemoteMemory
+
+    local_mem = MagicMock()  # not a RemoteMemory instance
+    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
+        from smartmemory_pkg.server import login
+
+        result = login.fn("sk_test")
+    assert "Local mode" in result
+    assert "authentication" in result.lower()
+
+
+def test_whoami_local_mode_returns_no_auth_message():
+    """whoami.fn() returns a 'no authentication' message in local mode."""
+    from unittest.mock import MagicMock
+
+    local_mem = MagicMock()
+    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
+        from smartmemory_pkg.server import whoami
+
+        result = whoami.fn()
+    assert "Local mode" in result
+
+
+def test_switch_team_local_mode_returns_not_applicable():
+    """switch_team.fn() returns a 'not applicable' message in local mode."""
+    from unittest.mock import MagicMock
+
+    local_mem = MagicMock()
+    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
+        from smartmemory_pkg.server import switch_team
+
+        result = switch_team.fn("team-xyz")
+    assert "Local mode" in result
+
+
+def test_login_remote_mode_delegates_to_remote_memory():
+    """login.fn() calls RemoteMemory.login() in remote mode."""
+    from unittest.mock import MagicMock
+    from smartmemory_pkg.remote_backend import RemoteMemory
+
+    remote_mem = MagicMock(spec=RemoteMemory)
+    remote_mem.login.return_value = "Logged in. Team: t1"
+    with patch("smartmemory_pkg.server.get_memory", return_value=remote_mem):
+        from smartmemory_pkg.server import login
+
+        result = login.fn("sk_live_key")
+    remote_mem.login.assert_called_once_with("sk_live_key")
+    assert result == "Logged in. Team: t1"
