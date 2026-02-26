@@ -1,5 +1,5 @@
 from fastmcp import FastMCP
-from smartmemory_cc.storage import ingest, search, recall, get
+from smartmemory_pkg.storage import ingest, search, recall, get
 
 mcp = FastMCP("smartmemory")
 
@@ -42,7 +42,7 @@ def memory_get(item_id: str) -> dict:
 
 def main() -> None:
     try:
-        from smartmemory_cc.events_server import start_background
+        from smartmemory_pkg.events_server import start_background
         start_background()   # non-fatal: logs warning and continues if port unavailable
     except Exception as exc:
         import logging

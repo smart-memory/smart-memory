@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 def test_memory_ingest_returns_item_id():
     """memory_ingest.fn() returns the item_id string on success."""
-    with patch("smartmemory_cc.server.ingest", return_value="item-abc-123"):
-        from smartmemory_cc.server import memory_ingest
+    with patch("smartmemory_pkg.server.ingest", return_value="item-abc-123"):
+        from smartmemory_pkg.server import memory_ingest
 
         result = memory_ingest.fn("some text")
     assert result == "item-abc-123"
@@ -18,8 +18,8 @@ def test_memory_ingest_returns_item_id():
 
 def test_memory_ingest_error_returns_string():
     """memory_ingest.fn() returns 'Error: ...' string when storage raises."""
-    with patch("smartmemory_cc.server.ingest", side_effect=RuntimeError("disk full")):
-        from smartmemory_cc.server import memory_ingest
+    with patch("smartmemory_pkg.server.ingest", side_effect=RuntimeError("disk full")):
+        from smartmemory_pkg.server import memory_ingest
 
         result = memory_ingest.fn("some text")
     assert result.startswith("Error:")
@@ -29,8 +29,8 @@ def test_memory_ingest_error_returns_string():
 def test_memory_search_returns_list():
     """memory_search.fn() returns a list of dicts on success."""
     mock_results = [{"item_id": "1", "content": "hello"}]
-    with patch("smartmemory_cc.server.search", return_value=mock_results):
-        from smartmemory_cc.server import memory_search
+    with patch("smartmemory_pkg.server.search", return_value=mock_results):
+        from smartmemory_pkg.server import memory_search
 
         result = memory_search.fn("query")
     assert isinstance(result, list)
@@ -40,10 +40,10 @@ def test_memory_search_returns_list():
 def test_memory_recall_returns_string():
     """memory_recall.fn() returns a string context block."""
     with patch(
-        "smartmemory_cc.server.recall",
+        "smartmemory_pkg.server.recall",
         return_value="## SmartMemory Context\n- [episodic] hello",
     ):
-        from smartmemory_cc.server import memory_recall
+        from smartmemory_pkg.server import memory_recall
 
         result = memory_recall.fn(cwd="/project")
     assert isinstance(result, str)
@@ -53,8 +53,8 @@ def test_memory_recall_returns_string():
 def test_memory_get_returns_dict():
     """memory_get.fn() returns a dict for the given item_id."""
     mock_item = {"item_id": "abc", "content": "some memory"}
-    with patch("smartmemory_cc.server.get", return_value=mock_item):
-        from smartmemory_cc.server import memory_get
+    with patch("smartmemory_pkg.server.get", return_value=mock_item):
+        from smartmemory_pkg.server import memory_get
 
         result = memory_get.fn("abc")
     assert isinstance(result, dict)

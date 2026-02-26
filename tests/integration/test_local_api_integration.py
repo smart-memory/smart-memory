@@ -12,7 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from smartmemory_cc.local_api import api as local_api
+from smartmemory_pkg.local_api import api as local_api
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ def backend():
 @pytest.fixture()
 def client(backend, monkeypatch):
     """TestClient with local_api mounted at /memory, backed by the in-memory SQLiteBackend."""
-    import smartmemory_cc.local_api as _mod
+    import smartmemory_pkg.local_api as _mod
     monkeypatch.setattr(_mod, "_get_backend", lambda: backend)
 
     wrapper = FastAPI()

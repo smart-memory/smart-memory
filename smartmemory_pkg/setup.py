@@ -133,7 +133,7 @@ def _seed_data_dir() -> None:
     raw = os.environ.get("SMARTMEMORY_DATA_DIR")
     data_dir = Path(raw) if raw else DATA_DIR
     data_dir.mkdir(parents=True, exist_ok=True)
-    from smartmemory_cc.patterns import LitePatternManager
+    from smartmemory_pkg.patterns import LitePatternManager
 
     LitePatternManager(data_dir)  # seeds entity_patterns.jsonl if absent
 

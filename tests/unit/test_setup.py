@@ -10,10 +10,10 @@ def test_register_hooks_idempotent(tmp_path):
     hooks_dest = tmp_path / "hooks"
 
     with (
-        patch("smartmemory_cc.setup.SETTINGS", settings_file),
-        patch("smartmemory_cc.setup.HOOKS_DEST", hooks_dest),
+        patch("smartmemory_pkg.setup.SETTINGS", settings_file),
+        patch("smartmemory_pkg.setup.HOOKS_DEST", hooks_dest),
     ):
-        from smartmemory_cc.setup import _register_hooks, _get_hook_registrations
+        from smartmemory_pkg.setup import _register_hooks, _get_hook_registrations
 
         _register_hooks()
         _register_hooks()  # second run
@@ -46,10 +46,10 @@ def test_copy_skills_no_overwrite(tmp_path):
     (skills_src / "search.md").write_text("# Search skill")
 
     with (
-        patch("smartmemory_cc.setup.SKILLS_SRC", skills_src),
-        patch("smartmemory_cc.setup.CLAUDE_DIR", tmp_path),
+        patch("smartmemory_pkg.setup.SKILLS_SRC", skills_src),
+        patch("smartmemory_pkg.setup.CLAUDE_DIR", tmp_path),
     ):
-        from smartmemory_cc.setup import _copy_skills
+        from smartmemory_pkg.setup import _copy_skills
 
         _copy_skills()
 
@@ -61,8 +61,8 @@ def test_copy_skills_no_overwrite(tmp_path):
 
 def test_seed_data_dir_idempotent(tmp_path):
     """_seed_data_dir() can be called twice without error or data corruption."""
-    with patch("smartmemory_cc.setup.DATA_DIR", tmp_path):
-        from smartmemory_cc.setup import _seed_data_dir
+    with patch("smartmemory_pkg.setup.DATA_DIR", tmp_path):
+        from smartmemory_pkg.setup import _seed_data_dir
 
         _seed_data_dir()
         first_content = (tmp_path / "entity_patterns.jsonl").read_text()
@@ -80,10 +80,10 @@ def test_deregister_hooks_removes_entries(tmp_path):
 
     # First register
     with (
-        patch("smartmemory_cc.setup.SETTINGS", settings_file),
-        patch("smartmemory_cc.setup.HOOKS_DEST", hooks_dest),
+        patch("smartmemory_pkg.setup.SETTINGS", settings_file),
+        patch("smartmemory_pkg.setup.HOOKS_DEST", hooks_dest),
     ):
-        from smartmemory_cc.setup import _register_hooks, _deregister_hooks
+        from smartmemory_pkg.setup import _register_hooks, _deregister_hooks
 
         _register_hooks()
         _deregister_hooks()
@@ -103,10 +103,10 @@ def test_deregister_hooks_preserves_other_hooks(tmp_path):
     settings_file.write_text(json.dumps({"hooks": {"SessionStart": [other_hook]}}))
 
     with (
-        patch("smartmemory_cc.setup.SETTINGS", settings_file),
-        patch("smartmemory_cc.setup.HOOKS_DEST", hooks_dest),
+        patch("smartmemory_pkg.setup.SETTINGS", settings_file),
+        patch("smartmemory_pkg.setup.HOOKS_DEST", hooks_dest),
     ):
-        from smartmemory_cc.setup import _register_hooks, _deregister_hooks
+        from smartmemory_pkg.setup import _register_hooks, _deregister_hooks
 
         _register_hooks()
         _deregister_hooks()
@@ -124,8 +124,8 @@ def test_remove_data_dir_honours_env_var(tmp_path, monkeypatch):
     (custom_dir / "memory.db").touch()
     monkeypatch.setenv("SMARTMEMORY_DATA_DIR", str(custom_dir))
 
-    with patch("smartmemory_cc.setup.DATA_DIR", tmp_path / "default"):
-        from smartmemory_cc.setup import _remove_data_dir
+    with patch("smartmemory_pkg.setup.DATA_DIR", tmp_path / "default"):
+        from smartmemory_pkg.setup import _remove_data_dir
 
         _remove_data_dir()
 
@@ -137,8 +137,8 @@ def test_seed_data_dir_honours_env_var(tmp_path, monkeypatch):
     custom_dir = tmp_path / "custom"
     monkeypatch.setenv("SMARTMEMORY_DATA_DIR", str(custom_dir))
 
-    with patch("smartmemory_cc.setup.DATA_DIR", tmp_path / "default"):
-        from smartmemory_cc.setup import _seed_data_dir
+    with patch("smartmemory_pkg.setup.DATA_DIR", tmp_path / "default"):
+        from smartmemory_pkg.setup import _seed_data_dir
 
         _seed_data_dir()
 

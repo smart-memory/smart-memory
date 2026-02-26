@@ -1,6 +1,6 @@
 import logging
 import click
-from smartmemory_cc.storage import ingest, recall
+from smartmemory_pkg.storage import ingest, recall
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ def cli() -> None:
 
 
 # Register setup/uninstall commands from setup module
-from smartmemory_cc.setup import setup as _setup_cmd, uninstall as _uninstall_cmd  # noqa: E402
+from smartmemory_pkg.setup import setup as _setup_cmd, uninstall as _uninstall_cmd  # noqa: E402
 
 cli.add_command(_setup_cmd, name="setup")
 cli.add_command(_uninstall_cmd, name="uninstall")
@@ -52,7 +52,7 @@ def events_server_cmd(port: int) -> None:
     Runs automatically inside the MCP server process. Use this command
     only for debugging or to run the events server standalone.
     """
-    from smartmemory_cc.events_server import main
+    from smartmemory_pkg.events_server import main
     main(port=port)
 
 
@@ -61,7 +61,7 @@ def events_server_cmd(port: int) -> None:
 @click.option("--no-browser", is_flag=True, default=False, help="Don't auto-open browser.")
 def viewer_cmd(port: int, no_browser: bool) -> None:
     """Open the knowledge graph viewer (loginless, no Docker required)."""
-    from smartmemory_cc.viewer_server import main  # lazy — avoids fastapi import at CLI startup
+    from smartmemory_pkg.viewer_server import main  # lazy — avoids fastapi import at CLI startup
     main(port=port, open_browser=not no_browser)
 
 

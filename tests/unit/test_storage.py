@@ -1,4 +1,4 @@
-"""Tests for smartmemory_cc.storage singleton and operations."""
+"""Tests for smartmemory_pkg.storage singleton and operations."""
 
 import pytest
 from unittest.mock import MagicMock, patch
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 def _reset_singleton():
     """Reset the storage module singleton between tests."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     storage._memory = None
 
@@ -20,15 +20,15 @@ def reset_storage():
 
 def test_get_memory_singleton(tmp_path):
     """get_memory() returns the same instance on repeated calls."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     mock_mem = MagicMock()
     mock_pm = MagicMock()
     mock_pm.get_patterns.return_value = {}
 
     with (
-        patch("smartmemory_cc.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_cc.patterns.LitePatternManager", return_value=mock_pm),
+        patch("smartmemory_pkg.storage._resolve_data_dir", return_value=tmp_path),
+        patch("smartmemory_pkg.patterns.LitePatternManager", return_value=mock_pm),
         patch("smartmemory.tools.factory.create_lite_memory", return_value=mock_mem),
     ):
         m1 = storage.get_memory()
@@ -38,15 +38,15 @@ def test_get_memory_singleton(tmp_path):
 
 def test_get_memory_registers_atexit(tmp_path):
     """get_memory() registers _shutdown with atexit on first init."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     mock_mem = MagicMock()
     mock_pm = MagicMock()
     mock_pm.get_patterns.return_value = {}
 
     with (
-        patch("smartmemory_cc.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_cc.patterns.LitePatternManager", return_value=mock_pm),
+        patch("smartmemory_pkg.storage._resolve_data_dir", return_value=tmp_path),
+        patch("smartmemory_pkg.patterns.LitePatternManager", return_value=mock_pm),
         patch("smartmemory.tools.factory.create_lite_memory", return_value=mock_mem),
         patch("atexit.register") as mock_register,
     ):
@@ -56,7 +56,7 @@ def test_get_memory_registers_atexit(tmp_path):
 
 def test_shutdown_calls_save_and_close():
     """_shutdown() calls _save() and backend.close() on the memory instance."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     mock_vector = MagicMock()
     mock_graph = MagicMock()
@@ -73,7 +73,7 @@ def test_shutdown_calls_save_and_close():
 
 def test_shutdown_clears_singleton():
     """_shutdown() sets _memory to None after running."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     storage._memory = MagicMock()
     storage._shutdown()
@@ -82,7 +82,7 @@ def test_shutdown_clears_singleton():
 
 def test_shutdown_noop_if_memory_none():
     """_shutdown() does nothing and does not raise if _memory is None."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     storage._memory = None
     storage._shutdown()  # must not raise
@@ -90,14 +90,14 @@ def test_shutdown_noop_if_memory_none():
 
 def test_normalize_ingest_result_str():
     """_normalize_ingest_result returns str directly."""
-    from smartmemory_cc.storage import _normalize_ingest_result
+    from smartmemory_pkg.storage import _normalize_ingest_result
 
     assert _normalize_ingest_result("abc-123") == "abc-123"
 
 
 def test_normalize_ingest_result_dict():
     """_normalize_ingest_result extracts item_id from dict."""
-    from smartmemory_cc.storage import _normalize_ingest_result
+    from smartmemory_pkg.storage import _normalize_ingest_result
 
     assert (
         _normalize_ingest_result({"item_id": "abc-123", "queued": False}) == "abc-123"
@@ -106,7 +106,7 @@ def test_normalize_ingest_result_dict():
 
 def test_ingest_acquires_lock(tmp_path):
     """ingest() acquires FileLock before calling mem.ingest()."""
-    import smartmemory_cc.storage as storage
+    import smartmemory_pkg.storage as storage
 
     mock_mem = MagicMock()
     mock_mem.ingest.return_value = "item-123"
@@ -117,8 +117,8 @@ def test_ingest_acquires_lock(tmp_path):
     mock_lock_instance.__exit__ = MagicMock(return_value=False)
 
     with (
-        patch("smartmemory_cc.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_cc.storage.FileLock", return_value=mock_lock_instance),
+        patch("smartmemory_pkg.storage._resolve_data_dir", return_value=tmp_path),
+        patch("smartmemory_pkg.storage.FileLock", return_value=mock_lock_instance),
     ):
         result = storage.ingest("test content")
 

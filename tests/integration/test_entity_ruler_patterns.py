@@ -13,7 +13,7 @@ import pytest
 @pytest.mark.integration
 def test_get_patterns_returns_correct_shape(tmp_path):
     """get_patterns() returns dict[str, str] as EntityRulerStage expects."""
-    from smartmemory_cc.patterns import LitePatternManager
+    from smartmemory_pkg.patterns import LitePatternManager
 
     pm = LitePatternManager(tmp_path)
     patterns = pm.get_patterns()
@@ -28,7 +28,7 @@ def test_get_patterns_returns_correct_shape(tmp_path):
 def test_create_lite_memory_accepts_pattern_manager(tmp_path):
     """create_lite_memory() accepts entity_ruler_patterns without raising."""
     from smartmemory.tools.factory import create_lite_memory
-    from smartmemory_cc.patterns import LitePatternManager
+    from smartmemory_pkg.patterns import LitePatternManager
 
     pm = LitePatternManager(tmp_path)
     # Must not raise — this is the critical seam between plugin and core
@@ -39,7 +39,7 @@ def test_create_lite_memory_accepts_pattern_manager(tmp_path):
 @pytest.mark.integration
 def test_frequency_gate_controls_active_patterns(tmp_path):
     """Only patterns with frequency >= 2 are returned by get_patterns()."""
-    from smartmemory_cc.patterns import LitePatternManager
+    from smartmemory_pkg.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     entries = [
@@ -65,7 +65,7 @@ def test_frequency_gate_controls_active_patterns(tmp_path):
 @pytest.mark.integration
 def test_add_pattern_persists_across_reload(tmp_path):
     """add_pattern() persists to JSONL so a fresh LitePatternManager sees the change."""
-    from smartmemory_cc.patterns import LitePatternManager
+    from smartmemory_pkg.patterns import LitePatternManager
 
     pm1 = LitePatternManager(tmp_path)
     # Add pattern twice to hit the frequency >= 2 gate
@@ -81,7 +81,7 @@ def test_add_pattern_persists_across_reload(tmp_path):
 @pytest.mark.integration
 def test_seed_patterns_present_after_fresh_init(tmp_path):
     """A fresh data directory gets seed patterns from bundled seed_patterns.jsonl."""
-    from smartmemory_cc.patterns import LitePatternManager, SEED_PATTERNS_FILE
+    from smartmemory_pkg.patterns import LitePatternManager, SEED_PATTERNS_FILE
 
     assert SEED_PATTERNS_FILE.exists(), (
         "bundled seed_patterns.jsonl must exist in package"

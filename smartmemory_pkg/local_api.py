@@ -28,7 +28,7 @@ _TOP_LEVEL_FIELDS = frozenset({
 
 def _get_backend():
     """Return the SQLiteBackend directly — avoids going through SmartMemory pipeline."""
-    from smartmemory_cc.storage import get_memory
+    from smartmemory_pkg.storage import get_memory
     return get_memory()._graph.backend
 
 

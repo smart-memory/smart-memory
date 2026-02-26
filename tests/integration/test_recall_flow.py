@@ -5,7 +5,7 @@ Verifies the end-to-end path from storage.ingest() through to storage.recall().
 """
 
 import pytest
-import smartmemory_cc.storage as storage_mod
+import smartmemory_pkg.storage as storage_mod
 
 
 @pytest.fixture(autouse=True)

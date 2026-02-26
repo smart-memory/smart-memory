@@ -48,8 +48,8 @@ def get_memory(data_dir: str | None = None) -> "SmartMemory":
         if _memory is not None:  # double-checked
             return _memory
         from smartmemory.tools.factory import create_lite_memory
-        from smartmemory_cc.event_sink import get_event_sink
-        from smartmemory_cc.patterns import LitePatternManager
+        from smartmemory_pkg.event_sink import get_event_sink
+        from smartmemory_pkg.patterns import LitePatternManager
 
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
