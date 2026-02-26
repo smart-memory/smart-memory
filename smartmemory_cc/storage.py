@@ -48,6 +48,7 @@ def get_memory(data_dir: str | None = None) -> "SmartMemory":
         if _memory is not None:  # double-checked
             return _memory
         from smartmemory.tools.factory import create_lite_memory
+        from smartmemory_cc.event_sink import get_event_sink
         from smartmemory_cc.patterns import LitePatternManager
 
         data_path = _resolve_data_dir(data_dir)
@@ -57,6 +58,7 @@ def get_memory(data_dir: str | None = None) -> "SmartMemory":
         _memory = create_lite_memory(
             data_dir=str(data_path),
             entity_ruler_patterns=pattern_manager,
+            event_sink=get_event_sink(),    # DIST-LITE-3
         )
         atexit.register(_shutdown)
         return _memory

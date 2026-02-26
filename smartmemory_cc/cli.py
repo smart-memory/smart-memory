@@ -44,5 +44,17 @@ def recall_cmd(cwd: str, top_k: int) -> None:
     click.echo(result)
 
 
+@cli.command("events-server")
+@click.option("--port", default=9004, show_default=True, help="WebSocket port")
+def events_server_cmd(port: int) -> None:
+    """Run the lite WebSocket events server (graph animations without Redis).
+
+    Runs automatically inside the MCP server process. Use this command
+    only for debugging or to run the events server standalone.
+    """
+    from smartmemory_cc.events_server import main
+    main(port=port)
+
+
 if __name__ == "__main__":
     cli()

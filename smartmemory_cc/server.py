@@ -41,6 +41,12 @@ def memory_get(item_id: str) -> dict:
 
 
 def main() -> None:
+    try:
+        from smartmemory_cc.events_server import start_background
+        start_background()   # non-fatal: logs warning and continues if port unavailable
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("events-server start failed (non-fatal): %s", exc)
     mcp.run(show_banner=False)
 
 
