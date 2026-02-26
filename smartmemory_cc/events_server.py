@@ -19,6 +19,52 @@ import threading
 
 log = logging.getLogger(__name__)
 
+# Span-envelope fields that belong at the message top level.
+# Everything else in a queue item becomes the nested ``data`` payload
+# that classifyEvent.js reads from ``raw.data``.
+_SPAN_STRUCTURAL_FIELDS = frozenset({
+    "event_type", "component", "operation", "name",
+    "trace_id", "span_id", "parent_span_id", "duration_ms",
+    "error", "status",
+})
+
+
+def _to_viewer_message(item: dict) -> dict:
+    """Reshape a raw sink queue item to the viewer's ``new_event`` message schema.
+
+    classifyEvent.js expects::
+
+        {
+            "type": "new_event",
+            "component": "graph",
+            "operation": "add_node",
+            "name": "graph.add_node",
+            "event_type": "span_event",
+            "trace_id": "...",        # may be null in lite mode
+            "span_id": "...",
+            "parent_span_id": null,
+            "duration_ms": null,
+            "data": {                 # node/edge-specific payload
+                "memory_id": "...",
+                ...
+            }
+        }
+    """
+    data = {k: v for k, v in item.items() if k not in _SPAN_STRUCTURAL_FIELDS}
+    return {
+        "type": "new_event",
+        "event_type": item.get("event_type", "span"),
+        "component": item.get("component", "unknown"),
+        "operation": item.get("operation", ""),
+        "name": item.get("name", ""),
+        "trace_id": item.get("trace_id") or None,
+        "span_id": item.get("span_id") or None,
+        "parent_span_id": item.get("parent_span_id"),
+        "duration_ms": item.get("duration_ms"),
+        "data": data,
+    }
+
+
 _server_thread: threading.Thread | None = None
 _server_thread_lock = threading.Lock()
 _stop_event = threading.Event()
@@ -36,7 +82,7 @@ async def _broadcast(sink, clients: set) -> None:
         return
 
     import json
-    message = json.dumps(item)
+    message = json.dumps(_to_viewer_message(item))
     if clients:
         await asyncio.gather(
             *[client.send(message) for client in clients],

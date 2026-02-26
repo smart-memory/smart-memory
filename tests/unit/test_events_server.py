@@ -208,7 +208,7 @@ class TestServe:
 
 class TestBroadcast:
     def test_item_sent_to_connected_client(self):
-        """An item in the queue is sent to the mock WebSocket client."""
+        """An item in the queue is broadcast as a new_event envelope to connected clients."""
         import smartmemory_cc.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
@@ -216,7 +216,19 @@ class TestBroadcast:
 
         async def _run():
             sink = InProcessQueueSink()
-            item = {"event_type": "node.added", "id": "abc"}
+            # Simulate a graph.add_node span event as produced by _emit_span
+            item = {
+                "event_type": "span_event",
+                "component": "graph",
+                "operation": "add_node",
+                "name": "graph.add_node",
+                "trace_id": "",
+                "span_id": "abc123",
+                "parent_span_id": None,
+                "memory_id": "item-1",
+                "memory_type": "semantic",
+                "label": "hello",
+            }
             await sink._q.put(item)
 
             mock_ws = AsyncMock()
@@ -227,7 +239,13 @@ class TestBroadcast:
 
             await _mod._broadcast(sink, clients)
 
-            mock_ws.send.assert_called_once_with(json.dumps(item))
+            # Must be wrapped in new_event envelope; data contains node-specific fields
+            sent_msg = json.loads(mock_ws.send.call_args[0][0])
+            assert sent_msg["type"] == "new_event"
+            assert sent_msg["component"] == "graph"
+            assert sent_msg["operation"] == "add_node"
+            assert sent_msg["data"]["memory_id"] == "item-1"
+            assert sent_msg["trace_id"] is None  # empty string → None
 
         asyncio.run(_run())
 
