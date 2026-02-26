@@ -12,6 +12,8 @@ dependencies = [
     "filelock>=3.12",
     "click>=8.0",
     "websockets>=12.0",    # DIST-LITE-3: lite WebSocket events server
+    "fastapi>=0.110",      # DIST-LITE-4: local graph API
+    "uvicorn>=0.29",       # DIST-LITE-4: viewer HTTP server
 ]
 
 [project.scripts]
@@ -19,7 +21,10 @@ smartmemory-cc = "smartmemory_cc.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["smartmemory_cc"]
-include = ["smartmemory_cc/data/seed_patterns.jsonl"]
+include = [
+    "smartmemory_cc/data/seed_patterns.jsonl",
+    "smartmemory_cc/static/**/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

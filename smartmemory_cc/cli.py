@@ -56,5 +56,14 @@ def events_server_cmd(port: int) -> None:
     main(port=port)
 
 
+@cli.command("viewer")
+@click.option("--port", default=9005, show_default=True, help="Port for the viewer server.")
+@click.option("--no-browser", is_flag=True, default=False, help="Don't auto-open browser.")
+def viewer_cmd(port: int, no_browser: bool) -> None:
+    """Open the knowledge graph viewer (loginless, no Docker required)."""
+    from smartmemory_cc.viewer_server import main  # lazy — avoids fastapi import at CLI startup
+    main(port=port, open_browser=not no_browser)
+
+
 if __name__ == "__main__":
     cli()

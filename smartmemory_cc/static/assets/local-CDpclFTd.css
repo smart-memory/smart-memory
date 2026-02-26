@@ -1,0 +1,1 @@
+.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}@keyframes fade-in{0%{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}.animate-fade-in{animation:fade-in .3s ease-out}.cytoscape-container{width:100%;height:100%}
