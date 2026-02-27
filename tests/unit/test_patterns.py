@@ -84,6 +84,67 @@ def test_add_pattern_quality_gate_name_len(tmp_path):
         pm.add_pattern("ab", "TOOL", confidence=0.9)
 
 
+# ------------------------------------------------------------------ #
+# initial_frequency (CODE-DEV-4)
+# ------------------------------------------------------------------ #
+
+
+def test_add_pattern_initial_frequency_2_visible_immediately(tmp_path):
+    """Pattern added with initial_frequency=2 passes the quality gate immediately."""
+    from smartmemory_pkg.patterns import LitePatternManager
+
+    pattern_file = tmp_path / "entity_patterns.jsonl"
+    pattern_file.write_text("")  # empty file, no seeds
+
+    pm = LitePatternManager(tmp_path)
+    pm.add_pattern("FastAPI", "Technology", confidence=0.9, initial_frequency=2)
+    assert "fastapi" in pm.get_patterns()
+
+
+def test_add_pattern_initial_frequency_1_needs_second_call(tmp_path):
+    """Default initial_frequency=1 means pattern is invisible until incremented."""
+    from smartmemory_pkg.patterns import LitePatternManager
+
+    pattern_file = tmp_path / "entity_patterns.jsonl"
+    pattern_file.write_text("")
+
+    pm = LitePatternManager(tmp_path)
+    pm.add_pattern("Flask", "Technology", confidence=0.9)
+    assert "flask" not in pm.get_patterns()  # frequency=1
+
+    pm.add_pattern("Flask", "Technology", confidence=0.9)
+    assert "flask" in pm.get_patterns()  # frequency=2
+
+
+def test_add_pattern_initial_frequency_persists_to_file(tmp_path):
+    """initial_frequency value is written to JSONL and survives reload."""
+    from smartmemory_pkg.patterns import LitePatternManager
+
+    pattern_file = tmp_path / "entity_patterns.jsonl"
+    pattern_file.write_text("")
+
+    pm = LitePatternManager(tmp_path)
+    pm.add_pattern("FastAPI", "Technology", confidence=0.9, initial_frequency=2)
+
+    # Reload from disk
+    pm2 = LitePatternManager(tmp_path)
+    assert "fastapi" in pm2.get_patterns()
+
+
+def test_add_pattern_validation_still_applies_with_initial_frequency(tmp_path):
+    """Name length and confidence validation applies regardless of initial_frequency."""
+    from smartmemory_pkg.patterns import LitePatternManager
+
+    pattern_file = tmp_path / "entity_patterns.jsonl"
+    pattern_file.write_text("")
+
+    pm = LitePatternManager(tmp_path)
+    with pytest.raises(ValueError, match="length"):
+        pm.add_pattern("abc", "Tool", confidence=0.9, initial_frequency=2)
+    with pytest.raises(ValueError, match="confidence"):
+        pm.add_pattern("FastAPI", "Tool", confidence=0.5, initial_frequency=2)
+
+
 def test_seed_survives_plugin_update(tmp_path):
     """Existing entity_patterns.jsonl is not overwritten on second instantiation."""
     from smartmemory_pkg.patterns import LitePatternManager

@@ -69,8 +69,17 @@ class LitePatternManager:
             if v.get("frequency", 1) >= QUALITY_MIN_FREQUENCY
         }
 
-    def add_pattern(self, name: str, label: str, confidence: float = 0.85) -> None:
-        """Add or increment a pattern. Persists to JSONL. Caller holds filelock."""
+    def add_pattern(
+        self, name: str, label: str, confidence: float = 0.85, initial_frequency: int = 1
+    ) -> None:
+        """Add or increment a pattern. Persists to JSONL. Caller holds filelock.
+
+        Args:
+            initial_frequency: Starting frequency for new patterns. Use 2 for
+                AST-validated code patterns to bypass the ``frequency >= 2``
+                quality gate in ``get_patterns()``. Default 1 preserves existing
+                threshold for LLM-discovered patterns.
+        """
         if confidence <= QUALITY_MIN_CONFIDENCE:
             raise ValueError(f"confidence {confidence} <= {QUALITY_MIN_CONFIDENCE}")
         if len(name) <= QUALITY_MIN_NAME_LEN:
@@ -86,7 +95,7 @@ class LitePatternManager:
                 "name": name,
                 "label": label,
                 "confidence": confidence,
-                "frequency": 1,
+                "frequency": initial_frequency,
             }
         self._rewrite()
 
