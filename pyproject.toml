@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartmemory"
-version = "1.0.0"
+version = "1.0.1"
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=2.0",
@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 local = [
     # smartmemory-core[lite] brings: core library + spaCy (hard dep) + usearch ([lite] extra)
-    "smartmemory-core[lite]>=0.5.2",
+    "smartmemory-core[lite]>=0.5.3",
     "filelock>=3.12",    # SQLite write locking across processes
 ]
 

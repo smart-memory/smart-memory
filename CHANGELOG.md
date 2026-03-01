@@ -1,5 +1,11 @@
 # Changelog — smartmemory
 
+## [1.0.1] - 2026-03-01
+
+### Fixed
+
+- Bumped `smartmemory-core[lite]` minimum to `>=0.5.3` (fixes pymongo lazy import, VectorStore lazy init, and no-op VersionTracker for SQLiteBackend).
+
 ## [1.0.0] - 2026-03-01
 
 ### Breaking Changes
