@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 local = [
     # smartmemory-core[lite] brings: core library + spaCy (hard dep) + usearch ([lite] extra)
-    "smartmemory-core[lite]>=0.3.1",
+    "smartmemory-core[lite]>=0.5.2",
     "filelock>=3.12",    # SQLite write locking across processes
 ]
 
