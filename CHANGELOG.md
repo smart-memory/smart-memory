@@ -1,6 +1,6 @@
 # Changelog — smartmemory
 
-## [Unreleased]
+## [1.0.0] - 2026-03-01
 
 ### Breaking Changes
 
