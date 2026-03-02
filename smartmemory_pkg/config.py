@@ -190,7 +190,7 @@ def _detect_and_migrate() -> bool:
     """Auto-write local config if local pipeline deps are already installed.
 
     Called by storage.get_memory() before raising UnconfiguredError.
-    Handles the upgrade path: users who had smart-memory-local installed
+    Handles the upgrade path: users who had smart-memory installed
     get their existing behaviour preserved without running setup manually.
 
     Returns True if migration succeeded (local config written).
