@@ -156,5 +156,5 @@ def stop_background() -> None:
 
 
 def main(port: int = 9004) -> None:
-    """Standalone entry point. Run via: smartmemory-cc events-server."""
+    """Standalone entry point. Run via: smartmemory events-server."""
     asyncio.run(_serve(port=port))

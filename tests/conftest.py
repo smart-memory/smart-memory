@@ -1,4 +1,4 @@
-"""Pytest configuration for smartmemory-cc tests."""
+"""Pytest configuration for smartmemory tests."""
 
 import pytest
 

@@ -167,22 +167,12 @@ def test_save_config_omits_smartmemory_table_when_unconfigured():
 # ── _detect_and_migrate ───────────────────────────────────────────────────────
 
 
-def test_detect_and_migrate_writes_local_config_when_deps_importable():
-    with patch.dict("sys.modules", {
-        "usearch": MagicMock(),
-        "smartmemory.graph.backends.sqlite": MagicMock(),
-    }):
-        result = _detect_and_migrate()
+def test_detect_and_migrate_always_writes_local_config():
+    """Local deps are now hard dependencies, so migration always succeeds."""
+    result = _detect_and_migrate()
     assert result is True
     cfg = load_config()
     assert cfg.mode == "local"
-
-
-def test_detect_and_migrate_returns_false_when_deps_missing():
-    # usearch not in sys.modules and can't be imported
-    with patch.dict("sys.modules", {"usearch": None}):
-        result = _detect_and_migrate()
-    assert result is False
 
 
 # ── get_api_key ───────────────────────────────────────────────────────────────

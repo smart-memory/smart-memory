@@ -13,7 +13,7 @@ AI memory for Claude Code and other MCP-compatible tools. Stores memories locall
 pip install smartmemory
 ```
 
-Base install (~50MB): MCP server, viewer, events server, CLI. Works immediately for remote mode.
+Includes everything for local mode: core library, spaCy NLP, USearch vectors, MCP server, viewer, CLI. No extras needed.
 
 ## First run
 
@@ -23,7 +23,7 @@ smartmemory setup
 
 Asks whether to store memories locally or use the hosted service, then configures accordingly.
 
-**Local mode** installs additional deps (~250MB: spaCy, USearch) and wires Claude Code hooks.
+**Local mode** wires Claude Code hooks and downloads the spaCy language model (~15MB).
 
 **Remote mode** validates your API key and stores it in the OS keychain.
 
@@ -31,7 +31,6 @@ Asks whether to store memories locally or use the hosted service, then configure
 
 ```bash
 # Local
-pip install smartmemory[local]
 SMARTMEMORY_MODE=local smartmemory server
 
 # Remote

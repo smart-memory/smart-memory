@@ -9,6 +9,6 @@ TOOL=$(echo "$INPUT" | jq -r '.tool_name // "unknown"')
 ERROR=$(echo "$INPUT" | jq -r '.error // empty')
 if [[ -n "$ERROR" ]]; then
     CONTENT="Tool $TOOL failed: $ERROR"
-    python -m smartmemory_cc ingest "$CONTENT" --type episodic 2>>"$LOG"
+    python -m smartmemory_pkg ingest "$CONTENT" --type episodic 2>>"$LOG"
 fi
 exit 0

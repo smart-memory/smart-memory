@@ -4,8 +4,9 @@
   - First-run mode/pipeline config (local vs remote, LLM provider, etc.)
   - Claude Code hook installation (~/.claude/hooks/ + settings.json)
 
-Local mode: installs [local] extra on demand, asks pipeline questions,
-  writes config, then wires Claude Code hooks.
+Local mode: asks pipeline questions, writes config, wires Claude Code hooks.
+  All local deps (smartmemory-core, spaCy, usearch, filelock) are included
+  in the base `pip install smartmemory` — no extras needed.
 Remote mode: validates API key against /auth/me, stores in OS keychain,
   writes config. No hook wiring (remote mode has no hook-invoked pipeline).
 """
@@ -102,27 +103,12 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
 
 
 def _setup_local() -> None:
-    """Install [local] extra on demand, ask pipeline questions, write config, wire hooks."""
+    """Ask pipeline questions, write config, wire Claude Code hooks.
+
+    All local deps (smartmemory-core, spaCy, usearch, filelock) are already
+    installed as part of `pip install smartmemory` — no extra install step needed.
+    """
     from smartmemory_pkg.config import SmartMemoryConfig, save_config
-
-    click.echo("\nInstalling local pipeline dependencies...")
-    click.echo("  smartmemory[local] adds: spaCy, USearch (~250MB)")
-    if not click.confirm("Proceed?", default=True):
-        raise SystemExit(0)
-
-    # Detect installer: prefer uv, fall back to pip
-    if shutil.which("uv"):
-        cmd = ["uv", "pip", "install", "smartmemory[local]"]
-    else:
-        cmd = [sys.executable, "-m", "pip", "install", "smartmemory[local]"]
-
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        click.echo(
-            "ERROR: local dep install failed. Try manually: pip install smartmemory[local]",
-            err=True,
-        )
-        raise SystemExit(1)
 
     coref = click.confirm(
         "\nEnable coreference resolution? "

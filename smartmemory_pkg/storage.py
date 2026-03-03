@@ -2,8 +2,10 @@
 
 get_memory() returns either a local SmartMemory instance or a RemoteMemory instance
 depending on config. All callers (server.py MCP tools, local_api.py viewer) go through
-this module and duck-type on the result — but each operation has an explicit branch
+this module and duck-type on the result — each operation has an explicit branch
 because the return types differ (MemoryItem vs dict, sort_by support, etc.).
+
+Local deps (smartmemory-core, filelock) are hard dependencies — always available.
 """
 from __future__ import annotations
 
@@ -14,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-# filelock imported lazily inside ingest() — only available with [local] extra
+from filelock import FileLock
 
 if TYPE_CHECKING:
     from smartmemory import SmartMemory
@@ -51,7 +53,6 @@ def _resolve_data_dir(explicit: str | None = None) -> Path:
 
 
 def _get_lock_file(data_path: Path):
-    from filelock import FileLock  # lazy — only in [local] extra
     return FileLock(str(data_path / ".write.lock"), timeout=WRITE_LOCK_TIMEOUT)
 
 
@@ -174,7 +175,7 @@ def ingest(content: str, memory_type: str = "episodic") -> str:
     from smartmemory_pkg.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.ingest(content, memory_type)
-    # Local path — lazy filelock (only available with [local] extra)
+    # Local path — acquire write lock for cross-process coordination
     data_path = _data_path if _data_path is not None else _resolve_data_dir()
     lock = _get_lock_file(data_path)
     with lock:

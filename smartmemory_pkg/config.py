@@ -187,18 +187,14 @@ def set_api_key(key: str) -> None:
 
 
 def _detect_and_migrate() -> bool:
-    """Auto-write local config if local pipeline deps are already installed.
+    """Auto-write local config when no config exists.
 
     Called by storage.get_memory() before raising UnconfiguredError.
-    Handles the upgrade path: users who had smart-memory installed
-    get their existing behaviour preserved without running setup manually.
+    Since all local deps (smartmemory-core, usearch, filelock) are now
+    hard dependencies of the smartmemory package, we default to local mode
+    on first run — the user has everything they need.
 
     Returns True if migration succeeded (local config written).
     """
-    try:
-        import usearch  # noqa: F401
-        import smartmemory.graph.backends.sqlite  # noqa: F401
-    except ImportError:
-        return False
     save_config(SmartMemoryConfig(mode="local"))
     return True
