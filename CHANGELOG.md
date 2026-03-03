@@ -1,5 +1,19 @@
 # Changelog — smartmemory
 
+## [Unreleased]
+
+### Changed
+
+#### CORE-EXT-2 — Unified PatternManager Backend (COMPLETE)
+
+- **`LitePatternManager` deleted** from `smartmemory_app/patterns.py`. Replaced by `JSONLPatternStore`, a `PatternStore`-protocol-conformant class with atomic `FileLock`-protected writes and source provenance preservation on update.
+- **`storage.py`**: `get_memory()` now constructs `PatternManager(store=JSONLPatternStore(data_path))` instead of `LitePatternManager(data_path)`.
+- **`setup.py`**: `_seed_data_dir()` instantiates `JSONLPatternStore(data_dir)` (seeds `entity_patterns.jsonl` on first run via `__init__` side-effect).
+- **`JSONLPatternStore.save()`**: source field is written on CREATE only — not overwritten on frequency increment updates. Matches FalkorDB `ON MATCH SET` provenance semantics.
+- 108 unit tests + 5 integration tests green; zero `LitePatternManager` references remain in source or test files.
+
+---
+
 ## [1.0.1] - 2026-03-01
 
 ### Fixed

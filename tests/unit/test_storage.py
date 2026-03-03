@@ -26,10 +26,13 @@ def test_get_memory_singleton(tmp_path):
     mock_mem = MagicMock()
     mock_pm = MagicMock()
     mock_pm.get_patterns.return_value = {}
+    mock_pm.add_patterns.return_value = 0
+    mock_store = MagicMock()
 
     with (
         patch("smartmemory_app.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_app.patterns.LitePatternManager", return_value=mock_pm),
+        patch("smartmemory_app.patterns.JSONLPatternStore", return_value=mock_store),
+        patch("smartmemory.ontology.pattern_manager.PatternManager", return_value=mock_pm),
         patch("smartmemory.tools.factory.create_lite_memory", return_value=mock_mem),
     ):
         m1 = storage.get_memory()
@@ -44,10 +47,13 @@ def test_get_memory_registers_atexit(tmp_path):
     mock_mem = MagicMock()
     mock_pm = MagicMock()
     mock_pm.get_patterns.return_value = {}
+    mock_pm.add_patterns.return_value = 0
+    mock_store = MagicMock()
 
     with (
         patch("smartmemory_app.storage._resolve_data_dir", return_value=tmp_path),
-        patch("smartmemory_app.patterns.LitePatternManager", return_value=mock_pm),
+        patch("smartmemory_app.patterns.JSONLPatternStore", return_value=mock_store),
+        patch("smartmemory.ontology.pattern_manager.PatternManager", return_value=mock_pm),
         patch("smartmemory.tools.factory.create_lite_memory", return_value=mock_mem),
         patch("atexit.register") as mock_register,
     ):

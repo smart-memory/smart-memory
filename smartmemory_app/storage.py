@@ -70,14 +70,15 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
     with _init_lock:
         if _memory is not None:  # double-checked
             return _memory
+        from smartmemory.ontology.pattern_manager import PatternManager
         from smartmemory.tools.factory import create_lite_memory
         from smartmemory_app.event_sink import get_event_sink
-        from smartmemory_app.patterns import LitePatternManager
+        from smartmemory_app.patterns import JSONLPatternStore
 
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
         _data_path = data_path  # cache so ingest() uses the same path as the singleton
-        pattern_manager = LitePatternManager(data_path)
+        pattern_manager = PatternManager(store=JSONLPatternStore(data_path))
         _memory = create_lite_memory(
             data_dir=str(data_path),
             entity_ruler_patterns=pattern_manager,
