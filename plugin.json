@@ -5,7 +5,7 @@
   "mcpServers": {
     "smartmemory": {
       "command": "python",
-      "args": ["-m", "smartmemory_pkg.server"]
+      "args": ["-m", "smartmemory_app.server"]
     }
   }
 }

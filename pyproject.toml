@@ -20,13 +20,13 @@ dependencies = [
 ]
 
 [project.scripts]
-smartmemory = "smartmemory_pkg.cli:cli"
+smartmemory = "smartmemory_app.cli:cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["smartmemory_pkg"]
+packages = ["smartmemory_app"]
 include = [
-    "smartmemory_pkg/data/seed_patterns.jsonl",
-    "smartmemory_pkg/static/**/*",
+    "smartmemory_app/data/seed_patterns.jsonl",
+    "smartmemory_app/static/**/*",
 ]
 
 [tool.pytest.ini_options]
