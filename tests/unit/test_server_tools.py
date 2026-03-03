@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 def test_memory_ingest_returns_item_id():
     """memory_ingest.fn() returns the item_id string on success."""
-    with patch("smartmemory_pkg.server.ingest", return_value="item-abc-123"):
-        from smartmemory_pkg.server import memory_ingest
+    with patch("smartmemory_app.server.ingest", return_value="item-abc-123"):
+        from smartmemory_app.server import memory_ingest
 
         result = memory_ingest.fn("some text")
     assert result == "item-abc-123"
@@ -18,8 +18,8 @@ def test_memory_ingest_returns_item_id():
 
 def test_memory_ingest_error_returns_string():
     """memory_ingest.fn() returns 'Error: ...' string when storage raises."""
-    with patch("smartmemory_pkg.server.ingest", side_effect=RuntimeError("disk full")):
-        from smartmemory_pkg.server import memory_ingest
+    with patch("smartmemory_app.server.ingest", side_effect=RuntimeError("disk full")):
+        from smartmemory_app.server import memory_ingest
 
         result = memory_ingest.fn("some text")
     assert result.startswith("Error:")
@@ -29,8 +29,8 @@ def test_memory_ingest_error_returns_string():
 def test_memory_search_returns_list():
     """memory_search.fn() returns a list of dicts on success."""
     mock_results = [{"item_id": "1", "content": "hello"}]
-    with patch("smartmemory_pkg.server.search", return_value=mock_results):
-        from smartmemory_pkg.server import memory_search
+    with patch("smartmemory_app.server.search", return_value=mock_results):
+        from smartmemory_app.server import memory_search
 
         result = memory_search.fn("query")
     assert isinstance(result, list)
@@ -40,10 +40,10 @@ def test_memory_search_returns_list():
 def test_memory_recall_returns_string():
     """memory_recall.fn() returns a string context block."""
     with patch(
-        "smartmemory_pkg.server.recall",
+        "smartmemory_app.server.recall",
         return_value="## SmartMemory Context\n- [episodic] hello",
     ):
-        from smartmemory_pkg.server import memory_recall
+        from smartmemory_app.server import memory_recall
 
         result = memory_recall.fn(cwd="/project")
     assert isinstance(result, str)
@@ -53,8 +53,8 @@ def test_memory_recall_returns_string():
 def test_memory_get_returns_dict():
     """memory_get.fn() returns a dict for the given item_id."""
     mock_item = {"item_id": "abc", "content": "some memory"}
-    with patch("smartmemory_pkg.server.get", return_value=mock_item):
-        from smartmemory_pkg.server import memory_get
+    with patch("smartmemory_app.server.get", return_value=mock_item):
+        from smartmemory_app.server import memory_get
 
         result = memory_get.fn("abc")
     assert isinstance(result, dict)
@@ -69,11 +69,11 @@ def test_memory_get_returns_dict():
 def test_login_local_mode_returns_no_auth_message():
     """login.fn() returns a 'no authentication' message in local mode."""
     from unittest.mock import MagicMock
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
 
     local_mem = MagicMock()  # not a RemoteMemory instance
-    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
-        from smartmemory_pkg.server import login
+    with patch("smartmemory_app.server.get_memory", return_value=local_mem):
+        from smartmemory_app.server import login
 
         result = login.fn("sk_test")
     assert "Local mode" in result
@@ -85,8 +85,8 @@ def test_whoami_local_mode_returns_no_auth_message():
     from unittest.mock import MagicMock
 
     local_mem = MagicMock()
-    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
-        from smartmemory_pkg.server import whoami
+    with patch("smartmemory_app.server.get_memory", return_value=local_mem):
+        from smartmemory_app.server import whoami
 
         result = whoami.fn()
     assert "Local mode" in result
@@ -97,8 +97,8 @@ def test_switch_team_local_mode_returns_not_applicable():
     from unittest.mock import MagicMock
 
     local_mem = MagicMock()
-    with patch("smartmemory_pkg.server.get_memory", return_value=local_mem):
-        from smartmemory_pkg.server import switch_team
+    with patch("smartmemory_app.server.get_memory", return_value=local_mem):
+        from smartmemory_app.server import switch_team
 
         result = switch_team.fn("team-xyz")
     assert "Local mode" in result
@@ -107,12 +107,12 @@ def test_switch_team_local_mode_returns_not_applicable():
 def test_login_remote_mode_delegates_to_remote_memory():
     """login.fn() calls RemoteMemory.login() in remote mode."""
     from unittest.mock import MagicMock
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
 
     remote_mem = MagicMock(spec=RemoteMemory)
     remote_mem.login.return_value = "Logged in. Team: t1"
-    with patch("smartmemory_pkg.server.get_memory", return_value=remote_mem):
-        from smartmemory_pkg.server import login
+    with patch("smartmemory_app.server.get_memory", return_value=remote_mem):
+        from smartmemory_app.server import login
 
         result = login.fn("sk_live_key")
     remote_mem.login.assert_called_once_with("sk_live_key")

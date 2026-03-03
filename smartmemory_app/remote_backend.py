@@ -21,7 +21,7 @@ from typing import Optional
 
 import httpx
 
-from smartmemory_pkg.config import get_api_key, set_api_key
+from smartmemory_app.config import get_api_key, set_api_key
 
 
 class RemoteMemory:
@@ -123,7 +123,7 @@ class RemoteMemory:
             return f"Login failed: {e}"
         set_api_key(api_key)  # persist to OS keychain (warns if unavailable, never raises)
         # Persist team_id to config so next startup uses the correct workspace
-        from smartmemory_pkg.config import load_config, save_config
+        from smartmemory_app.config import load_config, save_config
         cfg = load_config()
         cfg.team_id = self._team_id
         save_config(cfg)

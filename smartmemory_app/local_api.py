@@ -17,8 +17,8 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel
 
-from smartmemory_pkg.config import UnconfiguredError
-from smartmemory_pkg.storage import get_memory
+from smartmemory_app.config import UnconfiguredError
+from smartmemory_app.storage import get_memory
 
 api = FastAPI(title="SmartMemory Local API", docs_url=None, redoc_url=None)
 
@@ -96,7 +96,7 @@ def _flatten_node(raw: dict) -> dict:
 @api.get("/graph/full")
 def get_graph_full() -> dict:
     mem = _get_mem()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_graph_full()
     backend = _get_backend()
@@ -119,7 +119,7 @@ class EdgesBulkRequest(BaseModel):
 def get_edges_bulk(body: EdgesBulkRequest) -> dict:
     """Matches createFetchAdapter.getEdgesBulk — POST with {node_ids} body (fetchAdapter.js:35)."""
     mem = _get_mem()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_edges_bulk(body.node_ids)
     backend = _get_backend()
@@ -151,7 +151,7 @@ api.include_router(_graph_router, prefix="/graph")
 @api.get("/list")
 def list_memories(limit: int = 200, offset: int = 0) -> dict:
     mem = _get_mem()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         # Remote graph/full used as source; paginate client-side
         full = mem.get_graph_full()
@@ -178,7 +178,7 @@ def get_neighbors(memory_id: str) -> dict:
     (useGraphInteraction.js:106-107). Returning {"nodes": ...} produces an empty expansion.
     """
     mem = _get_mem()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_neighbors(memory_id)
     backend = _get_backend()
@@ -191,7 +191,7 @@ def get_neighbors(memory_id: str) -> dict:
 def get_memory_item(memory_id: str) -> dict[str, Any]:
     """get_node() uses _row_to_node() — output is already flat, no transformation needed."""
     mem = _get_mem()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         node = mem.get_node(memory_id)
         if node is None:

@@ -92,7 +92,7 @@ async def _broadcast(sink, clients: set) -> None:
 
 async def _serve(port: int = 9004) -> None:
     """Run the WebSocket server and broadcast loop."""
-    from smartmemory_pkg.event_sink import get_event_sink
+    from smartmemory_app.event_sink import get_event_sink
 
     sink = get_event_sink()
     loop = asyncio.get_running_loop()

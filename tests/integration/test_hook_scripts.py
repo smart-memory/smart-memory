@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 import pytest
 
-HOOKS_DIR = Path(__file__).parents[2] / "smartmemory_pkg" / "hooks"
+HOOKS_DIR = Path(__file__).parents[2] / "smartmemory_app" / "hooks"
 
 
 @pytest.mark.integration

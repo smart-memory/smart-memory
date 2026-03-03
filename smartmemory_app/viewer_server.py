@@ -16,7 +16,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from smartmemory_pkg.local_api import api as _local_api
+from smartmemory_app.local_api import api as _local_api
 
 STATIC_DIR = Path(__file__).parent / "static"
 DEFAULT_PORT = 9005
@@ -42,7 +42,7 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     optionally opens the browser, then runs uvicorn on the given port.
     """
     # Start DIST-LITE-3 events server — idempotent, lock-protected (events_server.py:131-150)
-    from smartmemory_pkg.events_server import start_background
+    from smartmemory_app.events_server import start_background
     start_background()
 
     if open_browser:

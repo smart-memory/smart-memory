@@ -22,12 +22,12 @@ class TestImportNoSideEffects:
         """Module-level app = _build_app() must not start uvicorn or the events server."""
         # If this import triggers uvicorn.run() or start_background(), the test hangs.
         # A clean import proves the module is side-effect-free.
-        from smartmemory_pkg.viewer_server import app  # noqa: F401
+        from smartmemory_app.viewer_server import app  # noqa: F401
         assert app is not None
 
     def test_app_is_fastapi_instance(self):
         from fastapi import FastAPI
-        from smartmemory_pkg.viewer_server import app
+        from smartmemory_app.viewer_server import app
         assert isinstance(app, FastAPI)
 
 
@@ -40,12 +40,12 @@ class TestImportNoSideEffects:
 def viewer_client(monkeypatch):
     """TestClient for viewer_server.app with _get_backend patched to a real in-memory backend."""
     from smartmemory.graph.backends.sqlite import SQLiteBackend
-    import smartmemory_pkg.local_api as _api_mod
+    import smartmemory_app.local_api as _api_mod
 
     backend = SQLiteBackend(db_path=":memory:")
     monkeypatch.setattr(_api_mod, "_get_backend", lambda: backend)
 
-    from smartmemory_pkg.viewer_server import app
+    from smartmemory_app.viewer_server import app
     client = TestClient(app)
     yield client
     backend.close()
@@ -82,12 +82,12 @@ class TestViewerServerRoutes:
 class TestMainCallsStartBackground:
     def test_main_uses_start_background_not_raw_thread(self):
         """main() must call start_background() from events_server — never Thread() directly."""
-        from smartmemory_pkg import viewer_server
+        from smartmemory_app import viewer_server
 
         # Patch out uvicorn.run so main() returns immediately
         with (
-            patch("smartmemory_pkg.viewer_server.uvicorn") as mock_uvicorn,
-            patch("smartmemory_pkg.events_server.start_background") as mock_start_bg,
+            patch("smartmemory_app.viewer_server.uvicorn") as mock_uvicorn,
+            patch("smartmemory_app.events_server.start_background") as mock_start_bg,
         ):
             mock_uvicorn.run = MagicMock()
             viewer_server.main(port=19005, open_browser=False)
@@ -98,13 +98,13 @@ class TestMainCallsStartBackground:
 
     def test_main_does_not_open_browser_when_disabled(self):
         """--no-browser flag: webbrowser.open must not be called."""
-        from smartmemory_pkg import viewer_server
+        from smartmemory_app import viewer_server
 
         with (
-            patch("smartmemory_pkg.viewer_server.uvicorn") as mock_uvicorn,
-            patch("smartmemory_pkg.events_server.start_background"),
-            patch("smartmemory_pkg.viewer_server.webbrowser") as mock_browser,
-            patch("smartmemory_pkg.viewer_server.threading") as mock_threading,
+            patch("smartmemory_app.viewer_server.uvicorn") as mock_uvicorn,
+            patch("smartmemory_app.events_server.start_background"),
+            patch("smartmemory_app.viewer_server.webbrowser") as mock_browser,
+            patch("smartmemory_app.viewer_server.threading") as mock_threading,
         ):
             mock_uvicorn.run = MagicMock()
             viewer_server.main(port=19005, open_browser=False)

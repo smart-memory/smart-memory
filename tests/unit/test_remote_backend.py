@@ -1,4 +1,4 @@
-"""Unit tests for smartmemory_pkg.remote_backend — DIST-LITE-5.
+"""Unit tests for smartmemory_app.remote_backend — DIST-LITE-5.
 
 Tests cover the critical behaviors identified in the coverage sweep:
   - ingest() returns "Error: ..." string when _request() fails (not raises)
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from smartmemory_pkg.remote_backend import RemoteMemory
+from smartmemory_app.remote_backend import RemoteMemory
 
 
 @pytest.fixture()

@@ -24,22 +24,22 @@ import pytest
 class TestGetEventSink:
     def setup_method(self):
         """Reset singleton before each test."""
-        import smartmemory_pkg.event_sink as _mod
+        import smartmemory_app.event_sink as _mod
         _mod._sink = None
 
     def teardown_method(self):
-        import smartmemory_pkg.event_sink as _mod
+        import smartmemory_app.event_sink as _mod
         _mod._sink = None
 
     def test_sequential_calls_return_same_instance(self):
-        from smartmemory_pkg.event_sink import get_event_sink
+        from smartmemory_app.event_sink import get_event_sink
         a = get_event_sink()
         b = get_event_sink()
         assert a is b
 
     def test_concurrent_calls_create_exactly_one_instance(self):
         """Two threads racing through get_event_sink() must create exactly one sink."""
-        from smartmemory_pkg.event_sink import get_event_sink
+        from smartmemory_app.event_sink import get_event_sink
 
         results = []
         barrier = threading.Barrier(2)
@@ -65,12 +65,12 @@ class TestGetEventSink:
 
 class TestStartBackground:
     def setup_method(self):
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         _mod._server_thread = None
         _mod._stop_event.clear()
 
     def teardown_method(self):
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         _mod._stop_event.set()
         if _mod._server_thread is not None:
             _mod._server_thread.join(timeout=2)
@@ -79,13 +79,13 @@ class TestStartBackground:
 
     def test_sequential_idempotent(self):
         """Second call while thread is alive spawns no new thread."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
 
         # Patch _serve so the thread doesn't actually try to bind
         async def _fake_serve(port=9004):
             await asyncio.sleep(10)  # block until stop_event or timeout
 
-        with patch("smartmemory_pkg.events_server._serve", side_effect=_fake_serve):
+        with patch("smartmemory_app.events_server._serve", side_effect=_fake_serve):
             _mod.start_background(port=9999)
             first_thread = _mod._server_thread
 
@@ -96,12 +96,12 @@ class TestStartBackground:
 
     def test_concurrent_safety(self):
         """Two concurrent callers each acquiring the lock still spawn exactly one thread."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
 
         async def _fake_serve(port=9004):
             await asyncio.sleep(10)
 
-        with patch("smartmemory_pkg.events_server._serve", side_effect=_fake_serve):
+        with patch("smartmemory_app.events_server._serve", side_effect=_fake_serve):
             threads_spawned = []
             barrier = threading.Barrier(2)
 
@@ -128,15 +128,15 @@ class TestStartBackground:
 class TestServe:
     def test_oserror_logs_warning_does_not_raise(self):
         """OSError binding failure logs a warning and exits cleanly."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         mock_sink = MagicMock(spec=InProcessQueueSink)
         mock_sink._q = asyncio.Queue()
 
         with (
-            patch("smartmemory_pkg.events_server.log") as mock_log,
-            patch("smartmemory_pkg.event_sink.get_event_sink", return_value=mock_sink),
+            patch("smartmemory_app.events_server.log") as mock_log,
+            patch("smartmemory_app.event_sink.get_event_sink", return_value=mock_sink),
             patch("websockets.serve", side_effect=OSError("address in use")),
         ):
             asyncio.run(_mod._serve(port=19999))
@@ -148,7 +148,7 @@ class TestServe:
 
     def test_attach_loop_none_called_in_finally(self):
         """attach_loop(None) is always called even when OSError is raised."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         mock_sink = MagicMock(spec=InProcessQueueSink)
@@ -157,9 +157,9 @@ class TestServe:
         mock_sink.attach_loop.side_effect = lambda loop: attach_calls.append(loop)
 
         with (
-            patch("smartmemory_pkg.event_sink.get_event_sink", return_value=mock_sink),
+            patch("smartmemory_app.event_sink.get_event_sink", return_value=mock_sink),
             patch("websockets.serve", side_effect=OSError("fail")),
-            patch("smartmemory_pkg.events_server.log"),
+            patch("smartmemory_app.events_server.log"),
         ):
             asyncio.run(_mod._serve(port=19999))
 
@@ -168,7 +168,7 @@ class TestServe:
 
     def test_stop_event_exits_broadcast_loop(self):
         """Setting stop_event causes _serve to exit the while loop."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         mock_sink = MagicMock(spec=InProcessQueueSink)
@@ -188,9 +188,9 @@ class TestServe:
             mock_ws_server.__aexit__ = AsyncMock(return_value=False)
 
             with (
-                patch("smartmemory_pkg.event_sink.get_event_sink", return_value=mock_sink),
+                patch("smartmemory_app.event_sink.get_event_sink", return_value=mock_sink),
                 patch("websockets.serve", return_value=mock_ws_server),
-                patch("smartmemory_pkg.events_server.log"),
+                patch("smartmemory_app.events_server.log"),
             ):
                 await asyncio.gather(
                     _mod._serve(port=19999),
@@ -209,7 +209,7 @@ class TestServe:
 class TestBroadcast:
     def test_item_sent_to_connected_client(self):
         """An item in the queue is broadcast as a new_event envelope to connected clients."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         import json
@@ -251,7 +251,7 @@ class TestBroadcast:
 
     def test_broken_client_does_not_kill_loop(self):
         """return_exceptions=True: an exception from one client doesn't crash the broadcast."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         async def _run():
@@ -276,7 +276,7 @@ class TestBroadcast:
 
     def test_idle_queue_returns_on_timeout(self):
         """asyncio.wait_for timeout on empty queue causes _broadcast to return without error."""
-        import smartmemory_pkg.events_server as _mod
+        import smartmemory_app.events_server as _mod
         from smartmemory.observability.events import InProcessQueueSink
 
         async def _run():

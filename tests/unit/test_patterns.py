@@ -6,7 +6,7 @@ import pytest
 
 def test_seeds_on_first_run(tmp_path):
     """LitePatternManager seeds entity_patterns.jsonl on first run."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pm = LitePatternManager(tmp_path)
     patterns = pm.get_patterns()
@@ -16,7 +16,7 @@ def test_seeds_on_first_run(tmp_path):
 
 def test_load_existing(tmp_path):
     """LitePatternManager loads patterns from an existing JSONL file."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     # Write a custom JSONL file
     pattern_file = tmp_path / "entity_patterns.jsonl"
@@ -31,7 +31,7 @@ def test_load_existing(tmp_path):
 
 def test_get_patterns_quality_gate(tmp_path):
     """Patterns with frequency=1 are excluded; frequency=2 are included."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     entries = [
@@ -48,7 +48,7 @@ def test_get_patterns_quality_gate(tmp_path):
 
 def test_add_pattern_increments_frequency(tmp_path):
     """add_pattern() increments frequency for existing patterns."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     entry = {"name": "pytest", "label": "TOOL", "confidence": 0.85, "frequency": 1}
@@ -64,7 +64,7 @@ def test_add_pattern_increments_frequency(tmp_path):
 
 def test_add_pattern_quality_gate_confidence(tmp_path):
     """add_pattern() raises ValueError for confidence <= 0.8."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pm = LitePatternManager(tmp_path)
     with pytest.raises(ValueError, match="confidence"):
@@ -75,7 +75,7 @@ def test_add_pattern_quality_gate_confidence(tmp_path):
 
 def test_add_pattern_quality_gate_name_len(tmp_path):
     """add_pattern() raises ValueError for name length <= 3."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pm = LitePatternManager(tmp_path)
     with pytest.raises(ValueError, match="length"):
@@ -91,7 +91,7 @@ def test_add_pattern_quality_gate_name_len(tmp_path):
 
 def test_add_pattern_initial_frequency_2_visible_immediately(tmp_path):
     """Pattern added with initial_frequency=2 passes the quality gate immediately."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")  # empty file, no seeds
@@ -103,7 +103,7 @@ def test_add_pattern_initial_frequency_2_visible_immediately(tmp_path):
 
 def test_add_pattern_initial_frequency_1_needs_second_call(tmp_path):
     """Default initial_frequency=1 means pattern is invisible until incremented."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
@@ -118,7 +118,7 @@ def test_add_pattern_initial_frequency_1_needs_second_call(tmp_path):
 
 def test_add_pattern_initial_frequency_persists_to_file(tmp_path):
     """initial_frequency value is written to JSONL and survives reload."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
@@ -133,7 +133,7 @@ def test_add_pattern_initial_frequency_persists_to_file(tmp_path):
 
 def test_add_pattern_validation_still_applies_with_initial_frequency(tmp_path):
     """Name length and confidence validation applies regardless of initial_frequency."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
@@ -147,7 +147,7 @@ def test_add_pattern_validation_still_applies_with_initial_frequency(tmp_path):
 
 def test_seed_survives_plugin_update(tmp_path):
     """Existing entity_patterns.jsonl is not overwritten on second instantiation."""
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
 
     # First run: seeds file
     LitePatternManager(tmp_path)

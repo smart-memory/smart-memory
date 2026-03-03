@@ -108,7 +108,7 @@ def _setup_local() -> None:
     All local deps (smartmemory-core, spaCy, usearch, filelock) are already
     installed as part of `pip install smartmemory` — no extra install step needed.
     """
-    from smartmemory_pkg.config import SmartMemoryConfig, save_config
+    from smartmemory_app.config import SmartMemoryConfig, save_config
 
     coref = click.confirm(
         "\nEnable coreference resolution? "
@@ -140,7 +140,7 @@ def _setup_local() -> None:
 def _setup_remote(api_key: str | None) -> None:
     """Validate API key, store in OS keychain, write remote config."""
     import httpx
-    from smartmemory_pkg.config import SmartMemoryConfig, save_config, set_api_key
+    from smartmemory_app.config import SmartMemoryConfig, save_config, set_api_key
 
     if not api_key:
         api_key = click.prompt(
@@ -257,7 +257,7 @@ def _seed_data_dir() -> None:
     raw = os.environ.get("SMARTMEMORY_DATA_DIR")
     data_dir = Path(raw) if raw else DATA_DIR
     data_dir.mkdir(parents=True, exist_ok=True)
-    from smartmemory_pkg.patterns import LitePatternManager
+    from smartmemory_app.patterns import LitePatternManager
     LitePatternManager(data_dir)  # seeds entity_patterns.jsonl if absent
 
 

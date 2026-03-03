@@ -1,4 +1,4 @@
-"""Unit tests for smartmemory_pkg.config — DIST-LITE-5."""
+"""Unit tests for smartmemory_app.config — DIST-LITE-5."""
 import os
 import warnings
 from pathlib import Path
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from smartmemory_pkg.config import (
+from smartmemory_app.config import (
     SmartMemoryConfig,
     UnconfiguredError,
     _detect_and_migrate,

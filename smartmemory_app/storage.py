@@ -20,9 +20,9 @@ from filelock import FileLock
 
 if TYPE_CHECKING:
     from smartmemory import SmartMemory
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
 
-from smartmemory_pkg.config import (
+from smartmemory_app.config import (
     SmartMemoryConfig,
     UnconfiguredError,
     _detect_and_migrate,
@@ -71,8 +71,8 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
         if _memory is not None:  # double-checked
             return _memory
         from smartmemory.tools.factory import create_lite_memory
-        from smartmemory_pkg.event_sink import get_event_sink
-        from smartmemory_pkg.patterns import LitePatternManager
+        from smartmemory_app.event_sink import get_event_sink
+        from smartmemory_app.patterns import LitePatternManager
 
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
@@ -95,7 +95,7 @@ def _get_remote_memory(cfg: SmartMemoryConfig) -> "RemoteMemory":
     with _remote_init_lock:
         if _remote_memory is not None:
             return _remote_memory
-        from smartmemory_pkg.remote_backend import RemoteMemory
+        from smartmemory_app.remote_backend import RemoteMemory
         _remote_memory = RemoteMemory(api_url=cfg.api_url, team_id=cfg.team_id)
         return _remote_memory
 
@@ -172,7 +172,7 @@ def ingest(content: str, memory_type: str = "episodic") -> str:
       On Timeout: raises filelock.Timeout — caller surfaces as error string.
     """
     mem = get_memory()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.ingest(content, memory_type)
     # Local path — acquire write lock for cross-process coordination
@@ -186,7 +186,7 @@ def ingest(content: str, memory_type: str = "episodic") -> str:
 def search(query: str, top_k: int = 5) -> list[dict]:
     """Search memories by semantic similarity. Returns list[dict] in both modes."""
     mem = get_memory()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.search(query, top_k)  # already returns list[dict]
     results = mem.search(query, top_k=top_k)
@@ -200,7 +200,7 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
     so recall() cannot be unified — explicit branch required.
     """
     mem = get_memory()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.recall(cwd, top_k)
     # Local path unchanged
@@ -226,7 +226,7 @@ def get(item_id: str) -> dict:
     Local returns MemoryItem (needs .to_dict()); remote returns dict | None directly.
     """
     mem = get_memory()
-    from smartmemory_pkg.remote_backend import RemoteMemory
+    from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get(item_id) or {}  # already a dict
     item = mem.get(item_id)

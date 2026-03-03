@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from smartmemory_pkg.local_api import api
+from smartmemory_app.local_api import api
 
 
 @pytest.fixture()
@@ -96,14 +96,14 @@ class TestGetGraphFull:
             "nodes": [_make_serialize_node()],
             "edges": [],
         }
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.get("/graph/full")
         assert r.status_code == 200
 
     def test_envelope_keys_present(self, client):
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": [], "edges": []}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/graph/full").json()
         assert "nodes" in body
         assert "edges" in body
@@ -120,7 +120,7 @@ class TestGetGraphFull:
         )
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": [node], "edges": []}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/graph/full").json()
 
         assert len(body["nodes"]) == 1
@@ -136,7 +136,7 @@ class TestGetGraphFull:
         node = _make_serialize_node()
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": [node], "edges": []}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/graph/full").json()
 
         n = body["nodes"][0]
@@ -147,7 +147,7 @@ class TestGetGraphFull:
         edges = [_make_edge("node-0", "node-1")]
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": nodes, "edges": edges}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/graph/full").json()
         assert body["node_count"] == 3
         assert body["edge_count"] == 1
@@ -162,7 +162,7 @@ class TestGetEdgesBulk:
     def test_returns_edges_key(self, client):
         mock_backend = MagicMock()
         mock_backend.get_edges_for_node.return_value = []
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.post("/graph/edges", json={"node_ids": ["node-1"]})
         assert r.status_code == 200
         assert "edges" in r.json()
@@ -177,7 +177,7 @@ class TestGetEdgesBulk:
 
         mock_backend = MagicMock()
         mock_backend.get_edges_for_node.side_effect = _get_edges
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.post("/graph/edges", json={"node_ids": ["node-A", "node-B"]})
 
         edges = r.json()["edges"]
@@ -197,7 +197,7 @@ class TestGetEdgesBulk:
 
         mock_backend = MagicMock()
         mock_backend.get_edges_for_node.side_effect = _get_edges
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.post("/graph/edges", json={"node_ids": ["node-A", "node-B"]})
 
         edges = r.json()["edges"]
@@ -206,7 +206,7 @@ class TestGetEdgesBulk:
     def test_empty_node_ids_returns_no_edges(self, client):
         mock_backend = MagicMock()
         mock_backend.get_edges_for_node.return_value = []
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.post("/graph/edges", json={"node_ids": []})
         assert r.json()["edges"] == []
 
@@ -220,7 +220,7 @@ class TestListMemories:
     def test_envelope_keys(self, client):
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": [], "edges": []}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/list").json()
         assert "items" in body
         assert "total" in body
@@ -231,7 +231,7 @@ class TestListMemories:
         nodes = [_make_serialize_node(item_id=f"node-{i}") for i in range(5)]
         mock_backend = MagicMock()
         mock_backend.serialize.return_value = {"nodes": nodes, "edges": []}
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/list?limit=2&offset=1").json()
         assert body["total"] == 5
         assert body["limit"] == 2
@@ -250,7 +250,7 @@ class TestGetNeighbors:
         mock_backend = MagicMock()
         mock_backend.get_neighbors.return_value = [_make_flat_node("node-2")]
         mock_backend.get_edges_for_node.return_value = [_make_edge("node-1", "node-2")]
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.get("/node-1/neighbors")
         assert r.status_code == 200
         body = r.json()
@@ -261,7 +261,7 @@ class TestGetNeighbors:
         mock_backend = MagicMock()
         mock_backend.get_neighbors.return_value = []
         mock_backend.get_edges_for_node.return_value = []
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/node-1/neighbors").json()
         assert "edges" in body
 
@@ -271,7 +271,7 @@ class TestGetNeighbors:
         mock_backend = MagicMock()
         mock_backend.get_neighbors.return_value = [flat_neighbor]
         mock_backend.get_edges_for_node.return_value = []
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/node-1/neighbors").json()
         # The flat node has item_id at top level — confirm it passes through unchanged
         neighbor = body["neighbors"][0]
@@ -288,7 +288,7 @@ class TestGetMemoryItem:
         flat = _make_flat_node("node-1")
         mock_backend = MagicMock()
         mock_backend.get_node.return_value = flat
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.get("/node-1")
         assert r.status_code == 200
         assert r.json()["item_id"] == "node-1"
@@ -296,7 +296,7 @@ class TestGetMemoryItem:
     def test_returns_404_when_not_found(self, client):
         mock_backend = MagicMock()
         mock_backend.get_node.return_value = None
-        with patch("smartmemory_pkg.local_api._get_backend", return_value=mock_backend):
+        with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             r = client.get("/nonexistent-id")
         assert r.status_code == 404
 
@@ -329,9 +329,9 @@ class TestUnconfiguredReturns503:
     """
 
     def test_graph_full_returns_503_when_unconfigured(self, client):
-        from smartmemory_pkg.config import UnconfiguredError
+        from smartmemory_app.config import UnconfiguredError
         with patch(
-            "smartmemory_pkg.local_api.get_memory",
+            "smartmemory_app.local_api.get_memory",
             side_effect=UnconfiguredError("not configured"),
         ):
             r = client.get("/graph/full")
@@ -339,18 +339,18 @@ class TestUnconfiguredReturns503:
         assert "smartmemory setup" in r.json()["detail"].lower()
 
     def test_graph_edges_returns_503_when_unconfigured(self, client):
-        from smartmemory_pkg.config import UnconfiguredError
+        from smartmemory_app.config import UnconfiguredError
         with patch(
-            "smartmemory_pkg.local_api.get_memory",
+            "smartmemory_app.local_api.get_memory",
             side_effect=UnconfiguredError("not configured"),
         ):
             r = client.post("/graph/edges", json={"node_ids": []})
         assert r.status_code == 503
 
     def test_memory_item_returns_503_when_unconfigured(self, client):
-        from smartmemory_pkg.config import UnconfiguredError
+        from smartmemory_app.config import UnconfiguredError
         with patch(
-            "smartmemory_pkg.local_api.get_memory",
+            "smartmemory_app.local_api.get_memory",
             side_effect=UnconfiguredError("not configured"),
         ):
             r = client.get("/some-id")
@@ -359,7 +359,7 @@ class TestUnconfiguredReturns503:
     def test_graph_full_returns_400_on_invalid_mode_env_var(self, client):
         """SMARTMEMORY_MODE=<typo> raises ValueError → _get_mem() converts to HTTP 400."""
         with patch(
-            "smartmemory_pkg.local_api.get_memory",
+            "smartmemory_app.local_api.get_memory",
             side_effect=ValueError("Invalid SMARTMEMORY_MODE='remtoe'. Expected one of: local, remote"),
         ):
             r = client.get("/graph/full")
