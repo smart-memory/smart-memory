@@ -26,27 +26,42 @@ HOOKS_DEST = CLAUDE_DIR / "hooks"
 SETTINGS = CLAUDE_DIR / "settings.json"
 DATA_DIR = Path.home() / ".smartmemory"
 
-HOOK_NAMES = ["session-start.sh", "session-end.sh", "post-tool-failure.sh"]
+# Maps source filename (in package) → namespaced dest filename (in ~/.claude/hooks/)
+_HOOK_FILE_MAP = {
+    "session-start.sh": "smartmemory-session-start.sh",
+    "session-end.sh": "smartmemory-session-end.sh",
+    "post-tool-failure.sh": "smartmemory-post-tool-failure.sh",
+}
+HOOK_NAMES = list(_HOOK_FILE_MAP.values())
 SKILL_NAMES = ["remember.md", "search.md", "ingest.md", "orient.md"]
+
+# Legacy entries to clean up during install (pre-namespacing)
+_LEGACY_HOOK_REGISTRATIONS = {
+    "SessionStart": {"command": "bash", "args": [str(HOOKS_DEST / "session-start.sh")]},
+    "Stop": {"command": "bash", "args": [str(HOOKS_DEST / "session-end.sh")]},
+    "PostToolUseFailure": {"command": "bash", "args": [str(HOOKS_DEST / "post-tool-failure.sh")]},
+}
 
 
 def _get_hook_registrations() -> dict:
-    """Build hook registration entries from current HOOKS_DEST.
+    """Build hook registration entries using current Claude Code hooks format.
 
-    Constructed lazily (not at import time) so that tests can monkeypatch
-    HOOKS_DEST and have the change reflected in both writing and reading.
-    Registered paths point to the COPIED destination (~/.claude/hooks/), not
-    the package source, so registrations are stable across package upgrades.
+    Each event maps to a registration dict with matcher + hooks array.
+    Paths point to the COPIED destination (~/.claude/hooks/), not the package
+    source, so registrations are stable across package upgrades.
     """
     return {
         "SessionStart": {
-            "command": "bash",
-            "args": [str(HOOKS_DEST / "session-start.sh")],
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-session-start.sh'}"}],
         },
-        "Stop": {"command": "bash", "args": [str(HOOKS_DEST / "session-end.sh")]},
+        "Stop": {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-session-end.sh'}"}],
+        },
         "PostToolUseFailure": {
-            "command": "bash",
-            "args": [str(HOOKS_DEST / "post-tool-failure.sh")],
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-post-tool-failure.sh'}"}],
         },
     }
 
@@ -85,7 +100,7 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
         click.echo("Where do you want to store memories?")
         click.echo("  1. Local  — on this machine, no account needed")
         click.echo("  2. Remote — SmartMemory hosted service (api.smartmemory.ai)")
-        choice = click.prompt(">", type=click.Choice(["1", "2"]))
+        choice = click.prompt(">", type=click.Choice(["1", "2"]), default="1")
         mode = "local" if choice == "1" else "remote"
 
     if mode == "remote":
@@ -119,12 +134,17 @@ def _setup_local() -> None:
         "LLM provider for enrichment? (openai / groq / anthropic / ollama / none)",
         default="none",
     )
+    embedding = click.prompt(
+        "Embedding provider? (local / openai / ollama)",
+        default="local",
+    )
     data_dir = click.prompt("Default data directory", default="~/.smartmemory")
 
     cfg = SmartMemoryConfig(
         mode="local",
         coreference=coref,
         llm_provider=llm,
+        embedding_provider=embedding,
         data_dir=data_dir,
     )
     save_config(cfg)
@@ -221,8 +241,10 @@ def _ensure_spacy() -> None:
 def _copy_hooks() -> None:
     dest = CLAUDE_DIR / "hooks"
     dest.mkdir(parents=True, exist_ok=True)
-    for src in HOOKS_SRC.glob("*.sh"):
-        shutil.copy2(src, dest / src.name)
+    for src_name, dest_name in _HOOK_FILE_MAP.items():
+        src = HOOKS_SRC / src_name
+        if src.exists():
+            shutil.copy2(src, dest / dest_name)
 
 
 def _copy_skills() -> None:
@@ -239,6 +261,33 @@ def _register_hooks() -> None:
     cfg = json.loads(SETTINGS.read_text()) if SETTINGS.exists() else {}
     hooks = cfg.setdefault("hooks", {})
     changed = False
+
+    # Remove legacy registrations (old format + old filenames)
+    for event, legacy_entry in _LEGACY_HOOK_REGISTRATIONS.items():
+        existing = hooks.get(event, [])
+        if not isinstance(existing, list):
+            existing = [existing]
+        filtered = [h for h in existing if h != legacy_entry]
+        # Also remove old-format entries pointing to legacy filenames
+        filtered = [
+            h for h in filtered
+            if not (isinstance(h, dict) and "command" in h and "args" in h and any("session-start.sh" in str(a) or "session-end.sh" in str(a) or "post-tool-failure.sh" in str(a) for a in h.get("args", [])))
+        ]
+        # Also remove new-format entries pointing to legacy (non-namespaced) filenames
+        filtered = [
+            h for h in filtered
+            if not (isinstance(h, dict) and "hooks" in h and any(
+                "hooks/session-start.sh" in hh.get("command", "") or
+                "hooks/session-end.sh" in hh.get("command", "") or
+                "hooks/post-tool-failure.sh" in hh.get("command", "")
+                for hh in h.get("hooks", []) if isinstance(hh, dict)
+            ))
+        ]
+        if len(filtered) != len(existing):
+            hooks[event] = filtered
+            changed = True
+
+    # Add current registrations (namespaced, new format)
     for event, entry in _get_hook_registrations().items():
         existing = hooks.get(event, [])
         if not isinstance(existing, list):
@@ -247,6 +296,7 @@ def _register_hooks() -> None:
             existing.append(entry)
             hooks[event] = existing
             changed = True
+
     if changed:
         SETTINGS.write_text(json.dumps(cfg, indent=2))
 
@@ -265,20 +315,30 @@ def _seed_data_dir() -> None:
 
 
 def _deregister_hooks() -> None:
-    """Remove hook entries from settings.json. Leaves other hooks intact."""
+    """Remove all SmartMemory hook entries from settings.json (current + legacy)."""
     if not SETTINGS.exists():
         return
     cfg = json.loads(SETTINGS.read_text())
     hooks = cfg.get("hooks", {})
     changed = False
-    for event, entry in _get_hook_registrations().items():
+
+    all_entries = {**_get_hook_registrations(), **_LEGACY_HOOK_REGISTRATIONS}
+    for event, entry in all_entries.items():
         existing = hooks.get(event, [])
         if not isinstance(existing, list):
             existing = [existing]
         filtered = [h for h in existing if h != entry]
+        # Also catch any entry referencing smartmemory hook files
+        filtered = [
+            h for h in filtered
+            if not (isinstance(h, dict) and any(
+                "smartmemory-" in str(v) for v in (h.get("args", []) + [hh.get("command", "") for hh in h.get("hooks", []) if isinstance(hh, dict)])
+            ))
+        ]
         if len(filtered) != len(existing):
             hooks[event] = filtered
             changed = True
+
     if changed:
         SETTINGS.write_text(json.dumps(cfg, indent=2))
 
@@ -288,6 +348,13 @@ def _remove_hooks() -> None:
         path = HOOKS_DEST / name
         if path.exists():
             path.unlink()
+    # Clean up legacy (non-namespaced) files only if they're SmartMemory-only
+    for src_name in _HOOK_FILE_MAP:
+        path = HOOKS_DEST / src_name
+        if path.exists():
+            content = path.read_text()
+            if "smartmemory_app" in content and content.count("\n") < 15:
+                path.unlink()
 
 
 def _remove_skills() -> None:

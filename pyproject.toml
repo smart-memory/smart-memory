@@ -27,6 +27,8 @@ packages = ["smartmemory_app"]
 include = [
     "smartmemory_app/data/seed_patterns.jsonl",
     "smartmemory_app/static/**/*",
+    "smartmemory_app/hooks/*.sh",
+    "smartmemory_app/skills/*.md",
 ]
 
 [tool.pytest.ini_options]

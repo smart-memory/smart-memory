@@ -1,8 +1,29 @@
 # Changelog — smartmemory
 
-## [Unreleased]
+## [1.0.3] — 2026-03-16
+
+### Fixed
+
+- **Hook safety**: Namespaced hook files (`smartmemory-session-start.sh` etc.) so `smartmemory setup` never clobbers other apps' hooks. Migrates legacy registrations in `settings.json`.
+- **Hook registration format**: Updated to current Claude Code hooks API format (`{matcher, hooks: [{type, command}]}`).
+- **Wheel packaging**: Added `hooks/*.sh` and `skills/*.md` to `pyproject.toml` includes — were missing from built wheels.
+
+### Added
+
+- **`smartmemory server`** command — starts MCP server (with events-server in background).
+- **`smartmemory clear`** command — deletes all local memories and resets vector index.
+- **Pinned embedding provider**: `embedding_provider` config field (`local`/`openai`/`ollama`) prevents env var changes from silently switching providers and causing dimension mismatches.
 
 ### Changed
+
+- **Default to local**: Setup question 1 defaults to local mode.
+- **`events-server`** command hidden from help (still accessible for debugging).
+
+## [1.0.2] — 2026-03-05
+
+### Changed
+
+- Bumped `smartmemory-core[lite]` minimum to `>=0.5.4` (DIST-QA-1: fixes Version node duplication in search results, adds `get()` to usearch backend for embedding retrieval).
 
 #### CORE-EXT-2 — Unified PatternManager Backend (COMPLETE)
 

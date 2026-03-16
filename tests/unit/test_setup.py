@@ -132,6 +132,61 @@ def test_remove_data_dir_honours_env_var(tmp_path, monkeypatch):
     assert not custom_dir.exists(), "SMARTMEMORY_DATA_DIR must be removed"
 
 
+def test_copy_hooks_namespaced_no_clobber(tmp_path):
+    """_copy_hooks() writes smartmemory-prefixed files and never touches generic names."""
+    hooks_dest = tmp_path / "hooks"
+    hooks_dest.mkdir()
+    hooks_src = tmp_path / "hooks_src"
+    hooks_src.mkdir()
+
+    # Existing generic hook owned by another app
+    other_app_hook = hooks_dest / "session-start.sh"
+    other_app_hook.write_text("#!/bin/bash\n# coder-config hook — DO NOT CLOBBER")
+
+    # SmartMemory source hooks
+    (hooks_src / "session-start.sh").write_text("#!/bin/bash\n# smartmemory session-start")
+    (hooks_src / "session-end.sh").write_text("#!/bin/bash\n# smartmemory session-end")
+
+    with (
+        patch("smartmemory_app.setup.HOOKS_SRC", hooks_src),
+        patch("smartmemory_app.setup.CLAUDE_DIR", tmp_path),
+    ):
+        from smartmemory_app.setup import _copy_hooks
+
+        _copy_hooks()
+
+    # Generic file must be untouched
+    assert other_app_hook.read_text() == "#!/bin/bash\n# coder-config hook — DO NOT CLOBBER"
+    # Namespaced files must exist
+    assert (hooks_dest / "smartmemory-session-start.sh").exists()
+    assert (hooks_dest / "smartmemory-session-end.sh").exists()
+
+
+def test_copy_hooks_updates_on_upgrade(tmp_path):
+    """_copy_hooks() overwrites its own namespaced files (safe for upgrades)."""
+    hooks_dest = tmp_path / "hooks"
+    hooks_dest.mkdir()
+    hooks_src = tmp_path / "hooks_src"
+    hooks_src.mkdir()
+
+    # Existing SmartMemory hook from v1
+    old = hooks_dest / "smartmemory-session-start.sh"
+    old.write_text("#!/bin/bash\n# v1 — old logic")
+
+    # New version in source
+    (hooks_src / "session-start.sh").write_text("#!/bin/bash\n# v2 — new logic")
+
+    with (
+        patch("smartmemory_app.setup.HOOKS_SRC", hooks_src),
+        patch("smartmemory_app.setup.CLAUDE_DIR", tmp_path),
+    ):
+        from smartmemory_app.setup import _copy_hooks
+
+        _copy_hooks()
+
+    assert old.read_text() == "#!/bin/bash\n# v2 — new logic"
+
+
 def test_seed_data_dir_honours_env_var(tmp_path, monkeypatch):
     """_seed_data_dir() uses SMARTMEMORY_DATA_DIR when set, not the default DATA_DIR."""
     custom_dir = tmp_path / "custom"

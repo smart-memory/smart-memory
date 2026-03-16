@@ -44,16 +44,47 @@ def recall_cmd(cwd: str, top_k: int) -> None:
     click.echo(result)
 
 
-@cli.command("events-server")
-@click.option("--port", default=9004, show_default=True, help="WebSocket port")
-def events_server_cmd(port: int) -> None:
-    """Run the lite WebSocket events server (graph animations without Redis).
+@cli.command("server")
+def server_cmd() -> None:
+    """Start the SmartMemory MCP server."""
+    from smartmemory_app.server import main
+    main()
 
-    Runs automatically inside the MCP server process. Use this command
-    only for debugging or to run the events server standalone.
-    """
-    from smartmemory_app.events_server import main
-    main(port=port)
+
+@cli.command("clear")
+@click.confirmation_option(prompt="This will delete all local memories. Are you sure?")
+def clear_cmd() -> None:
+    """Delete all local memories and reset the vector index."""
+    from smartmemory_app.storage import _resolve_data_dir, _shutdown
+
+    _shutdown()  # flush and release any open handles
+
+    data_path = _resolve_data_dir()
+    if not data_path.exists():
+        click.echo("No data directory found. Nothing to clear.")
+        return
+
+    removed = []
+    for pattern in ["*.db", "*.usearch", "*.json", "*.jsonl", ".write.lock"]:
+        for f in data_path.glob(pattern):
+            f.unlink()
+            removed.append(f.name)
+
+    # Also clear FTS database
+    fts = data_path / "fts.db"
+    if fts.exists():
+        fts.unlink()
+        removed.append("fts.db")
+
+    if removed:
+        click.echo(f"Cleared {len(removed)} files from {data_path}")
+    else:
+        click.echo(f"No data files found in {data_path}")
+
+    # Re-seed patterns file
+    from smartmemory_app.setup import _seed_data_dir
+    _seed_data_dir()
+    click.echo("Re-seeded entity patterns.")
 
 
 @cli.command("viewer")
@@ -63,6 +94,14 @@ def viewer_cmd(port: int, no_browser: bool) -> None:
     """Open the knowledge graph viewer (loginless, no Docker required)."""
     from smartmemory_app.viewer_server import main  # lazy — avoids fastapi import at CLI startup
     main(port=port, open_browser=not no_browser)
+
+
+@cli.command("events-server", hidden=True)
+@click.option("--port", default=9004, show_default=True, help="WebSocket port")
+def events_server_cmd(port: int) -> None:
+    """Run the lite WebSocket events server standalone (debugging only)."""
+    from smartmemory_app.events_server import main
+    main(port=port)
 
 
 if __name__ == "__main__":

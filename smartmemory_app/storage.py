@@ -63,6 +63,9 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
     """Return the local SmartMemory singleton, initialising on first call.
 
     Thread-safe via double-checked locking. Registers atexit shutdown on first init.
+    Pins the embedding provider from config before creating the memory instance
+    so that env var changes (e.g. OPENAI_API_KEY appearing) don't silently switch
+    the provider and cause dimension mismatches.
     """
     global _memory, _data_path
     if _memory is not None:
@@ -74,6 +77,11 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
         from smartmemory.tools.factory import create_lite_memory
         from smartmemory_app.event_sink import get_event_sink
         from smartmemory_app.patterns import JSONLPatternStore
+
+        # Pin embedding provider from config before core reads env
+        cfg = load_config()
+        if not os.environ.get("SMARTMEMORY_EMBEDDING_PROVIDER"):
+            os.environ["SMARTMEMORY_EMBEDDING_PROVIDER"] = cfg.embedding_provider
 
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
