@@ -131,10 +131,13 @@ def _setup_local() -> None:
         default=False,
     )
     click.echo("\nSmartMemory needs an LLM to extract entities and relationships.")
-    click.echo("  groq    — free tier, fast, cloud-based (recommended)")
-    click.echo("  ollama  — free, runs locally (llama3.1 or mistral)")
-    click.echo("  openai  — best quality, requires paid API key")
-    click.echo("  none    — EntityRuler only (very limited extraction)")
+    click.echo("  groq         — free tier, fast inference (recommended)")
+    click.echo("  claude-agent — Claude Agent SDK, OAuth (no API key)")
+    click.echo("  anthropic    — Anthropic API (ANTHROPIC_API_KEY)")
+    click.echo("  openai       — OpenAI API (OPENAI_API_KEY)")
+    click.echo("  ollama       — free, local (llama3.1, mistral)")
+    click.echo("  lmstudio     — local, OpenAI-compatible endpoint")
+    click.echo("  none         — EntityRuler only (very limited)")
     llm = click.prompt(
         "LLM provider",
         default="groq",

@@ -91,7 +91,7 @@ def config_cmd(key: str | None, value: str | None) -> None:
 
     # Settable fields and their validation
     settable = {
-        "llm_provider": {"values": ["groq", "openai", "anthropic", "ollama", "none"]},
+        "llm_provider": {"values": ["groq", "claude-agent", "anthropic", "openai", "ollama", "lmstudio", "none"]},
         "llm_model": {"values": None},  # freeform
         "embedding_provider": {"values": ["local", "openai", "ollama"]},
         "coreference": {"values": ["true", "false"]},
