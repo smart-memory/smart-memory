@@ -217,6 +217,51 @@ def get_memory_item(memory_id: str) -> dict[str, Any]:
     return node
 
 
+@api.post("/clear")
+def clear_all() -> dict:
+    """Clear all memories, reset vector index, re-seed patterns.
+
+    Resets the in-process singleton so subsequent API calls return fresh data.
+    Publishes graph_cleared event so connected viewers refresh.
+    """
+    from smartmemory_app.storage import _resolve_data_dir, _shutdown
+
+    _shutdown()
+
+    data_path = _resolve_data_dir()
+    removed = 0
+    if data_path.exists():
+        for pattern in [
+            "*.db", "*.db-shm", "*.db-wal", "*.db-journal",
+            "*.usearch", "*.json", "*.jsonl", "*.log", ".write.lock",
+        ]:
+            for f in data_path.glob(pattern):
+                try:
+                    f.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+
+    # Re-seed patterns
+    from smartmemory_app.setup import _seed_data_dir
+    _seed_data_dir()
+
+    # Publish graph_cleared event through the sink → events server → viewer
+    try:
+        from smartmemory_app.event_sink import get_event_sink
+        sink = get_event_sink()
+        sink.emit("span", {
+            "component": "graph",
+            "operation": "clear_all",
+            "name": "graph.clear_all",
+            "nuclear": True,
+        })
+    except Exception:
+        pass
+
+    return {"cleared": removed}
+
+
 @api.delete("/{memory_id}")
 def delete_node_405(memory_id: str) -> Response:
     """Local viewer is read-only. Memory node deletes return 405."""

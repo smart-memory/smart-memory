@@ -61,6 +61,100 @@ def search_cmd(query: str, top_k: int) -> None:
         click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
 
 
+@cli.command("models")
+@click.option("--provider", default=None, help="Filter by provider (ollama, lmstudio, groq, openai)")
+def models_cmd(provider: str | None) -> None:
+    """List available models from local and cloud providers."""
+    import httpx
+
+    providers_to_check = [provider] if provider else ["ollama", "lmstudio", "groq", "openai"]
+
+    for p in providers_to_check:
+        if p == "ollama":
+            try:
+                r = httpx.get("http://localhost:11434/api/tags", timeout=3)
+                r.raise_for_status()
+                models = r.json().get("models", [])
+                if models:
+                    click.echo(f"\nOllama ({len(models)} models):")
+                    for m in models:
+                        name = m.get("name", "?")
+                        size = m.get("size", 0)
+                        size_gb = f"{size / 1e9:.1f}GB" if size else "?"
+                        click.echo(f"  ollama/{name}  ({size_gb})")
+                else:
+                    click.echo("\nOllama: running but no models pulled")
+            except Exception:
+                click.echo("\nOllama: not running (start with: ollama serve)")
+
+        elif p == "lmstudio":
+            try:
+                r = httpx.get("http://localhost:1234/v1/models", timeout=3)
+                r.raise_for_status()
+                models = r.json().get("data", [])
+                if models:
+                    click.echo(f"\nLM Studio ({len(models)} models):")
+                    for m in models:
+                        click.echo(f"  lmstudio/{m.get('id', '?')}")
+                else:
+                    click.echo("\nLM Studio: running but no models loaded")
+            except Exception:
+                click.echo("\nLM Studio: not running (start LM Studio and load a model)")
+
+        elif p == "groq":
+            import os
+            key = os.environ.get("GROQ_API_KEY")
+            if not key:
+                click.echo("\nGroq: GROQ_API_KEY not set (get one at console.groq.com)")
+                continue
+            try:
+                r = httpx.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers={"Authorization": f"Bearer {key}"},
+                    timeout=5,
+                )
+                r.raise_for_status()
+                models = sorted(r.json().get("data", []), key=lambda m: m.get("id", ""))
+                if models:
+                    click.echo(f"\nGroq ({len(models)} models):")
+                    for m in models:
+                        click.echo(f"  groq/{m.get('id', '?')}")
+            except Exception as e:
+                click.echo(f"\nGroq: API error ({e})")
+
+        elif p == "openai":
+            import os
+            key = os.environ.get("OPENAI_API_KEY")
+            if not key:
+                click.echo("\nOpenAI: OPENAI_API_KEY not set")
+                continue
+            try:
+                r = httpx.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {key}"},
+                    timeout=5,
+                )
+                r.raise_for_status()
+                models = sorted(r.json().get("data", []), key=lambda m: m.get("id", ""))
+                # Filter to chat models only
+                chat_models = [m for m in models if any(
+                    m.get("id", "").startswith(prefix)
+                    for prefix in ("gpt-4", "gpt-3.5", "o1", "o3", "o4")
+                )]
+                if chat_models:
+                    click.echo(f"\nOpenAI ({len(chat_models)} chat models):")
+                    for m in chat_models:
+                        click.echo(f"  openai/{m.get('id', '?')}")
+            except Exception as e:
+                click.echo(f"\nOpenAI: API error ({e})")
+
+        elif p == "claude-agent":
+            click.echo("\nClaude Agent SDK: uses Claude Code OAuth (no model selection needed)")
+
+        elif p == "anthropic":
+            click.echo("\nAnthropic: claude-3-5-haiku-latest, claude-sonnet-4-5-20250514, claude-opus-4-6-20250603")
+
+
 @cli.command("config")
 @click.argument("key", required=False)
 @click.argument("value", required=False)
@@ -141,65 +235,51 @@ def server_cmd() -> None:
 @cli.command("clear")
 @click.confirmation_option(prompt="This will delete all local memories. Are you sure?")
 def clear_cmd() -> None:
-    """Delete all local memories and reset the vector index."""
+    """Delete all local memories and reset the vector index.
+
+    If the viewer is running, clears through its API (resets in-memory state
+    and publishes graph_cleared event). Falls back to direct file deletion.
+    """
+    import httpx
+
+    # Try clearing through the viewer API first — this resets the in-memory
+    # singleton and publishes the graph_cleared event to connected clients.
+    try:
+        r = httpx.post("http://localhost:9014/memory/clear", timeout=10)
+        r.raise_for_status()
+        result = r.json()
+        click.echo(f"Cleared {result.get('cleared', '?')} files via viewer API.")
+        return
+    except Exception:
+        pass
+
+    # Viewer not running — clear files directly
     from smartmemory_app.storage import _resolve_data_dir, _shutdown
 
-    _shutdown()  # flush and release any open handles
+    _shutdown()
 
     data_path = _resolve_data_dir()
     if not data_path.exists():
         click.echo("No data directory found. Nothing to clear.")
         return
 
-    removed = []
+    removed = 0
     for pattern in [
-        "*.db", "*.db-shm", "*.db-wal", "*.db-journal",  # SQLite + WAL
-        "*.usearch",                                        # vector index
-        "*.json",                                           # usearch metadata
-        "*.jsonl",                                          # patterns
-        "*.log",                                            # plugin.log, hooks.log
-        ".write.lock",                                      # filelock
+        "*.db", "*.db-shm", "*.db-wal", "*.db-journal",
+        "*.usearch", "*.json", "*.jsonl", "*.log", ".write.lock",
     ]:
         for f in data_path.glob(pattern):
             try:
                 f.unlink()
-                removed.append(f.name)
+                removed += 1
             except OSError as e:
                 click.echo(f"Warning: could not remove {f.name}: {e}")
 
-    if removed:
-        click.echo(f"Cleared {len(removed)} files from {data_path}")
-    else:
-        click.echo(f"No data files found in {data_path}")
+    click.echo(f"Cleared {removed} files from {data_path}")
 
-    # Re-seed patterns file
     from smartmemory_app.setup import _seed_data_dir
     _seed_data_dir()
     click.echo("Re-seeded entity patterns.")
-
-    # Notify viewer to refresh via events WebSocket
-    _notify_viewer_cleared()
-
-
-def _notify_viewer_cleared() -> None:
-    """Send graph_cleared event to the viewer via WebSocket."""
-    try:
-        import json
-        import websockets.sync.client as ws_sync
-
-        with ws_sync.connect("ws://localhost:9015", close_timeout=2) as ws:
-            ws.send(json.dumps({
-                "type": "new_event",
-                "event_type": "span",
-                "component": "graph",
-                "operation": "clear_all",
-                "name": "graph.clear_all",
-                "data": {"nuclear": True},
-            }))
-        click.echo("Notified viewer to refresh.")
-    except Exception:
-        # Viewer not running — that's fine
-        pass
 
 
 @cli.command("viewer")
