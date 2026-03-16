@@ -60,6 +60,76 @@ def search_cmd(query: str, top_k: int) -> None:
         click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
 
 
+@cli.command("config")
+@click.argument("key", required=False)
+@click.argument("value", required=False)
+def config_cmd(key: str | None, value: str | None) -> None:
+    """View or change SmartMemory configuration.
+
+    \b
+    smartmemory config                  Show all settings
+    smartmemory config llm_provider     Show one setting
+    smartmemory config llm_provider groq  Change a setting
+    """
+    from smartmemory_app.config import load_config, save_config, config_path
+
+    cfg = load_config()
+
+    if key is None:
+        # Show all
+        click.echo(f"Config: {config_path()}\n")
+        click.echo(f"  mode              = {cfg.mode}")
+        click.echo(f"  llm_provider      = {cfg.llm_provider}")
+        click.echo(f"  llm_model         = {cfg.llm_model or '(auto)'}")
+        click.echo(f"  embedding_provider = {cfg.embedding_provider}")
+        click.echo(f"  coreference       = {cfg.coreference}")
+        click.echo(f"  data_dir          = {cfg.data_dir}")
+        click.echo(f"  api_url           = {cfg.api_url}")
+        click.echo(f"  api_key_set       = {cfg.api_key_set}")
+        click.echo(f"  team_id           = {cfg.team_id or '(none)'}")
+        return
+
+    # Settable fields and their validation
+    settable = {
+        "llm_provider": {"values": ["groq", "openai", "anthropic", "ollama", "none"]},
+        "llm_model": {"values": None},  # freeform
+        "embedding_provider": {"values": ["local", "openai", "ollama"]},
+        "coreference": {"values": ["true", "false"]},
+        "data_dir": {"values": None},  # freeform
+        "mode": {"values": ["local", "remote"]},
+    }
+
+    if key not in settable:
+        current = getattr(cfg, key, None)
+        if current is not None:
+            click.echo(f"{key} = {current}")
+        else:
+            click.echo(f"Unknown key: {key}")
+            click.echo(f"Settable keys: {', '.join(settable)}")
+        return
+
+    if value is None:
+        click.echo(f"{key} = {getattr(cfg, key)}")
+        allowed = settable[key]["values"]
+        if allowed:
+            click.echo(f"Allowed: {', '.join(allowed)}")
+        return
+
+    # Validate
+    allowed = settable[key]["values"]
+    if allowed and value not in allowed:
+        click.echo(f"Invalid value '{value}'. Allowed: {', '.join(allowed)}")
+        return
+
+    # Special handling for bool
+    if key == "coreference":
+        value = value.lower() == "true"
+
+    setattr(cfg, key, value)
+    save_config(cfg)
+    click.echo(f"{key} = {value}")
+
+
 @cli.command("server", hidden=True)
 def server_cmd() -> None:
     """Start the SmartMemory MCP server (called by MCP clients, not users)."""

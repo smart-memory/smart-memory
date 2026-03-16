@@ -131,13 +131,13 @@ def _setup_local() -> None:
         default=False,
     )
     click.echo("\nSmartMemory needs an LLM to extract entities and relationships.")
-    click.echo("  ollama  — free, runs locally (recommended: llama3.1 or mistral)")
-    click.echo("  groq    — free tier, fast, cloud-based")
-    click.echo("  openai  — best quality, requires API key")
+    click.echo("  groq    — free tier, fast, cloud-based (recommended)")
+    click.echo("  ollama  — free, runs locally (llama3.1 or mistral)")
+    click.echo("  openai  — best quality, requires paid API key")
     click.echo("  none    — EntityRuler only (very limited extraction)")
     llm = click.prompt(
         "LLM provider",
-        default="ollama",
+        default="groq",
     )
     embedding = click.prompt(
         "Embedding provider? (local / openai / ollama)",
