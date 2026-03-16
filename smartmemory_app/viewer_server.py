@@ -1,14 +1,18 @@
-"""DIST-LITE-4: Viewer HTTP server — static SPA + local graph API + events server.
+"""DIST-DAEMON-1: SmartMemory daemon — HTTP API + static viewer + events WebSocket.
 
 Single uvicorn process serving:
-  GET /          →  static/index.html (LocalApp.jsx build)
-  GET /memory/*  →  local_api.py (SQLite-backed, read-only)
-  ws://:9004     →  events_server.start_background() (DIST-LITE-3, daemon thread)
+  GET  /health     →  daemon health check (root app, not /memory sub-app)
+  GET  /           →  static/index.html (LocalApp.jsx build)
+  /memory/*        →  local_api.py (graph + ingest + search + recall + clear)
+  ws://:9015       →  events_server.start_background() (DIST-LITE-3, daemon thread)
 
 The module-level ``app = _build_app()`` is side-effect-free — it does not start uvicorn
 or the events server. This makes the module safely importable by tests.
 """
+import atexit
+import os
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -24,6 +28,37 @@ DEFAULT_PORT = 9014
 
 def _build_app() -> FastAPI:
     app = FastAPI()
+
+    @app.get("/health")
+    def health():
+        """Daemon health check. Used by daemon.is_running() to verify ownership."""
+        from smartmemory_app.config import load_config
+        cfg = load_config()
+        backend_ok = False
+        node_count = -1
+        try:
+            from smartmemory_app.storage import get_memory
+            mem = get_memory()
+            backend_ok = mem is not None
+            from smartmemory_app.remote_backend import RemoteMemory
+            if not isinstance(mem, RemoteMemory):
+                try:
+                    snapshot = mem._graph.backend.serialize()
+                    nodes = snapshot.get("nodes", [])
+                    node_count = len([n for n in nodes if n.get("memory_type") != "Version"])
+                except Exception:
+                    node_count = 0  # backend exists but empty/new — still healthy
+        except Exception:
+            pass
+        return {
+            "service": "smartmemory",
+            "status": "ok" if backend_ok else "degraded",
+            "memories": node_count,
+            "llm_provider": cfg.llm_provider,
+            "embedding_provider": cfg.embedding_provider,
+            "pid": os.getpid(),
+        }
+
     # Mount local_api at /memory — sub-app routes (e.g. /graph/full) become /memory/graph/full,
     # matching createFetchAdapter's expected paths (fetchAdapter.js:34-49).
     app.mount("/memory", _local_api)
@@ -36,14 +71,17 @@ app = _build_app()
 
 
 def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
-    """Start the viewer server.
+    """Start the SmartMemory daemon.
 
     Eagerly warms the memory backend (spaCy + embedding model load) before
     starting uvicorn so the first API request doesn't time out.
+    Writes PID file after successful warmup for daemon lifecycle management.
     """
-    import time
+    from smartmemory_app.storage import get_memory, _shutdown, _resolve_data_dir
 
-    from smartmemory_app.storage import get_memory
+    data_path = _resolve_data_dir()
+    data_path.mkdir(parents=True, exist_ok=True)
+    pid_file = data_path / "daemon.pid"
 
     print("Loading SmartMemory backend...", flush=True)
     t0 = time.time()
@@ -51,13 +89,29 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
         get_memory()
         print(f"Backend ready ({time.time() - t0:.1f}s)", flush=True)
     except Exception as e:
-        print(f"Warning: backend init failed ({e}) — viewer may have limited functionality", flush=True)
+        print(f"Warning: backend init failed ({e}) — daemon running in degraded mode", flush=True)
 
-    # Start DIST-LITE-3 events server — idempotent, lock-protected (events_server.py:131-150)
+    # Write PID file after warmup
+    pid_file.write_text(str(os.getpid()))
+
+    def _cleanup():
+        _shutdown()
+        pid_file.unlink(missing_ok=True)
+
+    # atexit handles cleanup on normal exit AND uvicorn's graceful SIGTERM shutdown.
+    # Do NOT install a custom SIGTERM handler — uvicorn needs SIGTERM to trigger
+    # its graceful shutdown (drain active requests, then exit → atexit fires).
+    atexit.register(_cleanup)
+
+    # Start events WebSocket server as background daemon thread
     from smartmemory_app.events_server import start_background
     start_background()
 
     if open_browser:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
 
-    uvicorn.run(app, host="localhost", port=port, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+
+
+if __name__ == "__main__":
+    main()

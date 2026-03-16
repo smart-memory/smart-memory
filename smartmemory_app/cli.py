@@ -1,14 +1,37 @@
+"""SmartMemory CLI — daemon management + memory operations.
+
+DIST-DAEMON-1: All memory commands (persist, ingest, search, recall) try the
+daemon HTTP API first (<200ms). Falls back to direct storage calls if daemon
+is not running (~22s cold start).
+"""
 import logging
 
 import click
-from smartmemory_app.storage import ingest, recall, search
 
 log = logging.getLogger(__name__)
 
 
+def _daemon_url() -> str:
+    from smartmemory_app.config import load_config
+    return f"http://127.0.0.1:{load_config().daemon_port}"
+
+
+def _daemon_request(method: str, path: str, **kwargs):
+    """Try daemon HTTP API. Returns parsed JSON or None if daemon unreachable."""
+    import httpx
+    try:
+        r = httpx.request(method, f"{_daemon_url()}{path}", timeout=120, **kwargs)
+        r.raise_for_status()
+        return r.json() if r.status_code != 204 else {}
+    except (httpx.ConnectError, httpx.ConnectTimeout):
+        return None  # daemon not running — fall back to direct
+    except httpx.ReadTimeout:
+        return None  # daemon busy (model loading) — fall back to direct
+
+
 @click.group()
 def cli() -> None:
-    """SmartMemory CLI — used by Claude Code hooks."""
+    """SmartMemory — persistent AI memory system."""
 
 
 # Register setup/uninstall commands from setup module
@@ -18,22 +41,104 @@ cli.add_command(_setup_cmd, name="setup")
 cli.add_command(_uninstall_cmd, name="uninstall")
 
 
+# ── Daemon lifecycle ────────────────────────────────────────────────────────
+
+
+@cli.command("start")
+def start_cmd() -> None:
+    """Start the SmartMemory daemon."""
+    from smartmemory_app.daemon import start_daemon, is_running
+    if is_running():
+        click.echo("SmartMemory daemon is already running.")
+        return
+    click.echo("Starting SmartMemory daemon (loading models)...")
+    try:
+        start_daemon()
+        click.echo("Daemon ready.")
+    except Exception as e:
+        click.echo(f"Failed to start daemon: {e}", err=True)
+        raise SystemExit(1)
+
+
+@cli.command("stop")
+def stop_cmd() -> None:
+    """Stop the SmartMemory daemon."""
+    from smartmemory_app.daemon import stop_daemon, is_running
+    if not is_running(require_healthy=False):
+        click.echo("Daemon is not running.")
+        return
+    stop_daemon()
+    click.echo("Daemon stopped.")
+
+
+@cli.command("restart")
+def restart_cmd() -> None:
+    """Restart the SmartMemory daemon."""
+    from smartmemory_app.daemon import stop_daemon, start_daemon, is_running
+    if is_running(require_healthy=False):
+        click.echo("Stopping daemon...")
+        stop_daemon()
+    click.echo("Starting daemon...")
+    start_daemon()
+    click.echo("Daemon ready.")
+
+
+@cli.command("status")
+def status_cmd() -> None:
+    """Show SmartMemory daemon status."""
+    from smartmemory_app.daemon import get_status
+    info = get_status()
+    if info is None:
+        click.echo("SmartMemory daemon is not running.")
+        click.echo("Start with: smartmemory start")
+        return
+    click.echo(f"SmartMemory daemon: {info.get('status', '?')}")
+    click.echo(f"  Memories:   {info.get('memories', '?')}")
+    click.echo(f"  LLM:        {info.get('llm_provider', '?')}")
+    click.echo(f"  Embeddings: {info.get('embedding_provider', '?')}")
+    click.echo(f"  PID:        {info.get('pid', '?')}")
+
+
+@cli.command("viewer")
+@click.option("--port", default=None, type=int, help="Port override.")
+def viewer_cmd(port: int | None) -> None:
+    """Open the knowledge graph viewer in the browser."""
+    import webbrowser
+    from smartmemory_app.daemon import start_daemon, is_running, _port
+    if not is_running():
+        click.echo("Starting daemon...")
+        start_daemon()
+    p = port or _port()
+    webbrowser.open(f"http://localhost:{p}")
+
+
+# ── Memory operations ───────────────────────────────────────────────────────
+
+
 @cli.command("persist")
 @click.argument("text")
 @click.option("--type", "memory_type", default="episodic", show_default=True)
 def persist_cmd(text: str, memory_type: str) -> None:
     """Persist text as a memory (Stop hook)."""
-    item_id = ingest(text, memory_type)
-    click.echo(item_id)
+    result = _daemon_request("POST", "/memory/ingest", json={"content": text, "memory_type": memory_type})
+    if result:
+        click.echo(result.get("item_id", "?"))
+    else:
+        from smartmemory_app.storage import ingest
+        click.echo(ingest(text, memory_type))
 
 
 @cli.command("ingest")
 @click.argument("text")
 @click.option("--type", "memory_type", default="episodic", show_default=True)
 def ingest_cmd(text: str, memory_type: str) -> None:
-    """Full pipeline ingest (PostToolUseFailure hook)."""
-    item_id = ingest(text, memory_type)
-    click.echo(item_id)
+    """Ingest text through the full pipeline."""
+    result = _daemon_request("POST", "/memory/ingest", json={"content": text, "memory_type": memory_type})
+    if result:
+        click.echo(result.get("item_id", "?"))
+    else:
+        from smartmemory_app.storage import ingest
+        click.echo(ingest(text, memory_type))
 
 
 @cli.command("recall")
@@ -41,8 +146,12 @@ def ingest_cmd(text: str, memory_type: str) -> None:
 @click.option("--top-k", default=10, show_default=True)
 def recall_cmd(cwd: str, top_k: int) -> None:
     """Recall memories (SessionStart hook)."""
-    result = recall(cwd, top_k)
-    click.echo(result)
+    result = _daemon_request("GET", "/memory/recall", params={"cwd": cwd or "", "top_k": top_k})
+    if result:
+        click.echo(result.get("context", ""))
+    else:
+        from smartmemory_app.storage import recall
+        click.echo(recall(cwd, top_k))
 
 
 @cli.command("search")
@@ -50,7 +159,10 @@ def recall_cmd(cwd: str, top_k: int) -> None:
 @click.option("--top-k", default=5, show_default=True)
 def search_cmd(query: str, top_k: int) -> None:
     """Search memories by semantic similarity."""
-    results = search(query, top_k)
+    results = _daemon_request("POST", "/memory/search", json={"query": query, "top_k": top_k})
+    if results is None:
+        from smartmemory_app.storage import search
+        results = search(query, top_k)
     if not results:
         click.echo("No results.")
         return
@@ -59,6 +171,9 @@ def search_cmd(query: str, top_k: int) -> None:
         mem_type = r.get("memory_type", "?")
         item_id = r.get("item_id", "?")
         click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
+
+
+# ── Discovery + config ──────────────────────────────────────────────────────
 
 
 @cli.command("models")
@@ -136,7 +251,6 @@ def models_cmd(provider: str | None) -> None:
                 )
                 r.raise_for_status()
                 models = sorted(r.json().get("data", []), key=lambda m: m.get("id", ""))
-                # Filter to chat models only
                 chat_models = [m for m in models if any(
                     m.get("id", "").startswith(prefix)
                     for prefix in ("gpt-4", "gpt-3.5", "o1", "o3", "o4")
@@ -171,12 +285,12 @@ def config_cmd(key: str | None, value: str | None) -> None:
     cfg = load_config()
 
     if key is None:
-        # Show all
         click.echo(f"Config: {config_path()}\n")
         click.echo(f"  mode              = {cfg.mode}")
         click.echo(f"  llm_provider      = {cfg.llm_provider}")
         click.echo(f"  llm_model         = {cfg.llm_model or '(auto)'}")
         click.echo(f"  embedding_provider = {cfg.embedding_provider}")
+        click.echo(f"  daemon_port       = {cfg.daemon_port}")
         click.echo(f"  coreference       = {cfg.coreference}")
         click.echo(f"  data_dir          = {cfg.data_dir}")
         click.echo(f"  api_url           = {cfg.api_url}")
@@ -184,13 +298,13 @@ def config_cmd(key: str | None, value: str | None) -> None:
         click.echo(f"  team_id           = {cfg.team_id or '(none)'}")
         return
 
-    # Settable fields and their validation
     settable = {
         "llm_provider": {"values": ["groq", "claude-agent", "anthropic", "openai", "ollama", "lmstudio", "none"]},
-        "llm_model": {"values": None},  # freeform
+        "llm_model": {"values": None},
         "embedding_provider": {"values": ["local", "openai", "ollama"]},
+        "daemon_port": {"values": None},
         "coreference": {"values": ["true", "false"]},
-        "data_dir": {"values": None},  # freeform
+        "data_dir": {"values": None},
         "mode": {"values": ["local", "remote"]},
     }
 
@@ -210,52 +324,36 @@ def config_cmd(key: str | None, value: str | None) -> None:
             click.echo(f"Allowed: {', '.join(allowed)}")
         return
 
-    # Validate
     allowed = settable[key]["values"]
     if allowed and value not in allowed:
         click.echo(f"Invalid value '{value}'. Allowed: {', '.join(allowed)}")
         return
 
-    # Special handling for bool
+    coerced: object = value
     if key == "coreference":
-        value = value.lower() == "true"
+        coerced = value.lower() == "true"
+    elif key == "daemon_port":
+        coerced = int(value)
 
-    setattr(cfg, key, value)
+    setattr(cfg, key, coerced)
     save_config(cfg)
     click.echo(f"{key} = {value}")
 
 
-@cli.command("server", hidden=True)
-def server_cmd() -> None:
-    """Start the SmartMemory MCP server (called by MCP clients, not users)."""
-    from smartmemory_app.server import main
-    main()
+# ── Data management ─────────────────────────────────────────────────────────
 
 
 @cli.command("clear")
 @click.confirmation_option(prompt="This will delete all local memories. Are you sure?")
 def clear_cmd() -> None:
-    """Delete all local memories and reset the vector index.
-
-    If the viewer is running, clears through its API (resets in-memory state
-    and publishes graph_cleared event). Falls back to direct file deletion.
-    """
-    import httpx
-
-    # Try clearing through the viewer API first — this resets the in-memory
-    # singleton and publishes the graph_cleared event to connected clients.
-    try:
-        r = httpx.post("http://localhost:9014/memory/clear", timeout=10)
-        r.raise_for_status()
-        result = r.json()
-        click.echo(f"Cleared {result.get('cleared', '?')} files via viewer API.")
+    """Delete all local memories and reset the vector index."""
+    result = _daemon_request("POST", "/memory/clear")
+    if result is not None:
+        click.echo(f"Cleared {result.get('cleared', '?')} files via daemon.")
         return
-    except Exception:
-        pass
 
-    # Viewer not running — clear files directly
+    # Daemon not running — clear files directly
     from smartmemory_app.storage import _resolve_data_dir, _shutdown
-
     _shutdown()
 
     data_path = _resolve_data_dir()
@@ -282,13 +380,14 @@ def clear_cmd() -> None:
     click.echo("Re-seeded entity patterns.")
 
 
-@cli.command("viewer")
-@click.option("--port", default=9014, show_default=True, help="Port for the viewer server.")
-@click.option("--no-browser", is_flag=True, default=False, help="Don't auto-open browser.")
-def viewer_cmd(port: int, no_browser: bool) -> None:
-    """Open the knowledge graph viewer (loginless, no Docker required)."""
-    from smartmemory_app.viewer_server import main  # lazy — avoids fastapi import at CLI startup
-    main(port=port, open_browser=not no_browser)
+# ── Hidden/internal ─────────────────────────────────────────────────────────
+
+
+@cli.command("server", hidden=True)
+def server_cmd() -> None:
+    """Start the SmartMemory MCP server (called by MCP clients, not users)."""
+    from smartmemory_app.server import main
+    main()
 
 
 @cli.command("events-server", hidden=True)

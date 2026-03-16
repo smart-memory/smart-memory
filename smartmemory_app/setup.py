@@ -111,7 +111,17 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
     if for_tool:
         _setup_tool_config(for_tool)
 
-    click.echo("\nSetup complete. Run: smartmemory server")
+    # Start daemon automatically in local mode
+    if mode == "local":
+        click.echo("\nStarting SmartMemory daemon...")
+        try:
+            from smartmemory_app.daemon import start_daemon
+            start_daemon()
+            click.echo("SmartMemory is running.")
+        except Exception as e:
+            click.echo(f"Warning: daemon start failed ({e}). Start manually: smartmemory start")
+    else:
+        click.echo("\nSetup complete.")
 
 
 # ── Mode setup helpers ────────────────────────────────────────────────────────

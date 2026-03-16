@@ -1,24 +1,33 @@
-"""DIST-LITE-4/5: Graph API — local SQLite or remote hosted API.
+"""DIST-LITE-4/5 + DIST-DAEMON-1: Memory API — local SQLite or remote hosted API.
 
 Mounted at /memory by viewer_server.py — routes here are relative to that mount.
 GET  /graph/full         → /memory/graph/full
 POST /graph/edges        → /memory/graph/edges
 GET  /list               → /memory/list
+POST /ingest             → /memory/ingest           (DAEMON-1: full pipeline ingest)
+POST /search             → /memory/search           (DAEMON-1: semantic search)
+GET  /recall             → /memory/recall           (DAEMON-1: session context)
+POST /clear              → /memory/clear
 GET  /{id}/neighbors     → /memory/{id}/neighbors  (BEFORE /{id} — declaration order matters)
 GET  /{id}               → /memory/{id}
 DELETE /{id}             → /memory/{id}            (405 — local viewer is read-only)
 DELETE /graph/nodes/{id} → /memory/graph/nodes/{id} (405 — local viewer is read-only)
 
-DIST-LITE-5: each endpoint dispatches to RemoteMemory graph methods when mode=remote.
-Unconfigured state → HTTP 503 (UnconfiguredError caught by _get_mem()).
+All endpoints acquire _rw_lock for thread safety under uvicorn's thread pool.
 """
-from typing import Any
+import threading
+from typing import Any, Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel
 
 from smartmemory_app.config import UnconfiguredError
 from smartmemory_app.storage import get_memory
+
+# DIST-DAEMON-1: All endpoints serialize through this lock. Uvicorn runs sync
+# endpoints in a thread pool — without locking, concurrent ingest+clear or
+# ingest+read could race on the SmartMemory singleton's non-thread-safe state.
+_rw_lock = threading.RLock()
 
 api = FastAPI(title="SmartMemory Local API", docs_url=None, redoc_url=None)
 
@@ -224,29 +233,29 @@ def clear_all() -> dict:
     Resets the in-process singleton so subsequent API calls return fresh data.
     Publishes graph_cleared event so connected viewers refresh.
     """
-    from smartmemory_app.storage import _resolve_data_dir, _shutdown
+    with _rw_lock:
+        from smartmemory_app.storage import _resolve_data_dir, _shutdown
+        _shutdown()
 
-    _shutdown()
+        data_path = _resolve_data_dir()
+        removed = 0
+        if data_path.exists():
+            for pattern in [
+                "*.db", "*.db-shm", "*.db-wal", "*.db-journal",
+                "*.usearch", "*.json", "*.jsonl", "*.log", ".write.lock",
+            ]:
+                for f in data_path.glob(pattern):
+                    try:
+                        f.unlink()
+                        removed += 1
+                    except OSError:
+                        pass
 
-    data_path = _resolve_data_dir()
-    removed = 0
-    if data_path.exists():
-        for pattern in [
-            "*.db", "*.db-shm", "*.db-wal", "*.db-journal",
-            "*.usearch", "*.json", "*.jsonl", "*.log", ".write.lock",
-        ]:
-            for f in data_path.glob(pattern):
-                try:
-                    f.unlink()
-                    removed += 1
-                except OSError:
-                    pass
+        # Re-seed patterns
+        from smartmemory_app.setup import _seed_data_dir
+        _seed_data_dir()
 
-    # Re-seed patterns
-    from smartmemory_app.setup import _seed_data_dir
-    _seed_data_dir()
-
-    # Publish graph_cleared event through the sink → events server → viewer
+    # Publish graph_cleared event (outside lock — emit is thread-safe)
     try:
         from smartmemory_app.event_sink import get_event_sink
         sink = get_event_sink()
@@ -260,6 +269,53 @@ def clear_all() -> dict:
         pass
 
     return {"cleared": removed}
+
+
+# ── DIST-DAEMON-1: Memory operation endpoints ──────────────────────────────
+
+
+class IngestRequest(BaseModel):
+    content: str
+    memory_type: str = "episodic"
+    context: Optional[dict] = None
+    profile_name: Optional[str] = None  # accepted for service contract alignment, ignored in lite
+
+
+@api.post("/ingest")
+def ingest_endpoint(body: IngestRequest) -> dict:
+    """Ingest content through the full pipeline. Aligned with service POST /memory/ingest."""
+    memory_type = body.memory_type
+    if body.context and "memory_type" in body.context:
+        memory_type = body.context["memory_type"]
+    with _rw_lock:
+        from smartmemory_app.storage import ingest
+        item_id = ingest(body.content, memory_type)
+    return {"item_id": item_id}
+
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+
+@api.post("/search")
+def search_endpoint(body: SearchRequest) -> list:
+    """Search memories. Returns bare list matching service POST /memory/search."""
+    with _rw_lock:
+        from smartmemory_app.storage import search
+        return search(body.query, body.top_k)
+
+
+@api.get("/recall")
+def recall_endpoint(cwd: str = None, top_k: int = 10) -> dict:
+    """Recall recent + relevant memories for session context."""
+    with _rw_lock:
+        from smartmemory_app.storage import recall
+        context = recall(cwd, top_k)
+    return {"context": context}
+
+
+# ── Read-only boundary ─────────────────────────────────────────────────────
 
 
 @api.delete("/{memory_id}")

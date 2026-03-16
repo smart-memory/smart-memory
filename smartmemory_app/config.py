@@ -40,6 +40,7 @@ class SmartMemoryConfig:
     llm_provider: str = "none"
     llm_model: str = ""
     embedding_provider: str = "local"  # "local" | "openai" | "ollama"
+    daemon_port: int = 9014
     data_dir: str = "~/.smartmemory"
 
 
@@ -88,6 +89,7 @@ def load_config() -> SmartMemoryConfig:
             cfg.llm_provider = local.get("llm_provider", "none")
             cfg.llm_model = local.get("llm_model", "")
             cfg.embedding_provider = local.get("embedding_provider", "local")
+            cfg.daemon_port = local.get("daemon_port", 9014)
             cfg.data_dir = local.get("data_dir", "~/.smartmemory")
         except Exception as exc:
             warnings.warn(
@@ -115,6 +117,8 @@ def load_config() -> SmartMemoryConfig:
         cfg.llm_provider = p
     if ep := os.environ.get("SMARTMEMORY_EMBEDDING_PROVIDER"):
         cfg.embedding_provider = ep
+    if dp := os.environ.get("SMARTMEMORY_DAEMON_PORT"):
+        cfg.daemon_port = int(dp)
 
     return cfg
 
@@ -129,6 +133,7 @@ def save_config(cfg: SmartMemoryConfig) -> None:
             "llm_provider": cfg.llm_provider,
             "llm_model": cfg.llm_model,
             "embedding_provider": cfg.embedding_provider,
+            "daemon_port": cfg.daemon_port,
             "data_dir": cfg.data_dir,
         },
         "remote": {
