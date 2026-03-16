@@ -102,11 +102,24 @@ def get_graph_full() -> dict:
     backend = _get_backend()
     snapshot = backend.serialize()
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
-    edges = snapshot.get("edges", [])
+    # Filter out internal Version nodes — Cytoscape crashes if edges reference
+    # nodes that aren't in the graph (HAS_VERSION edges → missing Version targets).
+    node_ids = set()
+    filtered_nodes = []
+    for n in nodes:
+        if n.get("memory_type") == "Version":
+            continue
+        filtered_nodes.append(n)
+        node_ids.add(n["item_id"])
+    # Only include edges where both endpoints exist in the filtered node set
+    edges = [
+        e for e in snapshot.get("edges", [])
+        if e.get("source_id") in node_ids and e.get("target_id") in node_ids
+    ]
     return {
-        "nodes": nodes,
+        "nodes": filtered_nodes,
         "edges": edges,
-        "node_count": len(nodes),
+        "node_count": len(filtered_nodes),
         "edge_count": len(edges),
     }
 
