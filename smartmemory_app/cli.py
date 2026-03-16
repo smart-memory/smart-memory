@@ -151,16 +151,17 @@ def clear_cmd() -> None:
         return
 
     removed = []
-    for pattern in ["*.db", "*.usearch", "*.json", "*.jsonl", ".write.lock"]:
+    for pattern in [
+        "*.db", "*.db-shm", "*.db-wal", "*.db-journal",  # SQLite + WAL
+        "*.usearch",                                        # vector index
+        "*.json",                                           # usearch metadata
+        "*.jsonl",                                          # patterns
+        "*.log",                                            # plugin.log, hooks.log
+        ".write.lock",                                      # filelock
+    ]:
         for f in data_path.glob(pattern):
             f.unlink()
             removed.append(f.name)
-
-    # Also clear FTS database
-    fts = data_path / "fts.db"
-    if fts.exists():
-        fts.unlink()
-        removed.append("fts.db")
 
     if removed:
         click.echo(f"Cleared {len(removed)} files from {data_path}")
