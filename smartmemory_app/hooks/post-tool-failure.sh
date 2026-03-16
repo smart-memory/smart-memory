@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-DATA_DIR="${SMARTMEMORY_DATA_DIR:-$HOME/.smartmemory}"
-LOG="$DATA_DIR/plugin.log"
-mkdir -p "$DATA_DIR"
-INPUT=$(cat)
-IS_INTERRUPT=$(echo "$INPUT" | jq -r '.is_interrupt // false')
-if [[ "$IS_INTERRUPT" == "true" ]]; then exit 0; fi
-TOOL=$(echo "$INPUT" | jq -r '.tool_name // "unknown"')
-ERROR=$(echo "$INPUT" | jq -r '.error // empty')
-if [[ -n "$ERROR" ]]; then
-    CONTENT="Tool $TOOL failed: $ERROR"
-    python -m smartmemory_app ingest "$CONTENT" --type episodic >>"$LOG" 2>&1 &
-    disown
-fi
+# Disabled — was ingesting every tool failure as episodic memory,
+# flooding the graph with noise. Re-enable when dedup/throttle is implemented.
 exit 0
