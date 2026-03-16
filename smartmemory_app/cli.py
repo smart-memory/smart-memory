@@ -1,6 +1,6 @@
 import logging
 import click
-from smartmemory_app.storage import ingest, recall
+from smartmemory_app.storage import ingest, recall, search
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +42,22 @@ def recall_cmd(cwd: str, top_k: int) -> None:
     """Recall memories (SessionStart hook)."""
     result = recall(cwd, top_k)
     click.echo(result)
+
+
+@cli.command("search")
+@click.argument("query")
+@click.option("--top-k", default=5, show_default=True)
+def search_cmd(query: str, top_k: int) -> None:
+    """Search memories by semantic similarity."""
+    results = search(query, top_k)
+    if not results:
+        click.echo("No results.")
+        return
+    for r in results:
+        content = r.get("content", "")[:200]
+        mem_type = r.get("memory_type", "?")
+        item_id = r.get("item_id", "?")
+        click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
 
 
 @cli.command("server")
