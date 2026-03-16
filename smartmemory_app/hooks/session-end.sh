@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-DATA_DIR="${SMARTMEMORY_DATA_DIR:-$HOME/.smartmemory}"
-LOG="$DATA_DIR/plugin.log"
-mkdir -p "$DATA_DIR"
-INPUT=$(cat)
-LAST_MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // empty')
-if [[ -n "$LAST_MSG" ]]; then
-    python -m smartmemory_app persist "$LAST_MSG" >>"$LOG" 2>&1 &
-    disown
-fi
+# Disabled — all hooks that write to SmartMemory are disabled until
+# DIST-DAEMON-1 replaces cold-start CLI calls with HTTP to warm daemon.
 exit 0
