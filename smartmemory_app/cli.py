@@ -1,4 +1,6 @@
 import logging
+import os
+
 import click
 from smartmemory_app.storage import ingest, recall, search
 
@@ -141,9 +143,47 @@ def server_cmd() -> None:
 @click.confirmation_option(prompt="This will delete all local memories. Are you sure?")
 def clear_cmd() -> None:
     """Delete all local memories and reset the vector index."""
+    import signal
     from smartmemory_app.storage import _resolve_data_dir, _shutdown
 
     _shutdown()  # flush and release any open handles
+
+    # Kill any running viewer/server processes holding files open
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["lsof", "-ti", ":9014", ":9015"],
+            capture_output=True, text=True,
+        )
+        pids = result.stdout.strip().split()
+        my_pid = str(os.getpid())
+        for pid in pids:
+            if pid and pid != my_pid:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                    click.echo(f"Stopped viewer process {pid}")
+                except (ProcessLookupError, PermissionError):
+                    pass
+    except Exception:
+        pass
+
+    # Also kill background persist processes
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "smartmemory_app persist"],
+            capture_output=True, text=True,
+        )
+        for pid in result.stdout.strip().split():
+            if pid:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                except (ProcessLookupError, PermissionError):
+                    pass
+    except Exception:
+        pass
+
+    import time
+    time.sleep(0.5)  # let processes release file handles
 
     data_path = _resolve_data_dir()
     if not data_path.exists():
@@ -160,8 +200,11 @@ def clear_cmd() -> None:
         ".write.lock",                                      # filelock
     ]:
         for f in data_path.glob(pattern):
-            f.unlink()
-            removed.append(f.name)
+            try:
+                f.unlink()
+                removed.append(f.name)
+            except OSError as e:
+                click.echo(f"Warning: could not remove {f.name}: {e}")
 
     if removed:
         click.echo(f"Cleared {len(removed)} files from {data_path}")
