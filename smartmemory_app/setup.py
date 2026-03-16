@@ -130,9 +130,14 @@ def _setup_local() -> None:
         "(downloads ~500MB fastcoref model on first run)",
         default=False,
     )
+    click.echo("\nSmartMemory needs an LLM to extract entities and relationships.")
+    click.echo("  ollama  — free, runs locally (recommended: llama3.1 or mistral)")
+    click.echo("  groq    — free tier, fast, cloud-based")
+    click.echo("  openai  — best quality, requires API key")
+    click.echo("  none    — EntityRuler only (very limited extraction)")
     llm = click.prompt(
-        "LLM provider for enrichment? (openai / groq / anthropic / ollama / none)",
-        default="none",
+        "LLM provider",
+        default="ollama",
     )
     embedding = click.prompt(
         "Embedding provider? (local / openai / ollama)",
