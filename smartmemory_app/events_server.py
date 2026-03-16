@@ -107,7 +107,18 @@ async def _serve(port: int = 9015) -> None:
             clients.add(ws)
             log.info("events-server: client connected (total: %d)", len(clients))
             try:
-                await ws.wait_closed()
+                # Listen for incoming messages and rebroadcast to all other clients.
+                # This allows CLI commands (e.g. `smartmemory clear`) to push events
+                # to the viewer by connecting as a WebSocket client.
+                async for message in ws:
+                    others = {c for c in clients if c is not ws}
+                    if others:
+                        await asyncio.gather(
+                            *[c.send(message) for c in others],
+                            return_exceptions=True,
+                        )
+            except Exception:
+                pass
             finally:
                 clients.discard(ws)
                 log.info("events-server: client disconnected (total: %d)", len(clients))

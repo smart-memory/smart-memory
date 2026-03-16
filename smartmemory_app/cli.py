@@ -1,5 +1,4 @@
 import logging
-import os
 
 import click
 from smartmemory_app.storage import ingest, recall, search
@@ -143,47 +142,9 @@ def server_cmd() -> None:
 @click.confirmation_option(prompt="This will delete all local memories. Are you sure?")
 def clear_cmd() -> None:
     """Delete all local memories and reset the vector index."""
-    import signal
     from smartmemory_app.storage import _resolve_data_dir, _shutdown
 
     _shutdown()  # flush and release any open handles
-
-    # Kill any running viewer/server processes holding files open
-    try:
-        import subprocess
-        result = subprocess.run(
-            ["lsof", "-ti", ":9014", ":9015"],
-            capture_output=True, text=True,
-        )
-        pids = result.stdout.strip().split()
-        my_pid = str(os.getpid())
-        for pid in pids:
-            if pid and pid != my_pid:
-                try:
-                    os.kill(int(pid), signal.SIGTERM)
-                    click.echo(f"Stopped viewer process {pid}")
-                except (ProcessLookupError, PermissionError):
-                    pass
-    except Exception:
-        pass
-
-    # Also kill background persist processes
-    try:
-        result = subprocess.run(
-            ["pgrep", "-f", "smartmemory_app persist"],
-            capture_output=True, text=True,
-        )
-        for pid in result.stdout.strip().split():
-            if pid:
-                try:
-                    os.kill(int(pid), signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
-                    pass
-    except Exception:
-        pass
-
-    import time
-    time.sleep(0.5)  # let processes release file handles
 
     data_path = _resolve_data_dir()
     if not data_path.exists():
@@ -215,6 +176,30 @@ def clear_cmd() -> None:
     from smartmemory_app.setup import _seed_data_dir
     _seed_data_dir()
     click.echo("Re-seeded entity patterns.")
+
+    # Notify viewer to refresh via events WebSocket
+    _notify_viewer_cleared()
+
+
+def _notify_viewer_cleared() -> None:
+    """Send graph_cleared event to the viewer via WebSocket."""
+    try:
+        import json
+        import websockets.sync.client as ws_sync
+
+        with ws_sync.connect("ws://localhost:9015", close_timeout=2) as ws:
+            ws.send(json.dumps({
+                "type": "new_event",
+                "event_type": "span",
+                "component": "graph",
+                "operation": "clear_all",
+                "name": "graph.clear_all",
+                "data": {"nuclear": True},
+            }))
+        click.echo("Notified viewer to refresh.")
+    except Exception:
+        # Viewer not running — that's fine
+        pass
 
 
 @cli.command("viewer")
