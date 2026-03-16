@@ -104,7 +104,7 @@ def clear_cmd() -> None:
 
 
 @cli.command("viewer")
-@click.option("--port", default=9005, show_default=True, help="Port for the viewer server.")
+@click.option("--port", default=9014, show_default=True, help="Port for the viewer server.")
 @click.option("--no-browser", is_flag=True, default=False, help="Don't auto-open browser.")
 def viewer_cmd(port: int, no_browser: bool) -> None:
     """Open the knowledge graph viewer (loginless, no Docker required)."""
@@ -113,7 +113,7 @@ def viewer_cmd(port: int, no_browser: bool) -> None:
 
 
 @cli.command("events-server", hidden=True)
-@click.option("--port", default=9004, show_default=True, help="WebSocket port")
+@click.option("--port", default=9015, show_default=True, help="WebSocket port")
 def events_server_cmd(port: int) -> None:
     """Run the lite WebSocket events server standalone (debugging only)."""
     from smartmemory_app.events_server import main

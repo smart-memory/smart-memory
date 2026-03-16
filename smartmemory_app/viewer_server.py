@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from smartmemory_app.local_api import api as _local_api
 
 STATIC_DIR = Path(__file__).parent / "static"
-DEFAULT_PORT = 9005
+DEFAULT_PORT = 9014
 
 
 def _build_app() -> FastAPI:
@@ -38,9 +38,21 @@ app = _build_app()
 def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     """Start the viewer server.
 
-    Starts the DIST-LITE-3 events server as a background daemon thread (idempotent),
-    optionally opens the browser, then runs uvicorn on the given port.
+    Eagerly warms the memory backend (spaCy + embedding model load) before
+    starting uvicorn so the first API request doesn't time out.
     """
+    import time
+
+    from smartmemory_app.storage import get_memory
+
+    print("Loading SmartMemory backend...", flush=True)
+    t0 = time.time()
+    try:
+        get_memory()
+        print(f"Backend ready ({time.time() - t0:.1f}s)", flush=True)
+    except Exception as e:
+        print(f"Warning: backend init failed ({e}) — viewer may have limited functionality", flush=True)
+
     # Start DIST-LITE-3 events server — idempotent, lock-protected (events_server.py:131-150)
     from smartmemory_app.events_server import start_background
     start_background()

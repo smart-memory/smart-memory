@@ -90,7 +90,7 @@ async def _broadcast(sink, clients: set) -> None:
         )
 
 
-async def _serve(port: int = 9004) -> None:
+async def _serve(port: int = 9015) -> None:
     """Run the WebSocket server and broadcast loop."""
     from smartmemory_app.event_sink import get_event_sink
 
@@ -128,7 +128,7 @@ async def _serve(port: int = 9004) -> None:
         log.info("events-server: stopped")
 
 
-def start_background(port: int = 9004) -> None:
+def start_background(port: int = 9015) -> None:
     """Start the events server as a background daemon thread. Idempotent.
 
     The _server_thread_lock makes the is_alive() check + Thread() spawn atomic —
@@ -155,6 +155,6 @@ def stop_background() -> None:
     _stop_event.set()
 
 
-def main(port: int = 9004) -> None:
+def main(port: int = 9015) -> None:
     """Standalone entry point. Run via: smartmemory events-server."""
     asyncio.run(_serve(port=port))
