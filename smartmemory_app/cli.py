@@ -60,9 +60,9 @@ def search_cmd(query: str, top_k: int) -> None:
         click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
 
 
-@cli.command("server")
+@cli.command("server", hidden=True)
 def server_cmd() -> None:
-    """Start the SmartMemory MCP server."""
+    """Start the SmartMemory MCP server (called by MCP clients, not users)."""
     from smartmemory_app.server import main
     main()
 
