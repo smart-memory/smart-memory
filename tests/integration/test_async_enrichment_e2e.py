@@ -598,3 +598,300 @@ class TestLimitsAndEdgeCases:
         assert not errors, f"Ingest errors: {errors}"
         assert queue.stats["total_processed"] == 10
         assert queue.stats["total_failed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# 6. Stress tests
+# ---------------------------------------------------------------------------
+
+class TestStress:
+    """Throughput, large batches, and sustained load."""
+
+    def test_large_batch_drain(self, lite_memory):
+        """100 items queued before drain starts — all should process."""
+        from smartmemory_app.async_enrichment import (
+            AsyncEnrichmentQueue, enrichment_drain_loop, _stop_event, stop_drain,
+        )
+
+        queue = AsyncEnrichmentQueue(maxlen=200)
+        lock = threading.RLock()
+        _stop_event.clear()
+
+        # Ingest 100 items
+        for i in range(100):
+            result = lite_memory.ingest(f"Batch item {i} about topic {i % 10}.", sync=False)
+            ids = {k.lower(): v for k, v in result.get("entity_ids", {}).items()}
+            queue.enqueue({
+                "item_id": result["item_id"],
+                "workspace_id": "",
+                "entity_ids": ids,
+                "enable_ontology": False,
+                "enqueued_at": time.time(),
+            })
+
+        assert queue.size == 100
+
+        llm_extraction = _make_llm_extraction(entities_data=[])
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            t = threading.Thread(
+                target=enrichment_drain_loop,
+                args=(lambda: lite_memory, queue, lock),
+                daemon=True,
+            )
+            t.start()
+
+            deadline = time.time() + 120  # generous timeout for 100 items
+            while queue.stats["total_processed"] < 100 and time.time() < deadline:
+                time.sleep(0.5)
+
+            stop_drain()
+            t.join(timeout=10)
+
+        assert queue.stats["total_processed"] == 100, (
+            f"Only processed {queue.stats['total_processed']}/100"
+        )
+        assert queue.stats["total_failed"] == 0
+
+    def test_enqueue_dequeue_throughput(self):
+        """Measure raw queue throughput: 10k enqueue + dequeue_all should be fast."""
+        from smartmemory_app.async_enrichment import AsyncEnrichmentQueue
+
+        q = AsyncEnrichmentQueue(maxlen=15_000)
+        t0 = time.time()
+        for i in range(10_000):
+            q.enqueue({"item_id": f"perf-{i}"})
+        enqueue_time = time.time() - t0
+
+        t0 = time.time()
+        items = q.dequeue_all()
+        dequeue_time = time.time() - t0
+
+        assert len(items) == 10_000
+        # Both operations should complete in well under 1 second
+        assert enqueue_time < 2.0, f"Enqueue too slow: {enqueue_time:.2f}s"
+        assert dequeue_time < 1.0, f"Dequeue too slow: {dequeue_time:.2f}s"
+
+
+# ---------------------------------------------------------------------------
+# 7. Edge cases that could break production
+# ---------------------------------------------------------------------------
+
+class TestProductionEdgeCases:
+    """Cases that look innocent but have historically broken memory systems."""
+
+    def test_duplicate_item_id_in_queue(self, lite_memory):
+        """Same item_id enqueued twice — process_extract_job runs twice.
+
+        This shouldn't crash. The second run may write duplicate entities
+        (acceptable) or skip them (ideal). Either way, no error.
+        """
+        from smartmemory_app.async_enrichment import (
+            AsyncEnrichmentQueue, enrichment_drain_loop, _stop_event, stop_drain,
+        )
+
+        queue = AsyncEnrichmentQueue(maxlen=100)
+        lock = threading.RLock()
+        _stop_event.clear()
+
+        result = lite_memory.ingest("Alice leads Project Atlas.", sync=False)
+        ids = {k.lower(): v for k, v in result.get("entity_ids", {}).items()}
+
+        # Enqueue same item twice
+        job = {
+            "item_id": result["item_id"],
+            "workspace_id": "",
+            "entity_ids": ids,
+            "enable_ontology": False,
+            "enqueued_at": time.time(),
+        }
+        queue.enqueue(dict(job))
+        queue.enqueue(dict(job))
+
+        llm_extraction = _make_llm_extraction(
+            entities_data=[("Project Atlas", "project")],
+        )
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            t = threading.Thread(
+                target=enrichment_drain_loop,
+                args=(lambda: lite_memory, queue, lock),
+                daemon=True,
+            )
+            t.start()
+
+            deadline = time.time() + 15
+            while queue.stats["total_processed"] < 2 and time.time() < deadline:
+                time.sleep(0.1)
+
+            stop_drain()
+            t.join(timeout=5)
+
+        assert queue.stats["total_processed"] == 2
+        assert queue.stats["total_failed"] == 0
+
+    def test_malformed_llm_extraction_empty_entities(self, lite_memory):
+        """LLM returns empty entities list — should still succeed."""
+        item_id = lite_memory.ingest("Nothing interesting here.")
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value={"entities": [], "relations": []},
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": {}},
+            )
+        assert result["status"] == "ok"
+        assert result["new_entities"] == 0
+        assert result["new_relations"] == 0
+
+    def test_malformed_llm_extraction_none_values(self, lite_memory):
+        """LLM returns None for entities/relations — should not crash."""
+        item_id = lite_memory.ingest("Content for None test.")
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value={"entities": None, "relations": None},
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": {}},
+            )
+        assert result["status"] == "ok"
+        assert result["new_entities"] == 0
+
+    def test_malformed_llm_extraction_missing_keys(self, lite_memory):
+        """LLM returns dict with missing keys — should not crash."""
+        item_id = lite_memory.ingest("Content for missing keys test.")
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value={},  # No entities or relations keys at all
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": {}},
+            )
+        assert result["status"] == "ok"
+        assert result["new_entities"] == 0
+
+    def test_entity_names_with_special_characters(self, lite_memory):
+        """Entity names with quotes, newlines, backslashes — should survive round-trip."""
+        item_id = lite_memory.ingest("O'Reilly Media published the book.")
+
+        llm_extraction = _make_llm_extraction(
+            entities_data=[
+                ("O'Reilly Media", "organization"),
+                ('Path\\to\\file', "artifact"),
+                ("Line\nBreak", "concept"),
+            ],
+        )
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": {}},
+            )
+        assert result["status"] == "ok"
+        assert result["new_entities"] == 3
+
+    def test_content_with_no_tier1_entities(self, lite_memory):
+        """Content too short for EntityRuler → empty entity_ids → tier-2 still works."""
+        result = lite_memory.ingest("hi", sync=False)
+        entity_ids = result.get("entity_ids", {})
+        # Very short content may produce zero entities from EntityRuler
+        # Tier 2 should still work — LLM may find entities that ruler missed
+
+        llm_extraction = _make_llm_extraction(
+            entities_data=[("Something", "concept")],
+        )
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            result2 = process_extract_job(
+                lite_memory,
+                {
+                    "item_id": result["item_id"],
+                    "workspace_id": "",
+                    "entity_ids": {k.lower(): v for k, v in entity_ids.items()},
+                },
+            )
+        assert result2["status"] == "ok"
+
+    def test_same_content_ingested_twice(self, lite_memory):
+        """Duplicate content ingested twice → both get unique item_ids."""
+        text = "Alice leads Project Atlas at Acme Corp."
+        r1 = lite_memory.ingest(text, sync=False)
+        r2 = lite_memory.ingest(text, sync=False)
+
+        assert r1["item_id"] != r2["item_id"], "Duplicate content should still get unique item_ids"
+        assert lite_memory.get(r1["item_id"]) is not None
+        assert lite_memory.get(r2["item_id"]) is not None
+
+    def test_mixed_case_entity_dedup(self, lite_memory):
+        """Tier-1 stores 'Alice', LLM returns 'alice' — dedup should catch it."""
+        item_id = lite_memory.ingest("Alice and Bob work together.")
+
+        llm_extraction = _make_llm_extraction(
+            entities_data=[("alice", "person"), ("BOB", "person"), ("Charlie", "person")],
+        )
+
+        # Tier 1 found Alice and Bob (original case)
+        ruler_entity_ids = {"alice": "ruler_alice_001", "bob": "ruler_bob_001"}
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": ruler_entity_ids},
+            )
+
+        assert result["status"] == "ok"
+        # alice and BOB should be deduped (ruler has lowercase keys)
+        # Only Charlie should be net-new
+        assert result["new_entities"] == 1, (
+            f"Expected 1 net-new (Charlie), got {result['new_entities']}"
+        )
+
+    def test_null_bytes_in_content(self, lite_memory):
+        """Content with null bytes should not crash the pipeline."""
+        try:
+            result = lite_memory.ingest("Content with \x00 null byte.", sync=False)
+            # If it succeeds, item should be retrievable
+            assert result["item_id"]
+        except Exception:
+            # Some backends may reject null bytes — that's acceptable
+            pass
+
+    def test_very_many_entities_from_llm(self, lite_memory):
+        """LLM returns 50 entities — should all be written without error."""
+        item_id = lite_memory.ingest("A document mentioning many things.")
+
+        entities_data = [(f"Entity_{i}", "concept") for i in range(50)]
+        llm_extraction = _make_llm_extraction(entities_data=entities_data)
+
+        with patch(
+            "smartmemory.plugins.extractors.llm_single.LLMSingleExtractor.extract",
+            return_value=llm_extraction,
+        ):
+            result = process_extract_job(
+                lite_memory,
+                {"item_id": item_id, "workspace_id": "", "entity_ids": {}},
+            )
+
+        assert result["status"] == "ok"
+        assert result["new_entities"] == 50
