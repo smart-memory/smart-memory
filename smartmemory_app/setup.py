@@ -1,4 +1,4 @@
-"""DIST-LITE-5: Setup — first-run questionnaire + Claude Code hook wiring.
+"""DIST-LITE-5 + DIST-SETUP-TUI-1: Setup — first-run questionnaire + Claude Code hook wiring.
 
 `smartmemory setup` is the single entry point for both:
   - First-run mode/pipeline config (local vs remote, LLM provider, etc.)
@@ -9,22 +9,46 @@ Local mode: asks pipeline questions, writes config, wires Claude Code hooks.
   in the base `pip install smartmemory` — no extras needed.
 Remote mode: validates API key against /auth/me, stores in OS keychain,
   writes config. No hook wiring (remote mode has no hook-invoked pipeline).
+
+DIST-SETUP-TUI-1: When running interactively with textual installed,
+  launches a Textual TUI with arrow-key selection. Falls back to click
+  prompts when non-interactive, flags provided, or textual unavailable.
 """
 import json
 import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Optional
 
 import click
 
+
+# ── SetupResult — contract between TUI and business logic ─────────────────
+
+
+@dataclass
+class SetupResult:
+    """Answers collected from the TUI (or click prompts). Matches SmartMemoryConfig fields."""
+
+    mode: str = "local"
+    llm_provider: str = "groq"
+    llm_model: str = ""
+    embedding_provider: str = "local"
+    coreference: bool = False
+    data_dir: str = "~/.smartmemory"
+
 HOOKS_SRC = Path(__file__).parent / "hooks"
 SKILLS_SRC = Path(__file__).parent / "skills"
+PLIST_TEMPLATE = Path(__file__).parent / "data" / "ai.smartmemory.daemon.plist"
 CLAUDE_DIR = Path.home() / ".claude"
 HOOKS_DEST = CLAUDE_DIR / "hooks"
 SETTINGS = CLAUDE_DIR / "settings.json"
 DATA_DIR = Path.home() / ".smartmemory"
+LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
+PLIST_NAME = "ai.smartmemory.daemon.plist"
 
 # Maps source filename (in package) → namespaced dest filename (in ~/.claude/hooks/)
 _HOOK_FILE_MAP = {
@@ -94,7 +118,49 @@ HOOK_REGISTRATIONS = _get_hook_registrations()
     help="Tool config (e.g. 'cursor'). Works in both modes.",
 )
 def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
-    """First-run questionnaire: configure local or remote mode."""
+    """First-run questionnaire: configure local or remote mode.
+
+    Three self-contained branches — each handles config, post-config, AND daemon
+    start. No shared post-branch code to avoid double-start bugs.
+    """
+    # Branch 1: Flags provided — use click flow directly
+    if mode is not None:
+        _setup_click(mode, api_key)
+        if mode == "local":
+            _start_daemon_local()
+        if for_tool:
+            _setup_tool_config(for_tool)
+        return
+
+    # Branch 2: Interactive TUI (if available)
+    if _can_run_tui():
+        try:
+            from smartmemory_app.setup_tui import run_setup_tui
+            result = run_setup_tui()
+            if result is None:
+                click.echo("Setup cancelled.")
+                return
+            if result.mode == "remote":
+                # TUI only selected mode — hand off to click-based remote setup
+                _setup_remote(api_key)
+                click.echo("\nSetup complete.")
+            else:
+                # TUI ProgressScreen already ran config + hooks + daemon
+                pass
+            if for_tool:
+                _setup_tool_config(for_tool)
+            return
+        except Exception as e:
+            click.echo(f"TUI unavailable ({e}), using text prompts.\n")
+
+    # Branch 3: Click fallback
+    _setup_click(None, api_key)
+    if for_tool:
+        _setup_tool_config(for_tool)
+
+
+def _setup_click(mode: str | None, api_key: str | None) -> None:
+    """Click-based setup flow (non-TUI). Self-contained: config + post-config."""
     if mode is None:
         click.echo("Welcome to SmartMemory.\n")
         click.echo("Where do you want to store memories?")
@@ -105,14 +171,52 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
 
     if mode == "remote":
         _setup_remote(api_key)
+        click.echo("\nSetup complete.")
     else:
         _setup_local()
+        _start_daemon_local()
 
-    if for_tool:
-        _setup_tool_config(for_tool)
 
-    # Start daemon automatically in local mode
-    if mode == "local":
+def _can_run_tui() -> bool:
+    """Check if we can launch a Textual TUI."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    if os.environ.get("CI"):
+        return False
+    try:
+        import textual  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _start_daemon_local() -> None:
+    """Start daemon automatically in local mode.
+
+    On macOS: let launchd own the process (RunAtLoad starts it immediately).
+    On other platforms: start manually via start_daemon().
+    Never do both — that causes a duplicate-bind crash loop.
+    """
+    import time
+
+    launchd_ok = _install_launchd_plist()
+    if launchd_ok:
+        click.echo("\nWaiting for launchd to start daemon...")
+        try:
+            from smartmemory_app.daemon import is_running
+            for _ in range(60):
+                if is_running():
+                    break
+                time.sleep(1)
+            if is_running():
+                click.echo("SmartMemory is running (managed by launchd).")
+            else:
+                click.echo("Warning: daemon not yet healthy. Check: smartmemory status")
+        except Exception as e:
+            click.echo(f"Warning: health check failed ({e}). Check: smartmemory status")
+    else:
         click.echo("\nStarting SmartMemory daemon...")
         try:
             from smartmemory_app.daemon import start_daemon
@@ -120,8 +224,51 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
             click.echo("SmartMemory is running.")
         except Exception as e:
             click.echo(f"Warning: daemon start failed ({e}). Start manually: smartmemory start")
-    else:
-        click.echo("\nSetup complete.")
+
+
+def _apply_setup_result(result: SetupResult, on_step: Callable[[str], None] | None = None) -> None:
+    """Apply a SetupResult from TUI. Saves config + runs post-config steps.
+
+    Args:
+        result: Collected answers from the TUI.
+        on_step: Optional callback called with step name after each step completes.
+                 Used by ProgressScreen for per-step UI updates.
+    """
+    from smartmemory_app.config import SmartMemoryConfig, save_config
+
+    data_dir = str(Path(result.data_dir).expanduser())
+
+    cfg = SmartMemoryConfig(
+        mode=result.mode,
+        coreference=result.coreference,
+        llm_provider=result.llm_provider,
+        llm_model=result.llm_model,
+        embedding_provider=result.embedding_provider,
+        data_dir=data_dir,
+    )
+    save_config(cfg)
+    if on_step:
+        on_step("Config written")
+
+    _ensure_spacy()
+    if on_step:
+        on_step("spaCy model ready")
+
+    _copy_hooks()
+    if on_step:
+        on_step("Hooks installed")
+
+    _copy_skills()
+    if on_step:
+        on_step("Skills installed")
+
+    _register_hooks()
+    if on_step:
+        on_step("Hooks registered")
+
+    _seed_data_dir(data_dir)
+    if on_step:
+        on_step("Patterns seeded")
 
 
 # ── Mode setup helpers ────────────────────────────────────────────────────────
@@ -152,9 +299,12 @@ def _setup_local() -> None:
         "LLM provider",
         default="groq",
     )
+    # Default to openai embeddings if OPENAI_API_KEY is available, else local
+    import os
+    embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
     embedding = click.prompt(
-        "Embedding provider? (local / openai / ollama)",
-        default="local",
+        "Embedding provider? (openai / local / ollama)",
+        default=embedding_default,
     )
     data_dir = click.prompt("Default data directory", default="~/.smartmemory")
 
@@ -226,7 +376,14 @@ def _setup_tool_config(tool: str) -> None:
     help="Keep ~/.smartmemory/ data directory (memories, patterns). Only removes hooks and skills.",
 )
 def uninstall(keep_data: bool) -> None:
-    """Remove SmartMemory hooks, skills, and optionally data from ~/.smartmemory/."""
+    """Remove SmartMemory hooks, skills, launchd plist, and optionally data from ~/.smartmemory/."""
+    # Stop daemon before removing anything
+    try:
+        from smartmemory_app.daemon import stop_daemon
+        stop_daemon()
+    except Exception:
+        pass
+    _uninstall_launchd_plist()
     _deregister_hooks()
     _remove_hooks()
     _remove_skills()
@@ -319,14 +476,100 @@ def _register_hooks() -> None:
         SETTINGS.write_text(json.dumps(cfg, indent=2))
 
 
-def _seed_data_dir() -> None:
-    # Honour SMARTMEMORY_DATA_DIR so setup seeds the same directory that the
-    # runtime (storage._resolve_data_dir) will use.
-    raw = os.environ.get("SMARTMEMORY_DATA_DIR")
-    data_dir = Path(raw) if raw else DATA_DIR
-    data_dir.mkdir(parents=True, exist_ok=True)
+def _seed_data_dir(data_dir: str | None = None) -> None:
+    """Seed entity patterns in the data directory.
+
+    Args:
+        data_dir: Explicit data directory path. When provided, expanduser() is applied.
+                  When None, falls back to SMARTMEMORY_DATA_DIR env var or ~/.smartmemory.
+    """
+    if data_dir is not None:
+        resolved = Path(data_dir).expanduser()
+    else:
+        raw = os.environ.get("SMARTMEMORY_DATA_DIR")
+        resolved = Path(raw) if raw else DATA_DIR
+    resolved.mkdir(parents=True, exist_ok=True)
     from smartmemory_app.patterns import JSONLPatternStore
-    JSONLPatternStore(data_dir)  # seeds entity_patterns.jsonl if absent (side effect of __init__)
+    JSONLPatternStore(resolved)  # seeds entity_patterns.jsonl if absent (side effect of __init__)
+
+
+def _install_launchd_plist() -> bool:
+    """Install launchd plist for auto-start + crash recovery (macOS only).
+
+    Substitutes {PYTHON_PATH}, {DAEMON_PORT}, {DATA_DIR}, {BIN_DIR} into the
+    template plist and writes to ~/Library/LaunchAgents/. Then loads the plist
+    with launchctl so launchd starts managing the daemon immediately.
+
+    Returns True if the plist was loaded successfully (caller should NOT also
+    call start_daemon — launchd owns the process via RunAtLoad).
+    Returns False on non-macOS, missing template, or launchctl failure.
+    """
+    import platform
+    if platform.system() != "Darwin":
+        return False  # launchd is macOS-only
+
+    if not PLIST_TEMPLATE.exists():
+        click.echo("Warning: launchd plist template not found — skipping auto-start setup.")
+        return False
+
+    from smartmemory_app.config import load_config
+    cfg = load_config()
+
+    python_path = sys.executable
+    bin_dir = str(Path(python_path).parent)
+    # Use config as source of truth for data_dir — this is what the user chose
+    # during setup (or the default). Env var SMARTMEMORY_DATA_DIR is a runtime
+    # override that shouldn't be baked into a persistent plist.
+    data_dir = str(Path(cfg.data_dir).expanduser())
+
+    content = PLIST_TEMPLATE.read_text()
+    content = content.replace("{PYTHON_PATH}", python_path)
+    content = content.replace("{DAEMON_PORT}", str(cfg.daemon_port))
+    content = content.replace("{DATA_DIR}", data_dir)
+    content = content.replace("{BIN_DIR}", bin_dir)
+
+    LAUNCH_AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+    plist_dest = LAUNCH_AGENTS_DIR / PLIST_NAME
+
+    # Unload existing plist before overwriting (launchctl requires this)
+    if plist_dest.exists():
+        subprocess.run(
+            ["launchctl", "unload", str(plist_dest)],
+            capture_output=True,
+        )
+
+    plist_dest.write_text(content)
+
+    result = subprocess.run(
+        ["launchctl", "load", str(plist_dest)],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        click.echo(f"Installed launchd plist: {plist_dest}")
+        click.echo("SmartMemory will auto-start on login and restart on crash.")
+        return True
+    else:
+        click.echo(f"Warning: launchctl load failed: {result.stderr.strip()}")
+        click.echo(f"Plist written to {plist_dest} — load manually: launchctl load {plist_dest}")
+        return False
+
+
+def _uninstall_launchd_plist() -> None:
+    """Unload and remove the launchd plist (macOS only)."""
+    import platform
+    if platform.system() != "Darwin":
+        return
+
+    plist_dest = LAUNCH_AGENTS_DIR / PLIST_NAME
+    if not plist_dest.exists():
+        return
+
+    subprocess.run(
+        ["launchctl", "unload", str(plist_dest)],
+        capture_output=True,
+    )
+    plist_dest.unlink(missing_ok=True)
+    click.echo("Removed launchd plist — daemon will no longer auto-start.")
 
 
 # ── Uninstall helpers ─────────────────────────────────────────────────────────

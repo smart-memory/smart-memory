@@ -19,6 +19,9 @@ dependencies = [
     "tomli-w>=1.0",            # DIST-LITE-5: TOML config writing (tomllib stdlib reads only)
 ]
 
+[project.optional-dependencies]
+tui = ["textual>=8.0"]
+
 [project.scripts]
 smartmemory = "smartmemory_app.cli:cli"
 
@@ -26,6 +29,7 @@ smartmemory = "smartmemory_app.cli:cli"
 packages = ["smartmemory_app"]
 include = [
     "smartmemory_app/data/seed_patterns.jsonl",
+    "smartmemory_app/data/*.plist",
     "smartmemory_app/static/**/*",
     "smartmemory_app/hooks/*.sh",
     "smartmemory_app/skills/*.md",

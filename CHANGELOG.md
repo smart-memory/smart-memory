@@ -1,5 +1,25 @@
 # Changelog — smartmemory
 
+## [1.0.5] — 2026-03-19
+
+### Added
+
+#### DIST-SETUP-TUI-1 — Interactive Setup TUI (COMPLETE)
+
+- **Textual TUI for `smartmemory setup`**: Arrow-key selection for mode, LLM provider, embedding provider. 6 screens: Welcome, LLM, Model Discovery, Embedding, Summary, Progress.
+- **Live model discovery**: `@work` async worker fetches available models from ollama/lmstudio with loading indicator and graceful failure.
+- **Summary screen**: Edit data directory, toggle coreference, review all choices before confirming.
+- **Progress screen**: Per-step checklist with indeterminate spinner for daemon startup.
+- **Graceful fallback**: Non-interactive environments (pipes, CI, `TERM=dumb`, missing textual) fall back to existing click prompts automatically.
+- **Optional dependency**: `pip install smartmemory[tui]` adds Textual. Base install falls back to click.
+- **`SetupResult` dataclass**: Clean contract between TUI and business logic.
+- **`_can_run_tui()`**: Detects interactive terminal availability.
+- **`_apply_setup_result()`**: Shared post-config logic with `on_step` callback for per-step progress updates.
+
+### Fixed
+
+- **`_seed_data_dir()`**: Now accepts explicit `data_dir` parameter with `expanduser()`. Previously ignored user-selected directory from setup.
+
 ## [1.0.4] — 2026-03-19
 
 ### Added
