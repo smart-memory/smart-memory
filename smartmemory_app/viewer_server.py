@@ -43,13 +43,25 @@ def _build_app() -> FastAPI:
             from smartmemory_app.remote_backend import RemoteMemory
             if not isinstance(mem, RemoteMemory):
                 try:
-                    snapshot = mem._graph.backend.serialize()
+                    from smartmemory_app.local_api import _rw_lock
+                    with _rw_lock:
+                        snapshot = mem._graph.backend.serialize()
                     nodes = snapshot.get("nodes", [])
                     node_count = len([n for n in nodes if n.get("memory_type") != "Version"])
                 except Exception:
                     node_count = 0  # backend exists but empty/new — still healthy
         except Exception:
             pass
+        # Async enrichment status
+        async_info = {"enabled": False}
+        try:
+            from smartmemory_app.async_enrichment import _drain_running
+            if _drain_running:
+                from smartmemory_app.async_enrichment import get_queue
+                async_info = {"enabled": True, **get_queue().stats}
+        except Exception:
+            pass
+
         return {
             "service": "smartmemory",
             "status": "ok" if backend_ok else "degraded",
@@ -57,6 +69,7 @@ def _build_app() -> FastAPI:
             "llm_provider": cfg.llm_provider,
             "embedding_provider": cfg.embedding_provider,
             "pid": os.getpid(),
+            "async_enrichment": async_info,
         }
 
     # Mount local_api at /memory — sub-app routes (e.g. /graph/full) become /memory/graph/full,
@@ -106,6 +119,34 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     # Start events WebSocket server as background daemon thread
     from smartmemory_app.events_server import start_background
     start_background()
+
+    # Start background LLM enrichment drain thread if:
+    # 1. LLM API key available, AND
+    # 2. Backend is local (not RemoteMemory — drain thread uses SmartMemory internals)
+    _has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
+    _is_local = True
+    try:
+        from smartmemory_app.remote_backend import RemoteMemory
+        _is_local = not isinstance(get_memory(), RemoteMemory)
+    except Exception:
+        pass
+    if _has_llm and _is_local:
+        from smartmemory_app.async_enrichment import (
+            get_queue, enrichment_drain_loop, stop_drain, _stop_event,
+        )
+        from smartmemory_app.local_api import _rw_lock
+        _stop_event.clear()
+        drain_thread = threading.Thread(
+            target=enrichment_drain_loop,
+            args=(get_memory, get_queue(), _rw_lock),
+            daemon=True,
+            name="enrichment-drain",
+        )
+        drain_thread.start()
+        atexit.register(stop_drain)
+        print("Background LLM enrichment enabled", flush=True)
+    else:
+        print("Background enrichment disabled (no LLM API key)", flush=True)
 
     if open_browser:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()

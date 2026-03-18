@@ -178,5 +178,5 @@ def test_ingest_acquires_lock(tmp_path):
         result = storage.ingest("test content")
 
     mock_lock_instance.__enter__.assert_called_once()
-    mock_mem.ingest.assert_called_once_with("test content", memory_type="episodic")
+    mock_mem.ingest.assert_called_once_with("test content", context={"memory_type": "episodic"}, sync=True)
     assert result == "item-123"

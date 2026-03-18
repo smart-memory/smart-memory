@@ -108,8 +108,9 @@ def get_graph_full() -> dict:
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_graph_full()
-    backend = _get_backend()
-    snapshot = backend.serialize()
+    with _rw_lock:
+        backend = _get_backend()
+        snapshot = backend.serialize()
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
     # Filter out internal Version nodes — Cytoscape crashes if edges reference
     # nodes that aren't in the graph (HAS_VERSION edges → missing Version targets).
@@ -144,15 +145,16 @@ def get_edges_bulk(body: EdgesBulkRequest) -> dict:
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_edges_bulk(body.node_ids)
-    backend = _get_backend()
-    seen: set[tuple] = set()
-    edges: list[dict] = []
-    for node_id in body.node_ids:
-        for edge in backend.get_edges_for_node(node_id):
-            key = (edge["source_id"], edge["target_id"], edge["edge_type"])
-            if key not in seen:
-                seen.add(key)
-                edges.append(edge)
+    with _rw_lock:
+        backend = _get_backend()
+        seen: set[tuple] = set()
+        edges: list[dict] = []
+        for node_id in body.node_ids:
+            for edge in backend.get_edges_for_node(node_id):
+                key = (edge["source_id"], edge["target_id"], edge["edge_type"])
+                if key not in seen:
+                    seen.add(key)
+                    edges.append(edge)
     return {"edges": edges}
 
 
@@ -175,13 +177,13 @@ def list_memories(limit: int = 200, offset: int = 0) -> dict:
     mem = _get_mem()
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
-        # Remote graph/full used as source; paginate client-side
         full = mem.get_graph_full()
         nodes = full.get("nodes", [])
         paginated = nodes[offset: offset + limit]
         return {"items": paginated, "total": len(nodes), "limit": limit, "offset": offset}
-    backend = _get_backend()
-    snapshot = backend.serialize()
+    with _rw_lock:
+        backend = _get_backend()
+        snapshot = backend.serialize()
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
     paginated = nodes[offset: offset + limit]
     return {"items": paginated, "total": len(nodes), "limit": limit, "offset": offset}
@@ -203,9 +205,10 @@ def get_neighbors(memory_id: str) -> dict:
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.get_neighbors(memory_id)
-    backend = _get_backend()
-    neighbors = backend.get_neighbors(memory_id)
-    edges = backend.get_edges_for_node(memory_id)
+    with _rw_lock:
+        backend = _get_backend()
+        neighbors = backend.get_neighbors(memory_id)
+        edges = backend.get_edges_for_node(memory_id)
     return {"neighbors": neighbors, "edges": edges}
 
 
@@ -219,8 +222,9 @@ def get_memory_item(memory_id: str) -> dict[str, Any]:
         if node is None:
             raise HTTPException(status_code=404, detail="Memory not found")
         return node
-    backend = _get_backend()
-    node = backend.get_node(memory_id)
+    with _rw_lock:
+        backend = _get_backend()
+        node = backend.get_node(memory_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Memory not found")
     return node
@@ -255,6 +259,11 @@ def clear_all() -> dict:
         from smartmemory_app.setup import _seed_data_dir
         _seed_data_dir()
 
+        # Flush pending enrichment jobs INSIDE lock — prevents a concurrent
+        # ingest from enqueuing a job between clear and flush
+        from smartmemory_app.async_enrichment import reset_queue
+        reset_queue()
+
     # Publish graph_cleared event (outside lock — emit is thread-safe)
     try:
         from smartmemory_app.event_sink import get_event_sink
@@ -283,14 +292,50 @@ class IngestRequest(BaseModel):
 
 @api.post("/ingest")
 def ingest_endpoint(body: IngestRequest) -> dict:
-    """Ingest content through the full pipeline. Aligned with service POST /memory/ingest."""
+    """Ingest content through the pipeline. Two-tier when LLM key available.
+
+    Tier 1 (sync, ~4ms): spaCy + EntityRuler → returns item_id immediately.
+    Tier 2 (async, ~740ms): background LLM extraction if API key is set.
+    """
+    import os
+    import time
+
     memory_type = body.memory_type
     if body.context and "memory_type" in body.context:
         memory_type = body.context["memory_type"]
-    with _rw_lock:
-        from smartmemory_app.storage import ingest
-        item_id = ingest(body.content, memory_type)
-    return {"item_id": item_id}
+
+    has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
+
+    if has_llm:
+        # Two-tier: Tier 1 sync, enqueue for Tier 2
+        with _rw_lock:
+            from smartmemory_app.storage import ingest
+            result = ingest(body.content, memory_type, sync=False)
+            # result is {"item_id": str, "entity_ids": dict, "queued": bool}
+            item_id = result["item_id"] if isinstance(result, dict) else result
+            raw_ids = result.get("entity_ids", {}) if isinstance(result, dict) else {}
+            # Normalize entity_ids to lowercase keys — extraction_worker expects
+            # lowercase for dedup against ruler entities (extraction_worker.py:97)
+            entity_ids = {k.lower(): v for k, v in raw_ids.items()} if raw_ids else {}
+            # Enqueue locally only if Redis didn't already queue it (prevents
+            # double-processing when Redis is available alongside the daemon)
+            already_queued = result.get("queued", False) if isinstance(result, dict) else False
+            from smartmemory_app.async_enrichment import get_queue, _drain_running
+            if _drain_running and not already_queued:
+                get_queue().enqueue({
+                    "item_id": item_id,
+                    "workspace_id": "",
+                    "entity_ids": entity_ids,
+                    "enable_ontology": False,
+                    "enqueued_at": time.time(),
+                })
+        return {"item_id": item_id}
+    else:
+        # No LLM — full sync pipeline with lite config
+        with _rw_lock:
+            from smartmemory_app.storage import ingest
+            item_id = ingest(body.content, memory_type)
+        return {"item_id": item_id}
 
 
 class SearchRequest(BaseModel):

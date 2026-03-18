@@ -4,6 +4,7 @@ DIST-DAEMON-1: All memory commands (persist, ingest, search, recall) try the
 daemon HTTP API first (<200ms). Falls back to direct storage calls if daemon
 is not running (~22s cold start).
 """
+
 import logging
 
 import click
@@ -13,12 +14,14 @@ log = logging.getLogger(__name__)
 
 def _daemon_url() -> str:
     from smartmemory_app.config import load_config
+
     return f"http://127.0.0.1:{load_config().daemon_port}"
 
 
 def _daemon_request(method: str, path: str, **kwargs):
     """Try daemon HTTP API. Returns parsed JSON or None if daemon unreachable."""
     import httpx
+
     try:
         r = httpx.request(method, f"{_daemon_url()}{path}", timeout=120, **kwargs)
         r.raise_for_status()
@@ -48,6 +51,7 @@ cli.add_command(_uninstall_cmd, name="uninstall")
 def start_cmd() -> None:
     """Start the SmartMemory daemon."""
     from smartmemory_app.daemon import start_daemon, is_running
+
     if is_running():
         click.echo("SmartMemory daemon is already running.")
         return
@@ -64,6 +68,7 @@ def start_cmd() -> None:
 def stop_cmd() -> None:
     """Stop the SmartMemory daemon."""
     from smartmemory_app.daemon import stop_daemon, is_running
+
     if not is_running(require_healthy=False):
         click.echo("Daemon is not running.")
         return
@@ -75,6 +80,7 @@ def stop_cmd() -> None:
 def restart_cmd() -> None:
     """Restart the SmartMemory daemon."""
     from smartmemory_app.daemon import stop_daemon, start_daemon, is_running
+
     if is_running(require_healthy=False):
         click.echo("Stopping daemon...")
         stop_daemon()
@@ -87,6 +93,7 @@ def restart_cmd() -> None:
 def status_cmd() -> None:
     """Show SmartMemory daemon status."""
     from smartmemory_app.daemon import get_status
+
     info = get_status()
     if info is None:
         click.echo("SmartMemory daemon is not running.")
@@ -97,6 +104,14 @@ def status_cmd() -> None:
     click.echo(f"  LLM:        {info.get('llm_provider', '?')}")
     click.echo(f"  Embeddings: {info.get('embedding_provider', '?')}")
     click.echo(f"  PID:        {info.get('pid', '?')}")
+    async_info = info.get("async_enrichment", {})
+    if async_info.get("enabled"):
+        pending = async_info.get("pending", 0)
+        processed = async_info.get("total_processed", 0)
+        failed = async_info.get("total_failed", 0)
+        click.echo(f"  Enrichment: active (pending={pending}, processed={processed}, failed={failed})")
+    else:
+        click.echo("  Enrichment: disabled")
 
 
 @cli.command("viewer")
@@ -105,6 +120,7 @@ def viewer_cmd(port: int | None) -> None:
     """Open the knowledge graph viewer in the browser."""
     import webbrowser
     from smartmemory_app.daemon import start_daemon, is_running, _port
+
     if not is_running():
         click.echo("Starting daemon...")
         start_daemon()
@@ -120,11 +136,14 @@ def viewer_cmd(port: int | None) -> None:
 @click.option("--type", "memory_type", default="episodic", show_default=True)
 def persist_cmd(text: str, memory_type: str) -> None:
     """Persist text as a memory (Stop hook)."""
-    result = _daemon_request("POST", "/memory/ingest", json={"content": text, "memory_type": memory_type})
+    result = _daemon_request(
+        "POST", "/memory/ingest", json={"content": text, "memory_type": memory_type}
+    )
     if result:
         click.echo(result.get("item_id", "?"))
     else:
         from smartmemory_app.storage import ingest
+
         click.echo(ingest(text, memory_type))
 
 
@@ -133,11 +152,14 @@ def persist_cmd(text: str, memory_type: str) -> None:
 @click.option("--type", "memory_type", default="episodic", show_default=True)
 def ingest_cmd(text: str, memory_type: str) -> None:
     """Ingest text through the full pipeline."""
-    result = _daemon_request("POST", "/memory/ingest", json={"content": text, "memory_type": memory_type})
+    result = _daemon_request(
+        "POST", "/memory/ingest", json={"content": text, "memory_type": memory_type}
+    )
     if result:
         click.echo(result.get("item_id", "?"))
     else:
         from smartmemory_app.storage import ingest
+
         click.echo(ingest(text, memory_type))
 
 
@@ -146,11 +168,14 @@ def ingest_cmd(text: str, memory_type: str) -> None:
 @click.option("--top-k", default=10, show_default=True)
 def recall_cmd(cwd: str, top_k: int) -> None:
     """Recall memories (SessionStart hook)."""
-    result = _daemon_request("GET", "/memory/recall", params={"cwd": cwd or "", "top_k": top_k})
+    result = _daemon_request(
+        "GET", "/memory/recall", params={"cwd": cwd or "", "top_k": top_k}
+    )
     if result:
         click.echo(result.get("context", ""))
     else:
         from smartmemory_app.storage import recall
+
         click.echo(recall(cwd, top_k))
 
 
@@ -159,9 +184,12 @@ def recall_cmd(cwd: str, top_k: int) -> None:
 @click.option("--top-k", default=5, show_default=True)
 def search_cmd(query: str, top_k: int) -> None:
     """Search memories by semantic similarity."""
-    results = _daemon_request("POST", "/memory/search", json={"query": query, "top_k": top_k})
+    results = _daemon_request(
+        "POST", "/memory/search", json={"query": query, "top_k": top_k}
+    )
     if results is None:
         from smartmemory_app.storage import search
+
         results = search(query, top_k)
     if not results:
         click.echo("No results.")
@@ -177,12 +205,18 @@ def search_cmd(query: str, top_k: int) -> None:
 
 
 @cli.command("models")
-@click.option("--provider", default=None, help="Filter by provider (ollama, lmstudio, groq, openai)")
+@click.option(
+    "--provider",
+    default=None,
+    help="Filter by provider (ollama, lmstudio, groq, openai)",
+)
 def models_cmd(provider: str | None) -> None:
     """List available models from local and cloud providers."""
     import httpx
 
-    providers_to_check = [provider] if provider else ["ollama", "lmstudio", "groq", "openai"]
+    providers_to_check = (
+        [provider] if provider else ["ollama", "lmstudio", "groq", "openai"]
+    )
 
     for p in providers_to_check:
         if p == "ollama":
@@ -214,10 +248,13 @@ def models_cmd(provider: str | None) -> None:
                 else:
                     click.echo("\nLM Studio: running but no models loaded")
             except Exception:
-                click.echo("\nLM Studio: not running (start LM Studio and load a model)")
+                click.echo(
+                    "\nLM Studio: not running (start LM Studio and load a model)"
+                )
 
         elif p == "groq":
             import os
+
             key = os.environ.get("GROQ_API_KEY")
             if not key:
                 click.echo("\nGroq: GROQ_API_KEY not set (get one at console.groq.com)")
@@ -239,6 +276,7 @@ def models_cmd(provider: str | None) -> None:
 
         elif p == "openai":
             import os
+
             key = os.environ.get("OPENAI_API_KEY")
             if not key:
                 click.echo("\nOpenAI: OPENAI_API_KEY not set")
@@ -251,10 +289,14 @@ def models_cmd(provider: str | None) -> None:
                 )
                 r.raise_for_status()
                 models = sorted(r.json().get("data", []), key=lambda m: m.get("id", ""))
-                chat_models = [m for m in models if any(
-                    m.get("id", "").startswith(prefix)
-                    for prefix in ("gpt-4", "gpt-3.5", "o1", "o3", "o4")
-                )]
+                chat_models = [
+                    m
+                    for m in models
+                    if any(
+                        m.get("id", "").startswith(prefix)
+                        for prefix in ("gpt-4", "gpt-3.5", "o1", "o3", "o4")
+                    )
+                ]
                 if chat_models:
                     click.echo(f"\nOpenAI ({len(chat_models)} chat models):")
                     for m in chat_models:
@@ -263,10 +305,14 @@ def models_cmd(provider: str | None) -> None:
                 click.echo(f"\nOpenAI: API error ({e})")
 
         elif p == "claude-agent":
-            click.echo("\nClaude Agent SDK: uses Claude Code OAuth (no model selection needed)")
+            click.echo(
+                "\nClaude Agent SDK: uses Claude Code OAuth (no model selection needed)"
+            )
 
         elif p == "anthropic":
-            click.echo("\nAnthropic: claude-3-5-haiku-latest, claude-sonnet-4-5-20250514, claude-opus-4-6-20250603")
+            click.echo(
+                "\nAnthropic: claude-3-5-haiku-latest, claude-sonnet-4-5-20250514, claude-opus-4-6-20250603"
+            )
 
 
 @cli.command("config")
@@ -299,7 +345,17 @@ def config_cmd(key: str | None, value: str | None) -> None:
         return
 
     settable = {
-        "llm_provider": {"values": ["groq", "claude-agent", "anthropic", "openai", "ollama", "lmstudio", "none"]},
+        "llm_provider": {
+            "values": [
+                "groq",
+                "claude-agent",
+                "anthropic",
+                "openai",
+                "ollama",
+                "lmstudio",
+                "none",
+            ]
+        },
         "llm_model": {"values": None},
         "embedding_provider": {"values": ["local", "openai", "ollama"]},
         "daemon_port": {"values": None},
@@ -340,6 +396,322 @@ def config_cmd(key: str | None, value: str | None) -> None:
     click.echo(f"{key} = {value}")
 
 
+# ── Corpus import/export ───────────────────────────────────────────────────
+
+
+@cli.command("import")
+@click.argument("path", type=click.Path(exists=True))
+@click.option(
+    "--mode",
+    "import_mode",
+    default="full",
+    type=click.Choice(["full", "direct"]),
+    show_default=True,
+    help="full=ingest pipeline, direct=add() skip extraction",
+)
+@click.option(
+    "--batch-size", default=100, show_default=True, help="Checkpoint interval"
+)
+@click.option("--resume", is_flag=True, help="Resume from last checkpoint")
+@click.option("--dry-run", is_flag=True, help="Validate only, don't import")
+@click.option("--domain-filter", default=None, help="Filter by metadata.domain")
+def import_cmd(
+    path: str,
+    import_mode: str,
+    batch_size: int,
+    resume: bool,
+    dry_run: bool,
+    domain_filter: str | None,
+) -> None:
+    """Import a corpus JSONL file into SmartMemory."""
+    from smartmemory.corpus.reader import CorpusReader
+    from smartmemory.corpus.importer import CorpusImporter
+
+    reader = CorpusReader(path)
+    header = reader.read_header()
+    click.echo(f"Corpus: source={header.source}, domain={header.domain or '(none)'}")
+
+    if dry_run:
+        click.echo("Dry run — validating records...")
+
+    total = header.item_count or reader.count_records()
+
+    try:
+        from rich.progress import (
+            Progress,
+            SpinnerColumn,
+            TimeElapsedColumn,
+            MofNCompleteColumn,
+        )
+
+        use_rich = True
+    except ImportError:
+        use_rich = False
+
+    if not dry_run:
+        from smartmemory_app.storage import get_memory
+
+        sm = get_memory()
+    else:
+        sm = None
+
+    importer = CorpusImporter(
+        smart_memory=sm,
+        mode=import_mode,
+        batch_size=batch_size,
+        domain_filter=domain_filter,
+    )
+
+    if use_rich and total > 0:
+        with Progress(
+            SpinnerColumn(),
+            "[progress.description]{task.description}",
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+        ) as progress:
+            task = progress.add_task("Importing", total=total)
+
+            def on_progress(stats, record):
+                progress.update(task, completed=stats.total)
+
+            stats = importer.run(
+                path, resume=resume, dry_run=dry_run, progress_callback=on_progress
+            )
+    else:
+        stats = importer.run(path, resume=resume, dry_run=dry_run)
+
+    action = "Validated" if dry_run else "Imported"
+    click.echo(
+        f"{action} {stats.imported} records ({stats.errors} errors, {stats.rate:.1f} items/sec)"
+    )
+
+
+@cli.command("export")
+@click.argument("path", type=click.Path())
+@click.option("--memory-type", default=None, help="Filter by memory type")
+@click.option(
+    "--include-entities", is_flag=True, help="Include extracted entities/relations"
+)
+@click.option("--limit", default=0, help="Max records to export (0=all)")
+@click.option(
+    "--source", default="smartmemory-export", help="Source tag in corpus header"
+)
+@click.option("--domain", default="", help="Domain tag in corpus header")
+def export_cmd(
+    path: str,
+    memory_type: str | None,
+    include_entities: bool,
+    limit: int,
+    source: str,
+    domain: str,
+) -> None:
+    """Export memories to a corpus JSONL file."""
+    from smartmemory.corpus.exporter import CorpusExporter
+    from smartmemory_app.storage import get_memory
+
+    sm = get_memory()
+    exporter = CorpusExporter(
+        smart_memory=sm,
+        memory_type=memory_type,
+        include_entities=include_entities,
+        limit=limit,
+    )
+    count = exporter.run(path, source=source, domain=domain)
+    click.echo(f"Exported {count} records to {path}")
+
+
+# ── Wikidata mining ────────────────────────────────────────────────────────
+
+
+@cli.command("mine")
+@click.option(
+    "--domain", "domain_qid", default=None, help="Single P31 QID (e.g. Q9143)"
+)
+@click.option(
+    "--domain-file",
+    default=None,
+    type=click.Path(exists=True),
+    help="JSON config file with multiple domains",
+)
+@click.option("--all-defaults", is_flag=True, help="Mine expanded default domains")
+@click.option("--incremental", default=None, help="Only entities newer than ISO date")
+@click.option(
+    "--limit", default=5000, show_default=True, help="Per-domain entity limit"
+)
+@click.option("--output", "-o", default="./mining-output/", help="Output directory")
+@click.option(
+    "--format",
+    "output_format",
+    default="both",
+    type=click.Choice(["corpus", "snapshot", "both"]),
+    show_default=True,
+)
+@click.option(
+    "--quota-limit", default=0, help="Max SPARQL queries per run (0=unlimited)"
+)
+def mine_cmd(
+    domain_qid: str | None,
+    domain_file: str | None,
+    all_defaults: bool,
+    incremental: str | None,
+    limit: int,
+    output: str,
+    output_format: str,
+    quota_limit: int,
+) -> None:
+    """Mine Wikidata for entities via SPARQL."""
+    from smartmemory.grounding.miner import (
+        EXPANDED_DOMAINS,
+        WikidataMiner,
+        load_domain_config,
+    )
+
+    if domain_file:
+        domains = load_domain_config(domain_file)
+    elif domain_qid:
+        domains = {domain_qid: domain_qid}
+    elif all_defaults:
+        domains = EXPANDED_DOMAINS
+    else:
+        click.echo("Specify --domain, --domain-file, or --all-defaults")
+        raise SystemExit(1)
+
+    miner = WikidataMiner(quota_limit=quota_limit, limit_per_domain=limit)
+    click.echo(f"Mining {len(domains)} domain(s)...")
+    result = miner.mine_domains(
+        domains=domains,
+        output_dir=output,
+        output_format=output_format,
+        incremental_since=incremental,
+    )
+    click.echo(
+        f"Mined {len(result.entities)} unique entities ({result.total_queries} queries)"
+    )
+    if result.quota_exhausted:
+        click.echo("Quota exhausted — resume with same command to continue")
+    for domain_name, count in result.domain_counts.items():
+        click.echo(f"  {domain_name}: {count}")
+
+
+# ── REBEL conversion ───────────────────────────────────────────────────────
+
+
+@cli.command("convert-rebel")
+@click.option(
+    "--output", "-o", required=True, type=click.Path(), help="Output corpus JSONL path"
+)
+@click.option("--limit", default=0, help="Max samples to convert (0=all)")
+@click.option("--domain", default=None, help="Domain keyword filter (tech, science)")
+@click.option(
+    "--split", default="train", show_default=True, help="HuggingFace dataset split"
+)
+def convert_rebel_cmd(output: str, limit: int, domain: str | None, split: str) -> None:
+    """Convert REBEL dataset (HuggingFace) to corpus JSONL."""
+    from smartmemory.corpus.rebel import REBELConverter
+
+    converter = REBELConverter(domain=domain, limit=limit, split=split)
+    click.echo(f"Converting REBEL ({domain or 'all'}, limit={limit or 'unlimited'})...")
+    count = converter.convert_to_file(output)
+    click.echo(f"Wrote {count} records to {output}")
+
+
+# ── Seed packs ─────────────────────────────────────────────────────────────
+
+
+@cli.command("list-packs")
+def list_packs_cmd() -> None:
+    """List available seed packs from the registry."""
+    from smartmemory.corpus.registry import PackRegistry
+
+    registry = PackRegistry()
+    click.echo("Fetching pack registry...")
+    packs = registry.fetch()
+    if not packs:
+        click.echo("No packs available (or registry unreachable).")
+        return
+    click.echo(f"\n{'Name':<25} {'Version':<10} {'Size':<8} {'Domain':<15} Description")
+    click.echo("-" * 80)
+    for p in packs:
+        click.echo(
+            f"{p.name:<25} {p.version:<10} {p.size_mb:<8.1f} {p.domain:<15} {p.description}"
+        )
+
+
+@cli.command("install-pack")
+@click.argument("name")
+@click.option(
+    "--source",
+    default=None,
+    type=click.Path(exists=True),
+    help="Local pack directory (skip registry download)",
+)
+@click.option(
+    "--mode",
+    "install_mode",
+    default="direct",
+    type=click.Choice(["full", "direct"]),
+    show_default=True,
+)
+@click.option("--skip-patterns", is_flag=True, help="Skip EntityRuler pattern import")
+@click.option("--skip-entities", is_flag=True, help="Skip grounding entity import")
+def install_pack_cmd(
+    name: str,
+    source: str | None,
+    install_mode: str,
+    skip_patterns: bool,
+    skip_entities: bool,
+) -> None:
+    """Install a seed pack into SmartMemory."""
+    from pathlib import Path
+    from smartmemory.corpus.pack import InstalledPacks, SeedPack
+    from smartmemory_app.storage import get_memory, _resolve_data_dir
+
+    if source:
+        pack_dir = source
+    else:
+        # Check bundled packs first
+        bundled = (
+            Path(__file__).parent.parent
+            / "smart-memory-core"
+            / "smartmemory"
+            / "data"
+            / "seed_packs"
+            / name
+        )
+        if bundled.exists():
+            pack_dir = str(bundled)
+        else:
+            from smartmemory.corpus.registry import PackRegistry
+
+            registry = PackRegistry()
+            registry.fetch()
+            pack_info = registry.get(name)
+            if not pack_info:
+                click.echo(f"Pack '{name}' not found in registry.")
+                raise SystemExit(1)
+            pack_dir = registry.download(pack_info, str(_resolve_data_dir() / "packs"))
+
+    pack = SeedPack(pack_dir)
+    errors = pack.validate()
+    if errors:
+        click.echo(f"Invalid pack: {'; '.join(errors)}")
+        raise SystemExit(1)
+
+    sm = get_memory()
+    installed = InstalledPacks(_resolve_data_dir())
+    click.echo(f"Installing pack: {pack.manifest.name} v{pack.manifest.version}...")
+    counts = pack.install(
+        smart_memory=sm,
+        installed_packs=installed,
+        mode=install_mode,
+        skip_patterns=skip_patterns,
+        skip_entities=skip_entities,
+    )
+    click.echo(
+        f"Installed: {counts['corpus']} memories, {counts['patterns']} patterns, {counts['entities']} entities"
+    )
+
+
 # ── Data management ─────────────────────────────────────────────────────────
 
 
@@ -354,6 +726,7 @@ def clear_cmd() -> None:
 
     # Daemon not running — clear files directly
     from smartmemory_app.storage import _resolve_data_dir, _shutdown
+
     _shutdown()
 
     data_path = _resolve_data_dir()
@@ -363,8 +736,15 @@ def clear_cmd() -> None:
 
     removed = 0
     for pattern in [
-        "*.db", "*.db-shm", "*.db-wal", "*.db-journal",
-        "*.usearch", "*.json", "*.jsonl", "*.log", ".write.lock",
+        "*.db",
+        "*.db-shm",
+        "*.db-wal",
+        "*.db-journal",
+        "*.usearch",
+        "*.json",
+        "*.jsonl",
+        "*.log",
+        ".write.lock",
     ]:
         for f in data_path.glob(pattern):
             try:
@@ -376,6 +756,7 @@ def clear_cmd() -> None:
     click.echo(f"Cleared {removed} files from {data_path}")
 
     from smartmemory_app.setup import _seed_data_dir
+
     _seed_data_dir()
     click.echo("Re-seeded entity patterns.")
 
@@ -387,6 +768,7 @@ def clear_cmd() -> None:
 def server_cmd() -> None:
     """Start the SmartMemory MCP server (called by MCP clients, not users)."""
     from smartmemory_app.server import main
+
     main()
 
 
@@ -395,6 +777,7 @@ def server_cmd() -> None:
 def events_server_cmd(port: int) -> None:
     """Run the lite WebSocket events server standalone (debugging only)."""
     from smartmemory_app.events_server import main
+
     main(port=port)
 
 

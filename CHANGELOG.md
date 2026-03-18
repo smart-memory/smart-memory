@@ -1,5 +1,23 @@
 # Changelog — smartmemory
 
+## [1.0.4] — 2026-03-19
+
+### Added
+
+#### DIST-DAEMON-1 — Async Background Enrichment (COMPLETE)
+
+- **Two-tier ingest pipeline**: When LLM API key is available, `POST /memory/ingest` runs Tier 1 (spaCy + EntityRuler, ~4ms) synchronously and returns immediately. Tier 2 (LLM extraction via `process_extract_job()`) runs in a background drain thread, progressively improving extraction quality from 96.9% to 100% E-F1.
+- **`AsyncEnrichmentQueue`**: Thread-safe bounded deque (`maxlen=10_000`) with enqueue/dequeue_all/wait/clear/stats. Overflow drops oldest items and tracks `total_dropped`.
+- **Background drain thread**: Daemon thread in `viewer_server.py` processes queued items one at a time, acquiring `_rw_lock` to serialize with API endpoints. Graceful shutdown via `_stop_event`. Re-fetches SmartMemory singleton per item to handle `/clear` invalidation.
+- **Health endpoint enrichment stats**: `/health` now includes `async_enrichment` object with `enabled`, `pending`, `total_enqueued`, `total_processed`, `total_failed`, `total_dropped`.
+- **`smartmemory status` enrichment display**: Shows enrichment queue stats when drain thread is active.
+- **Thread safety hardened**: All read endpoints (`/graph/full`, `/graph/edges`, `/list`, `/{id}/neighbors`, `/{id}`) and `/health` now acquire `_rw_lock` for backend access.
+
+### Changed
+
+- **`storage.ingest()`**: Now accepts `sync` parameter. Passes `memory_type` via `context={"memory_type": ...}` instead of loose kwarg (fixes memory_type not being preserved for raw string inputs).
+- **`SmartMemory.ingest(sync=False)`**: Now returns `entity_ids` in result dict alongside `item_id` and `queued`.
+
 ## [1.0.3] — 2026-03-16
 
 ### Fixed

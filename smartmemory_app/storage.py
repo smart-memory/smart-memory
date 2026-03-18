@@ -172,8 +172,15 @@ def _normalize_ingest_result(result) -> str:
 # --- Operations ------------------------------------------------------------------
 
 
-def ingest(content: str, memory_type: str = "episodic") -> str:
+def ingest(content: str, memory_type: str = "episodic", sync: bool = True):
     """Ingest content into the active backend.
+
+    Args:
+        content: Text to ingest.
+        memory_type: Memory type (episodic, semantic, etc.).
+        sync: If True (default), run full pipeline synchronously and return item_id string.
+              If False, run Tier 1 only (spaCy + EntityRuler) and return dict with
+              item_id + entity_ids for background Tier 2 enrichment.
 
     Remote mode: delegates to RemoteMemory.ingest() — no file lock needed.
     Local mode: acquires filelock before calling SmartMemory.ingest() because
@@ -188,7 +195,9 @@ def ingest(content: str, memory_type: str = "episodic") -> str:
     data_path = _data_path if _data_path is not None else _resolve_data_dir()
     lock = _get_lock_file(data_path)
     with lock:
-        result = mem.ingest(content, memory_type=memory_type)
+        result = mem.ingest(content, context={"memory_type": memory_type}, sync=sync)
+    if not sync and isinstance(result, dict):
+        return result  # Return full dict with entity_ids for async enrichment
     return _normalize_ingest_result(result)
 
 
