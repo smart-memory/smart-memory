@@ -13,7 +13,13 @@ AI memory for Claude Code and other MCP-compatible tools. Stores memories locall
 pip install smartmemory
 ```
 
-Includes everything for local mode: core library, spaCy NLP, USearch vectors, MCP server, viewer, CLI. No extras needed.
+Includes everything for local mode: core library, spaCy NLP, USearch vectors, MCP server, viewer, CLI, persistent daemon.
+
+For the interactive setup TUI (arrow-key selection, model discovery):
+
+```bash
+pip install smartmemory[tui]
+```
 
 ## First run
 
@@ -21,11 +27,52 @@ Includes everything for local mode: core library, spaCy NLP, USearch vectors, MC
 smartmemory setup
 ```
 
-Asks whether to store memories locally or use the hosted service, then configures accordingly.
+With `smartmemory[tui]` installed, this launches a Textual TUI with arrow-key selection for LLM provider, live model discovery from ollama/lmstudio, embedding provider, and a summary screen. Without `[tui]`, falls back to text prompts.
 
-**Local mode** wires Claude Code hooks and downloads the spaCy language model (~15MB).
+**Local mode** wires Claude Code hooks, downloads the spaCy language model (~15MB), and starts a persistent daemon.
 
 **Remote mode** validates your API key and stores it in the OS keychain.
+
+## Daemon
+
+SmartMemory runs a persistent background daemon so CLI commands respond in <200ms instead of cold-starting Python every time (~22s).
+
+```bash
+smartmemory start       # Start daemon (auto-started by setup)
+smartmemory stop        # Stop daemon
+smartmemory restart     # Restart daemon
+smartmemory status      # Show status, memory count, enrichment queue
+```
+
+On macOS, `smartmemory setup` installs a launchd plist — the daemon auto-starts on login and restarts on crash.
+
+### Two-tier ingest
+
+When an LLM API key is available, the daemon runs **two-tier ingestion**:
+
+- **Tier 1 (sync, ~4ms):** spaCy + EntityRuler extracts entities immediately, returns item_id
+- **Tier 2 (async, ~740ms):** Background drain thread runs LLM extraction, adds net-new entities and relations
+
+This means `smartmemory persist` returns instantly while quality improves in the background.
+
+## Commands
+
+```bash
+smartmemory setup            # First-run questionnaire (TUI or text)
+smartmemory start             # Start daemon
+smartmemory stop              # Stop daemon
+smartmemory status            # Daemon health + enrichment stats
+smartmemory persist "text"    # Ingest text as episodic memory
+smartmemory ingest "text"     # Ingest with full pipeline
+smartmemory search "query"    # Semantic search
+smartmemory recall            # Session context for Claude Code
+smartmemory viewer            # Open knowledge graph viewer
+smartmemory models            # List available LLM models
+smartmemory config            # View/edit settings
+smartmemory clear             # Delete all memories
+smartmemory server            # Start MCP server (used by Claude Code)
+smartmemory uninstall         # Remove hooks, plist, and optionally data
+```
 
 ## Non-interactive / CI
 
@@ -37,17 +84,7 @@ SMARTMEMORY_MODE=local smartmemory server
 SMARTMEMORY_MODE=remote SMARTMEMORY_API_KEY=sk_... smartmemory server
 ```
 
-Env vars always override config file — the correct path for Docker and CI.
-
-## Commands
-
-```bash
-smartmemory setup            # First-run questionnaire
-smartmemory server           # Start MCP server
-smartmemory viewer           # Open knowledge graph viewer
-smartmemory events-server    # Run WebSocket events server standalone
-smartmemory uninstall        # Remove hooks, skills, and optionally data
-```
+Env vars always override config file — the correct path for Docker and CI. The TUI is automatically disabled in non-interactive environments.
 
 ## Configuration
 
@@ -65,3 +102,6 @@ API keys are stored in the OS keychain, never in the config file. Set `SMARTMEMO
 | `SMARTMEMORY_TEAM_ID` | Team/workspace ID for remote mode |
 | `SMARTMEMORY_DATA_DIR` | Local data directory (default: `~/.smartmemory`) |
 | `SMARTMEMORY_LLM_PROVIDER` | LLM provider for local enrichment |
+| `SMARTMEMORY_EMBEDDING_PROVIDER` | Embedding provider (`local`, `openai`, `ollama`) |
+| `SMARTMEMORY_DAEMON_PORT` | Daemon port (default: `9014`) |
+| `SMARTMEMORY_ASYNC_ENRICHMENT` | Enable/disable background enrichment |
