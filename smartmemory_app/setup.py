@@ -124,10 +124,9 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
     start. No shared post-branch code to avoid double-start bugs.
     """
     # Branch 1: Flags provided — use click flow directly
+    # _setup_click() already handles daemon start for local mode internally
     if mode is not None:
         _setup_click(mode, api_key)
-        if mode == "local":
-            _start_daemon_local()
         if for_tool:
             _setup_tool_config(for_tool)
         return

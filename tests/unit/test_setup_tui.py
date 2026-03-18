@@ -191,19 +191,46 @@ class TestSetupDispatch:
     """setup() routes to TUI vs click correctly."""
 
     def test_flags_bypass_tui(self):
-        """--mode local skips TUI entirely."""
+        """--mode local skips TUI entirely and calls _setup_click once."""
         from click.testing import CliRunner
         from smartmemory_app.cli import cli
 
         with (
             patch("smartmemory_app.setup._setup_click") as mock_click,
-            patch("smartmemory_app.setup._start_daemon_local"),
             patch("smartmemory_app.setup._can_run_tui", return_value=True),
         ):
             runner = CliRunner()
             runner.invoke(cli, ["setup", "--mode", "local"])
 
         mock_click.assert_called_once_with("local", None)
+
+    def test_mode_local_starts_daemon_exactly_once(self):
+        """--mode local must not double-start the daemon."""
+        from click.testing import CliRunner
+        from smartmemory_app.cli import cli
+
+        with (
+            patch("smartmemory_app.setup._setup_local"),
+            patch("smartmemory_app.setup._start_daemon_local") as mock_daemon,
+        ):
+            runner = CliRunner()
+            runner.invoke(cli, ["setup", "--mode", "local"])
+
+        mock_daemon.assert_called_once()
+
+    def test_mode_remote_does_not_start_daemon(self):
+        """--mode remote must not start the daemon."""
+        from click.testing import CliRunner
+        from smartmemory_app.cli import cli
+
+        with (
+            patch("smartmemory_app.setup._setup_remote"),
+            patch("smartmemory_app.setup._start_daemon_local") as mock_daemon,
+        ):
+            runner = CliRunner()
+            runner.invoke(cli, ["setup", "--mode", "remote", "--api-key", "test-key"])
+
+        mock_daemon.assert_not_called()
 
     def test_tui_fallback_on_import_error(self):
         """When TUI fails, falls back to click prompts."""
@@ -214,14 +241,11 @@ class TestSetupDispatch:
             patch("smartmemory_app.setup._can_run_tui", return_value=True),
             patch("smartmemory_app.setup_tui.run_setup_tui", side_effect=ImportError("no textual")),
             patch("smartmemory_app.setup._setup_click") as mock_click,
-            patch("smartmemory_app.setup._start_daemon_local"),
         ):
             runner = CliRunner()
             result = runner.invoke(cli, ["setup"], input="1\ngroq\nlocal\n~/.smartmemory\n")
 
-        # Should have fallen back to click
-        # (mock_click won't be called if _setup_click is the fallback — it's the real function)
-        # Just verify it didn't crash
+        # Should have fallen back — either mock_click was called or real click ran
         assert result.exit_code == 0 or "TUI unavailable" in result.output
 
 

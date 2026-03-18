@@ -332,13 +332,27 @@ class ProgressScreen(Screen):
                 "● Starting daemon...",
             )
             _start_daemon_local()
-            self.app.call_from_thread(
-                self.query_one("#step-daemon", Static).update,
-                "[green]✓[/green] Daemon started",
-            )
 
-            # Show final status
-            status_text = "\n[bold green]SmartMemory is ready![/bold green]\n\nTry: [cyan]smartmemory persist \"hello world\"[/cyan]\n\nPress any key to exit."
+            # Check if daemon actually started (since _start_daemon_local never raises).
+            # Use require_healthy=False — daemon may still be warming up (loading
+            # spaCy/embeddings) but is serving on the port. _start_daemon_local()
+            # already waited for the port, so False here means it truly failed.
+            from smartmemory_app.daemon import is_running
+            daemon_ok = is_running(require_healthy=False)
+
+            if daemon_ok:
+                self.app.call_from_thread(
+                    self.query_one("#step-daemon", Static).update,
+                    "[green]✓[/green] Daemon started",
+                )
+                status_text = "\n[bold green]SmartMemory is ready![/bold green]\n\nTry: [cyan]smartmemory persist \"hello world\"[/cyan]\n\nPress any key to exit."
+            else:
+                self.app.call_from_thread(
+                    self.query_one("#step-daemon", Static).update,
+                    "[yellow]⚠[/yellow] Daemon not running",
+                )
+                status_text = "\n[bold yellow]Setup complete but daemon not running.[/bold yellow]\nStart manually: [cyan]smartmemory start[/cyan]\n\nPress any key to exit."
+
             self.app.call_from_thread(
                 self.query_one("#final-status", Static).update,
                 status_text,
