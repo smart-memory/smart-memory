@@ -8,6 +8,7 @@ POST /ingest             → /memory/ingest           (DAEMON-1: full pipeline i
 POST /search             → /memory/search           (DAEMON-1: semantic search)
 GET  /recall             → /memory/recall           (DAEMON-1: session context)
 POST /clear              → /memory/clear
+POST /reindex            → /memory/reindex          (re-embed all with current model)
 GET  /{id}/neighbors     → /memory/{id}/neighbors  (BEFORE /{id} — declaration order matters)
 GET  /{id}               → /memory/{id}
 DELETE /{id}             → /memory/{id}            (405 — local viewer is read-only)
@@ -278,6 +279,75 @@ def clear_all() -> dict:
         pass
 
     return {"cleared": removed}
+
+
+@api.post("/reindex")
+def reindex() -> dict:
+    """Re-embed all memories with the current embedding model.
+
+    Use after changing embedding provider/model to rebuild the vector index
+    without losing any data. Blocks writes during re-indexing.
+    """
+    import json
+    import os
+    import sqlite3
+    import time
+
+    with _rw_lock:
+        from smartmemory.plugins.embedding import EmbeddingService
+        from smartmemory_app.storage import _resolve_data_dir
+
+        data_dir = str(_resolve_data_dir())
+        svc = EmbeddingService()
+
+        # Detect dimensions from a test embedding
+        test_vec = svc.embed("dimension probe")
+        dims = len(test_vec)
+
+        # Read all memory nodes from SQLite
+        db_path = os.path.join(data_dir, "memory.db")
+        db = sqlite3.connect(db_path)
+        rows = db.execute(
+            "SELECT item_id, properties FROM nodes "
+            "WHERE memory_type IS NOT NULL AND memory_type != 'Version'"
+        ).fetchall()
+        db.close()
+
+        if not rows:
+            return {"reindexed": 0, "dims": dims, "provider": svc.provider}
+
+        # Delete old vector index — will be recreated at new dimension
+        from smartmemory.stores.vector.backends.usearch import UsearchVectorBackend
+
+        backend = UsearchVectorBackend(persist_directory=data_dir, collection_name="memory")
+
+        t0 = time.time()
+        embedded = 0
+        skipped = 0
+        for item_id, props_json in rows:
+            props = json.loads(props_json) if props_json else {}
+            content = props.get("content", props.get("label", ""))
+            if not content:
+                skipped += 1
+                continue
+            try:
+                vec = svc.embed(content[:512])
+                backend.upsert(item_id=item_id, embedding=vec.tolist(), metadata={"content": content[:200]})
+                embedded += 1
+            except Exception:
+                skipped += 1
+
+        backend._save()
+        elapsed = time.time() - t0
+
+    return {
+        "reindexed": embedded,
+        "skipped": skipped,
+        "total": len(rows),
+        "dims": dims,
+        "provider": svc.provider,
+        "elapsed_s": round(elapsed, 1),
+    }
 
 
 # ── DIST-DAEMON-1: Memory operation endpoints ──────────────────────────────

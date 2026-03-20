@@ -104,6 +104,17 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     except Exception as e:
         print(f"Warning: backend init failed ({e}) — daemon running in degraded mode", flush=True)
 
+    # Warm embedding model — first embed() triggers lazy model load (~3-5s).
+    # Do it here so the first ingest/search request doesn't time out.
+    try:
+        from smartmemory.plugins.embedding import EmbeddingService
+        t1 = time.time()
+        svc = EmbeddingService()
+        svc.embed("warmup")
+        print(f"Embedding model ready ({time.time() - t1:.1f}s, provider={svc.provider})", flush=True)
+    except Exception as e:
+        print(f"Warning: embedding warmup failed ({e})", flush=True)
+
     # Write PID file after warmup
     pid_file.write_text(str(os.getpid()))
 
