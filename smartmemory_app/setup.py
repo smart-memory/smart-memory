@@ -348,7 +348,6 @@ def _setup_local() -> None:
             click.echo(f"  {key_envvar} saved.")
 
     # Default to openai embeddings if OPENAI_API_KEY is available, else local
-    import os
     embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
     embedding = click.prompt(
         "Embedding provider? (openai / local / ollama)",
