@@ -275,7 +275,11 @@ def _apply_setup_result(result: SetupResult, on_step: Callable[[str], None] | No
 
 
 def _persist_env_var(name: str, value: str) -> None:
-    """Append an export line to the user's shell profile so the key persists."""
+    """Write an export line to the user's shell profile so the key persists.
+
+    If the key already exists in the profile, replaces the line.
+    Also sets os.environ so the current process picks it up immediately.
+    """
     shell = os.environ.get("SHELL", "/bin/zsh")
     if "zsh" in shell:
         profile = Path.home() / ".zshrc"
@@ -284,22 +288,33 @@ def _persist_env_var(name: str, value: str) -> None:
     else:
         profile = Path.home() / ".profile"
 
-    line = f'\nexport {name}="{value}"\n'
+    export_line = f'export {name}="{value}"'
 
-    # Don't duplicate if already in the file
     try:
         existing = profile.read_text() if profile.exists() else ""
-        if f"export {name}=" in existing:
-            return  # Already set in profile
-    except Exception:
-        pass
+        lines = existing.splitlines()
 
-    try:
-        with open(profile, "a") as f:
-            f.write(line)
+        # Replace existing line or append
+        replaced = False
+        for i, line in enumerate(lines):
+            if line.strip().startswith(f"export {name}="):
+                lines[i] = export_line
+                replaced = True
+                break
+
+        if replaced:
+            profile.write_text("\n".join(lines) + "\n")
+        else:
+            with open(profile, "a") as f:
+                f.write(f"\n{export_line}\n")
+
+        click.echo(f"  Written to {profile}")
     except Exception as e:
         click.echo(f"  Warning: could not write to {profile}: {e}")
-        click.echo(f"  Add this to your shell profile manually: export {name}=\"{value}\"")
+        click.echo(f"  Add this manually: {export_line}")
+
+    # Set in current process so daemon picks it up
+    os.environ[name] = value
 
 
 def _setup_local() -> None:
@@ -340,16 +355,24 @@ def _setup_local() -> None:
         existing = os.environ.get(key_envvar, "").strip()
         if existing:
             masked = existing[:8] + "..." + existing[-4:] if len(existing) > 12 else "***"
-            click.echo(f"\n  {key_envvar} already set ({masked})")
-        else:
             api_key = click.prompt(
-                f"\n{key_envvar} not set. Enter your API key",
+                f"\n{key_envvar} ({masked}). Press Enter to keep, or paste new key",
                 default="",
             )
-            if api_key.strip():
-                _persist_env_var(key_envvar, api_key.strip())
-                os.environ[key_envvar] = api_key.strip()
-                click.echo(f"  {key_envvar} saved to shell profile.")
+        else:
+            api_key = click.prompt(
+                f"\n{key_envvar} not set. Enter your API key (Enter to skip)",
+                default="",
+            )
+        if api_key.strip():
+            _persist_env_var(key_envvar, api_key.strip())
+            # Also store in OS keychain so daemon can load it without sourcing shell
+            try:
+                import keyring
+                keyring.set_password("smartmemory", key_envvar, api_key.strip())
+                click.echo(f"  Also stored in OS keychain.")
+            except Exception:
+                pass  # keyring optional — shell profile is the primary store
 
     # Default to openai embeddings if OPENAI_API_KEY is available, else local
     embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
@@ -374,6 +397,17 @@ def _setup_local() -> None:
     _copy_skills()
     _register_hooks()
     _seed_data_dir()
+
+    # Start (or restart) daemon so it picks up the new config + keys
+    from smartmemory_app.daemon import is_running, stop_daemon, start_daemon
+    if is_running(require_healthy=False):
+        click.echo("\nRestarting daemon with new config...")
+        stop_daemon()
+        import time
+        time.sleep(2)
+    click.echo("Starting daemon...")
+    start_daemon()
+    click.echo("Done. SmartMemory is ready.")
 
 
 def _setup_remote(api_key: str | None) -> None:
