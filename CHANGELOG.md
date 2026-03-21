@@ -9,6 +9,12 @@
 - **Wildcard search.** `smartmemory search "*"` returns all memory nodes (excludes entity/relation/pattern nodes from enrichment).
 - **Admin reindex guard.** `smartmemory admin reindex` rejects with clear error in remote mode (local-only operation).
 - **Auto-sync hooks on daemon start.** Hook scripts are recopied from the package to `~/.claude/hooks/` on every daemon start, so pip upgrades that change hook content take effect without re-running `smartmemory setup`.
+- **`ingest` command removed.** `add` is now the single entry point — `ingest` was identical (both called `/memory/ingest`).
+
+### Fixed
+
+- **Async enrichment no longer drops nodes on SQLite.** Tier 2 LLM entities used deterministic SHA256[:16] item_ids that could collide with existing nodes via SQLite's `ON CONFLICT DO UPDATE`. Entity IDs are now stripped before persist on backends without dual-node support.
+- **Recall works with few memories.** Recency sort key returned `""` for `None` created_at, pushing items with missing timestamps to the end. Fixed to use `"0000-00-00"` fallback.
 
 ## [1.0.10] — 2026-03-21
 
