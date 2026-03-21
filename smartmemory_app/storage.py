@@ -169,10 +169,27 @@ def _normalize_ingest_result(result) -> str:
     return str(result)
 
 
+def _split_recall_counts(top_k: int) -> tuple[int, int]:
+    """Split recall budget between recency and semantic passes.
+
+    Keep at least one slot for the recency pass so ``top_k=1`` still returns the
+    most recent memory instead of issuing two zero-length searches.
+    """
+    requested = max(1, top_k)
+    recent_k = max(1, (requested + 1) // 2)
+    semantic_k = max(0, requested - recent_k)
+    return recent_k, semantic_k
+
+
 # --- Operations ------------------------------------------------------------------
 
 
-def ingest(content: str, memory_type: str = "episodic", sync: bool = True):
+def ingest(
+    content: str,
+    memory_type: str = "episodic",
+    sync: bool = True,
+    properties: dict[str, str] | None = None,
+):
     """Ingest content into the active backend.
 
     Args:
@@ -181,6 +198,7 @@ def ingest(content: str, memory_type: str = "episodic", sync: bool = True):
         sync: If True (default), run full pipeline synchronously and return item_id string.
               If False, run Tier 1 only (spaCy + EntityRuler) and return dict with
               item_id + entity_ids for background Tier 2 enrichment.
+        properties: Optional user-supplied key-value properties stored in metadata.
 
     Remote mode: delegates to RemoteMemory.ingest() — no file lock needed.
     Local mode: acquires filelock before calling SmartMemory.ingest() because
@@ -190,25 +208,69 @@ def ingest(content: str, memory_type: str = "episodic", sync: bool = True):
     mem = get_memory()
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
-        return mem.ingest(content, memory_type)
+        return mem.ingest(content, memory_type)  # TODO: pass properties to remote API
+    # Reserved keys that user properties must not overwrite
+    _RESERVED = frozenset({"memory_type", "node_category", "item_id", "content",
+                           "embedding", "created_at", "valid_from", "valid_to"})
+    ctx: dict = {"memory_type": memory_type}
+    if properties:
+        # Flatten user properties into context so they become top-level node
+        # properties (metadata keys merge into graph node properties dict).
+        for k, v in properties.items():
+            if k not in _RESERVED:
+                ctx[k] = v
     # Local path — acquire write lock for cross-process coordination
     data_path = _data_path if _data_path is not None else _resolve_data_dir()
     lock = _get_lock_file(data_path)
     with lock:
-        result = mem.ingest(content, context={"memory_type": memory_type}, sync=sync)
+        result = mem.ingest(content, context=ctx, sync=sync)
     if not sync and isinstance(result, dict):
         return result  # Return full dict with entity_ids for async enrichment
     return _normalize_ingest_result(result)
 
 
-def search(query: str, top_k: int = 5) -> list[dict]:
-    """Search memories by semantic similarity. Returns list[dict] in both modes."""
+def search(
+    query: str,
+    top_k: int = 5,
+    filters: dict[str, str] | None = None,
+) -> list[dict]:
+    """Search memories by semantic similarity with optional property filters.
+
+    Args:
+        query: Search query string.
+        top_k: Maximum results.
+        filters: Optional property filters (e.g. {"project": "atlas"}).
+                 Applied as post-filter on search results.
+    """
+    top_k = max(1, min(top_k, 200))  # clamp to [1, 200]
     mem = get_memory()
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
-        return mem.search(query, top_k)  # already returns list[dict]
-    results = mem.search(query, top_k=top_k)
-    return [r.to_dict() for r in results]  # MemoryItem objects need .to_dict()
+        if filters:
+            raise NotImplementedError(
+                "Property filters are not supported in remote mode. "
+                "Use local mode or remove --<property> flags."
+            )
+        return mem.search(query, top_k)
+    if not filters:
+        results = mem.search(query, top_k=top_k)
+        return [r.to_dict() for r in results]
+    # With filters: fetch a wider window, then post-filter. If still short,
+    # widen progressively to avoid missing sparse matches.
+    for multiplier in (5, 20, 50):
+        fetch_k = top_k * multiplier
+        results = mem.search(query, top_k=fetch_k)
+        items = [r.to_dict() for r in results]
+        matched = [
+            r for r in items
+            if all(
+                r.get("metadata", {}).get(k) == v or r.get(k) == v
+                for k, v in filters.items()
+            )
+        ]
+        if len(matched) >= top_k or len(results) < fetch_k:
+            break  # enough matches found, or exhausted all results
+    return matched[:top_k]
 
 
 def recall(cwd: str | None = None, top_k: int = 10) -> str:
@@ -221,9 +283,14 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         return mem.recall(cwd, top_k)
-    # Local path unchanged
-    recent = mem.search("", top_k=top_k // 2, sort_by="recency")
-    semantic = mem.search(cwd or "", top_k=top_k // 2) if cwd else []
+    if cwd:
+        recent_k, semantic_k = _split_recall_counts(top_k)
+        recent = mem.search("", top_k=recent_k, sort_by="recency")
+        semantic = mem.search(cwd, top_k=semantic_k) if semantic_k else []
+    else:
+        # No cwd — give full budget to recency
+        recent = mem.search("", top_k=top_k, sort_by="recency")
+        semantic = []
     seen: set[str] = set()
     items = []
     for r in recent + semantic:
