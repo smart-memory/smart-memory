@@ -274,6 +274,27 @@ def _apply_setup_result(result: SetupResult, on_step: Callable[[str], None] | No
 # ── Mode setup helpers ────────────────────────────────────────────────────────
 
 
+def _read_env_from_profile(name: str) -> str:
+    """Try to read an export value from the user's shell profile."""
+    shell = os.environ.get("SHELL", "/bin/zsh")
+    if "zsh" in shell:
+        profile = Path.home() / ".zshrc"
+    elif "bash" in shell:
+        profile = Path.home() / ".bashrc"
+    else:
+        profile = Path.home() / ".profile"
+    try:
+        for line in profile.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith(f"export {name}="):
+                # Extract value — handles export KEY="value" and export KEY=value
+                val = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+                return val
+    except Exception:
+        pass
+    return ""
+
+
 def _persist_env_var(name: str, value: str) -> None:
     """Write an export line to the user's shell profile so the key persists.
 
@@ -352,7 +373,21 @@ def _setup_local() -> None:
     }
     key_envvar = _LLM_KEY_ENVVAR.get(llm)
     if key_envvar:
+        # Check env, then keychain, then shell profile
         existing = os.environ.get(key_envvar, "").strip()
+        if not existing:
+            try:
+                import keyring
+                existing = (keyring.get_password("smartmemory", key_envvar) or "").strip()
+                if existing:
+                    os.environ[key_envvar] = existing  # load into current process
+            except Exception:
+                pass
+        if not existing:
+            # Try reading from shell profile as last resort
+            existing = _read_env_from_profile(key_envvar)
+            if existing:
+                os.environ[key_envvar] = existing
         if existing:
             masked = existing[:8] + "..." + existing[-4:] if len(existing) > 12 else "***"
             api_key = click.prompt(

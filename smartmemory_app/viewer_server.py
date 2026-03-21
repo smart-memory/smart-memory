@@ -133,20 +133,32 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     data_path.mkdir(parents=True, exist_ok=True)
     pid_file = data_path / "daemon.pid"
 
-    # Load LLM API keys from OS keychain if not in environment.
-    # setup stores keys in both shell profile and keychain — keychain is
-    # available immediately without sourcing .zshrc.
+    # Load LLM API keys: env → keychain → shell profile.
+    # setup stores keys in all three locations. Keychain and profile
+    # are available immediately without sourcing .zshrc in a new shell.
     _LLM_KEYS = ["GROQ_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY"]
-    try:
-        import keyring
-        for key_name in _LLM_KEYS:
-            if not os.environ.get(key_name):
-                stored = keyring.get_password("smartmemory", key_name)
-                if stored:
-                    os.environ[key_name] = stored
-                    print(f"  Loaded {key_name} from keychain", flush=True)
-    except Exception:
-        pass  # keyring not available — rely on shell environment
+    for key_name in _LLM_KEYS:
+        if os.environ.get(key_name):
+            continue
+        # Try keychain
+        try:
+            import keyring
+            stored = keyring.get_password("smartmemory", key_name)
+            if stored:
+                os.environ[key_name] = stored
+                print(f"  Loaded {key_name} from keychain", flush=True)
+                continue
+        except Exception:
+            pass
+        # Try shell profile
+        try:
+            from smartmemory_app.setup import _read_env_from_profile
+            stored = _read_env_from_profile(key_name)
+            if stored:
+                os.environ[key_name] = stored
+                print(f"  Loaded {key_name} from shell profile", flush=True)
+        except Exception:
+            pass
 
     print("Loading SmartMemory backend...", flush=True)
     t0 = time.time()
