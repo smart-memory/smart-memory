@@ -202,32 +202,6 @@ def add_cmd(ctx, text: str, memory_type: str) -> None:
         click.echo(ingest(text, memory_type, properties=props))
 
 
-@cli.command("ingest", context_settings=dict(
-    ignore_unknown_options=True, allow_extra_args=True,
-))
-@click.argument("text")
-@click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
-@click.pass_context
-def ingest_cmd(ctx, text: str, memory_type: str) -> None:
-    """Ingest text through the full pipeline.
-
-    Supports arbitrary property flags: --project atlas --domain legal
-    """
-    if not text.strip():
-        raise click.ClickException("Content cannot be empty.")
-    props = _parse_extra_props(ctx.args)
-    body: dict = {"content": text, "memory_type": memory_type}
-    if props:
-        body["properties"] = props
-    result = _daemon_request("POST", "/memory/ingest", json=body)
-    if result:
-        click.echo(result.get("item_id", "?"))
-    else:
-        from smartmemory_app.storage import ingest
-
-        click.echo(ingest(text, memory_type, properties=props))
-
-
 @cli.command("recall")
 @click.option("--cwd", default=None, help="Current working directory for context.")
 @click.option("--top-k", default=10, show_default=True)

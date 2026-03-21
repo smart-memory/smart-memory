@@ -40,20 +40,6 @@ def test_add_cmd_daemon_path(runner):
     assert "daemon-id" in result.output
 
 
-def test_ingest_cmd_fallback(runner):
-    """ingest command falls back to storage.ingest when daemon is down."""
-    with (
-        patch("smartmemory_app.cli._daemon_request", return_value=None),
-        patch("smartmemory_app.storage.ingest", return_value="item-xyz") as mock_ingest,
-    ):
-        from smartmemory_app.cli import cli
-        result = runner.invoke(cli, ["ingest", "some content"])
-
-    assert result.exit_code == 0
-    assert "item-xyz" in result.output
-    mock_ingest.assert_called_once_with("some content", "episodic", properties={})
-
-
 def test_recall_cmd_fallback(runner):
     """recall command falls back to storage.recall when daemon is down."""
     with (

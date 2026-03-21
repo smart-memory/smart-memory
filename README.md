@@ -63,7 +63,6 @@ smartmemory start              # Start daemon
 smartmemory stop               # Stop daemon
 smartmemory status             # Daemon health + enrichment stats
 smartmemory add "text"         # Add text as a memory
-smartmemory ingest "text"      # Ingest with full pipeline
 smartmemory search "query"     # Semantic search (use "*" for all)
 smartmemory recall             # Session context for Claude Code
 smartmemory get <item_id>      # Fetch a single memory by ID
