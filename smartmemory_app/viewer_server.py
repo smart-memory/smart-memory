@@ -29,9 +29,46 @@ DEFAULT_PORT = 9014
 def _build_app() -> FastAPI:
     app = FastAPI()
 
+    # Capture versions at startup — used to detect pip upgrades.
+    # On every request, compare against installed versions. If different,
+    # exit cleanly — launchd KeepAlive restarts with new code.
+    _startup_versions: dict[str, str] = {}
+    try:
+        from importlib.metadata import version as _pkg_version
+        _startup_versions = {
+            "smartmemory": _pkg_version("smartmemory"),
+            "smartmemory-core": _pkg_version("smartmemory-core"),
+        }
+    except Exception:
+        pass
+
+    _version_check_counter = 0  # Only check every 10th request to avoid I/O overhead
+
+    @app.middleware("http")
+    async def _version_guard(request, call_next):
+        """Auto-restart daemon when pip upgrade is detected.
+
+        Checks installed package version every 10th request. If a version
+        mismatch is found, the daemon exits cleanly and launchd restarts it.
+        """
+        nonlocal _version_check_counter
+        _version_check_counter += 1
+        if _startup_versions and _version_check_counter % 10 == 0:
+            try:
+                from importlib.metadata import version as _pkg_version
+                for pkg, startup_ver in _startup_versions.items():
+                    current = _pkg_version(pkg)
+                    if current != startup_ver:
+                        print(f"{pkg} version changed ({startup_ver} → {current}), restarting...", flush=True)
+                        os._exit(0)
+            except Exception:
+                pass
+        return await call_next(request)
+
     @app.get("/health")
     def health():
         """Daemon health check. Used by daemon.is_running() to verify ownership."""
+
         from smartmemory_app.config import load_config
         cfg = load_config()
         backend_ok = False
