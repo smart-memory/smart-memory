@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartmemory"
-version = "1.0.15"
+version = "1.0.16"
 requires-python = ">=3.11"
 dependencies = [
-    "smartmemory-core[lite]==0.6.1",   # EXACT pin — wrapper and core versions move in lockstep
+    "smartmemory-core[lite]==0.6.2",   # EXACT pin — wrapper and core versions move in lockstep
     "filelock>=3.12",                    # cross-process SQLite write locking
     "fastmcp>=2.0",
     "httpx>=0.27",             # remote API calls (DIST-LITE-5)
