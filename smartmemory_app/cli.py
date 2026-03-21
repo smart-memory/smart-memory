@@ -6,6 +6,7 @@ is not running (~22s cold start).
 """
 
 import logging
+import json
 
 import click
 
@@ -19,17 +20,27 @@ def _daemon_url() -> str:
 
 
 def _daemon_request(method: str, path: str, **kwargs):
-    """Try daemon HTTP API. Returns parsed JSON or None if daemon unreachable."""
-    import httpx
+    """Try daemon HTTP API. Returns parsed JSON or None if daemon unreachable.
 
-    try:
-        r = httpx.request(method, f"{_daemon_url()}{path}", timeout=120, **kwargs)
-        r.raise_for_status()
-        return r.json() if r.status_code != 204 else {}
-    except (httpx.ConnectError, httpx.ConnectTimeout):
-        return None  # daemon not running — fall back to direct
-    except httpx.ReadTimeout:
-        return None  # daemon busy (model loading) — fall back to direct
+    Retries once on connection drop — handles the case where the daemon
+    auto-restarts after a pip upgrade (version guard middleware exits the
+    process, launchd restarts it within ~5s).
+    """
+    import httpx
+    import time
+
+    for attempt in range(2):
+        try:
+            r = httpx.request(method, f"{_daemon_url()}{path}", timeout=120, **kwargs)
+            r.raise_for_status()
+            return r.json() if r.status_code != 204 else {}
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
+            if attempt == 0:
+                time.sleep(6)  # wait for launchd to restart daemon
+                continue
+            return None  # still down after retry — fall back to direct
+        except httpx.ReadTimeout:
+            return None
 
 
 @click.group()
@@ -199,6 +210,27 @@ def search_cmd(query: str, top_k: int) -> None:
         mem_type = r.get("memory_type", "?")
         item_id = r.get("item_id", "?")
         click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
+
+
+@cli.command("get")
+@click.argument("item_id")
+def get_cmd(item_id: str) -> None:
+    """Fetch a single memory by item ID."""
+    try:
+        result = _daemon_request("GET", f"/memory/{item_id}")
+    except Exception:
+        result = None
+
+    if result is None:
+        from smartmemory_app.storage import get
+
+        result = get(item_id)
+
+    if not result:
+        click.echo("Memory not found.", err=True)
+        raise SystemExit(1)
+
+    click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
 # ── Discovery + config ──────────────────────────────────────────────────────
