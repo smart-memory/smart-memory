@@ -299,7 +299,7 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
             items.append(r)
     if not items:
         return ""
-    lines = ["## SmartMemory Context\n"]
+    lines = ["## SmartMemory Context"]
     for item in items[:top_k]:
         lines.append(f"- [{item.memory_type}] {item.content[:200]}")
     return "\n".join(lines)
