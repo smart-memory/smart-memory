@@ -1,0 +1,64 @@
+name: Auto-bump patch version + sync core pin
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 2
+
+    - name: Check if version was changed in this push
+      id: check
+      run: |
+        if git diff HEAD~1 --name-only | grep -q 'pyproject.toml'; then
+          # Check if version line actually changed
+          if git diff HEAD~1 -- pyproject.toml | grep -q '^+version ='; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+        fi
+        echo "skip=false" >> $GITHUB_OUTPUT
+
+    - name: Bump wrapper version + sync core pin
+      if: steps.check.outputs.skip == 'false'
+      run: |
+        # Get current wrapper version
+        CURRENT=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+        # Get latest core version from PyPI
+        CORE_VERSION=$(pip index versions smartmemory-core 2>/dev/null | head -1 | sed 's/smartmemory-core (\(.*\))/\1/')
+
+        # Update pyproject.toml
+        sed -i "s/^version = \"$CURRENT\"/version = \"$NEW_VERSION\"/" pyproject.toml
+        if [ -n "$CORE_VERSION" ]; then
+          sed -i "s/smartmemory-core\[lite\]==[0-9.]*/smartmemory-core[lite]==$CORE_VERSION/" pyproject.toml
+        fi
+
+        echo "Bumped wrapper $CURRENT → $NEW_VERSION (core pin: $CORE_VERSION)"
+
+    - name: Commit, push, and release
+      if: steps.check.outputs.skip == 'false'
+      run: |
+        NEW_VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        git config user.name "smartmem-dev"
+        git config user.email "smartmem-dev@users.noreply.github.com"
+        git add pyproject.toml
+        git commit -m "chore: auto-bump to $NEW_VERSION"
+        git push
+        # Create release to trigger PyPI publish
+        gh release create "v$NEW_VERSION" --title "v$NEW_VERSION" --notes "Auto-release: pin latest core, patch bump" --target main
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
