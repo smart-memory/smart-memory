@@ -212,7 +212,7 @@ class TestCLIDaemonFallback:
 
         with patch("smartmemory_app.storage.ingest", return_value="fallback-id") as mock:
             runner = CliRunner()
-            result = runner.invoke(cli, ["persist", "test text"])
+            result = runner.invoke(cli, ["add", "test text"])
 
         assert result.exit_code == 0
         assert "fallback-id" in result.output

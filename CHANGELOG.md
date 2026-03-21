@@ -1,11 +1,21 @@
 # Changelog — smartmemory
 
+## [Unreleased]
+
+### Changed
+
+- **DIST-QA-2: CLI cleanup.** `persist` renamed to `add`. Admin commands (`export`, `import`, `mine`, `convert-rebel`, `list-packs`, `install-pack`, `reindex`) moved under `smartmemory admin` subgroup.
+- **Input validation.** `smartmemory add` rejects invalid `--type` values and empty content with clear error messages.
+- **Wildcard search.** `smartmemory search "*"` returns all memory nodes (excludes entity/relation/pattern nodes from enrichment).
+- **Admin reindex guard.** `smartmemory admin reindex` rejects with clear error in remote mode (local-only operation).
+- **Auto-sync hooks on daemon start.** Hook scripts are recopied from the package to `~/.claude/hooks/` on every daemon start, so pip upgrades that change hook content take effect without re-running `smartmemory setup`.
+
 ## [1.0.10] — 2026-03-21
 
 ### Fixed
 
 - **Search returns only matching results.** Lite mode search no longer returns unrelated memories. Text-first fallback chain (substring + keyword) replaces unreliable vector search on small corpora.
-- **Persist no longer drops nodes with LLM key.** Batch evolution disabled in Tier 1 config — destructive evolvers were deleting nodes during rapid sequential ingests.
+- **Add no longer drops nodes with LLM key.** Batch evolution disabled in Tier 1 config — destructive evolvers were deleting nodes during rapid sequential ingests.
 - **Recall endpoint works.** `/recall` route moved before `/{memory_id}` wildcard to prevent 404 capture.
 - **Recall returns results.** Recency sort and empty-query handling fixed in search fallback.
 
@@ -14,7 +24,7 @@
 - **`smartmemory get <item_id>`** — retrieve a memory by ID via CLI.
 - **Auto-restart on pip upgrade.** Daemon middleware checks installed package version every 10th request. Version mismatch triggers clean exit; launchd restarts with new code.
 - **CLI retry on daemon restart.** `_daemon_request` retries once with 2s wait on connection drop for seamless upgrades.
-- **Arbitrary persist properties.** `smartmemory persist "text" --project atlas --domain legal` passes extra properties.
+- **Arbitrary properties.** `smartmemory add "text" --project atlas --domain legal` passes extra properties.
 
 ## [1.0.5] — 2026-03-19
 

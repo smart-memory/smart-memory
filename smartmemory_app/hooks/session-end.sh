@@ -12,7 +12,7 @@ if [[ -n "$LAST_MSG" ]]; then
         PAYLOAD="{\"content\": $(echo "$LAST_MSG" | jq -Rs .), \"memory_type\": \"episodic\"}"
         if ! curl -sf -X POST "http://localhost:${PORT}/memory/ingest" \
              -H "Content-Type: application/json" -d "$PAYLOAD" >>"$LOG" 2>&1; then
-            python -m smartmemory_app persist "$LAST_MSG" >>"$LOG" 2>&1
+            python -m smartmemory_app add "$LAST_MSG" >>"$LOG" 2>&1
         fi
     } &
     disown

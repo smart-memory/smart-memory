@@ -179,6 +179,15 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     except Exception as e:
         print(f"Warning: embedding warmup failed ({e})", flush=True)
 
+    # Sync hook scripts from package → ~/.claude/hooks/ on every daemon start.
+    # Ensures pip upgrades that change hook content (e.g. persist→add rename)
+    # take effect without requiring users to re-run `smartmemory setup`.
+    try:
+        from smartmemory_app.setup import _copy_hooks
+        _copy_hooks()
+    except Exception as e:
+        print(f"Warning: hook sync failed ({e})", flush=True)
+
     # Write PID file after warmup
     pid_file.write_text(str(os.getpid()))
 

@@ -345,7 +345,7 @@ class ProgressScreen(Screen):
                     self.query_one("#step-daemon", Static).update,
                     "[green]✓[/green] Daemon started",
                 )
-                status_text = "\n[bold green]SmartMemory is ready![/bold green]\n\nTry: [cyan]smartmemory persist \"hello world\"[/cyan]\n\nPress any key to exit."
+                status_text = "\n[bold green]SmartMemory is ready![/bold green]\n\nTry: [cyan]smartmemory add \"hello world\"[/cyan]\n\nPress any key to exit."
             else:
                 self.app.call_from_thread(
                     self.query_one("#step-daemon", Static).update,

@@ -17,24 +17,24 @@ def runner():
 
 
 def test_persist_cmd_fallback(runner):
-    """persist command falls back to storage.ingest when daemon is down."""
+    """add command falls back to storage.ingest when daemon is down."""
     with (
         patch("smartmemory_app.cli._daemon_request", return_value=None),
         patch("smartmemory_app.storage.ingest", return_value="item-abc") as mock_ingest,
     ):
         from smartmemory_app.cli import cli
-        result = runner.invoke(cli, ["persist", "test memory text"])
+        result = runner.invoke(cli, ["add", "test memory text"])
 
     assert result.exit_code == 0
     assert "item-abc" in result.output
     mock_ingest.assert_called_once_with("test memory text", "episodic", properties={})
 
 
-def test_persist_cmd_daemon_path(runner):
-    """persist command uses daemon response when available."""
+def test_add_cmd_daemon_path(runner):
+    """add command uses daemon response when available."""
     with patch("smartmemory_app.cli._daemon_request", return_value={"item_id": "daemon-id"}):
         from smartmemory_app.cli import cli
-        result = runner.invoke(cli, ["persist", "test memory text"])
+        result = runner.invoke(cli, ["add", "test memory text"])
 
     assert result.exit_code == 0
     assert "daemon-id" in result.output
@@ -178,14 +178,14 @@ def test_get_cmd_daemon_http_error_surfaces(runner):
     assert "Not Implemented" in result.output
 
 
-def test_persist_cmd_with_properties(runner):
-    """persist command passes extra --key value flags as properties."""
+def test_add_cmd_with_properties(runner):
+    """add command passes extra --key value flags as properties."""
     with (
         patch("smartmemory_app.cli._daemon_request", return_value=None),
         patch("smartmemory_app.storage.ingest", return_value="prop-id") as mock_ingest,
     ):
         from smartmemory_app.cli import cli
-        result = runner.invoke(cli, ["persist", "test text", "--project", "atlas", "--domain", "legal"])
+        result = runner.invoke(cli, ["add", "test text", "--project", "atlas", "--domain", "legal"])
 
     assert result.exit_code == 0
     assert "prop-id" in result.output

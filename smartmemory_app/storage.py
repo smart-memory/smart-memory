@@ -229,6 +229,41 @@ def ingest(
     return _normalize_ingest_result(result)
 
 
+def _list_all_memories(mem) -> list[dict]:
+    """Return all memory nodes (excluding entity/relation/Version nodes).
+
+    Used by wildcard search (`*`). Filters to user memory items only —
+    enrichment creates entity/relation nodes that should not appear in
+    user-facing search results.
+    """
+    backend = mem._graph.backend
+    snapshot = backend.serialize()
+    _EXCLUDED_TYPES = {"Version", "entity", "relation", "pattern"}
+    items = []
+    for raw in snapshot.get("nodes", []):
+        mt = raw.get("memory_type", "")
+        if mt in _EXCLUDED_TYPES:
+            continue
+        props = raw.get("properties", {})
+        nc = props.get("node_category", "")
+        if nc in ("entity", "relation"):
+            continue
+        # Include user metadata so property filters work on wildcard results
+        metadata = {k: v for k, v in props.items()
+                    if k not in {"content", "label", "memory_type", "node_category",
+                                 "entity_type", "embedding", "category", "confidence"}}
+        item = {
+            "item_id": raw.get("item_id", ""),
+            "content": props.get("content", props.get("label", "")),
+            "memory_type": mt or props.get("memory_type", ""),
+            "created_at": raw.get("created_at", props.get("created_at", "")),
+        }
+        if metadata:
+            item["metadata"] = metadata
+        items.append(item)
+    return items
+
+
 def search(
     query: str,
     top_k: int = 5,
@@ -237,7 +272,7 @@ def search(
     """Search memories by semantic similarity with optional property filters.
 
     Args:
-        query: Search query string.
+        query: Search query string. Use "*" to return all memories.
         top_k: Maximum results.
         filters: Optional property filters (e.g. {"project": "atlas"}).
                  Applied as post-filter on search results.
@@ -252,6 +287,18 @@ def search(
                 "Use local mode or remove --<property> flags."
             )
         return mem.search(query, top_k)
+    # Wildcard: return all memory nodes (not entity/relation/pattern nodes)
+    if query.strip() == "*":
+        all_items = _list_all_memories(mem)
+        if filters:
+            all_items = [
+                r for r in all_items
+                if all(
+                    r.get("metadata", {}).get(k) == v or r.get(k) == v
+                    for k, v in filters.items()
+                )
+            ]
+        return all_items
     if not filters:
         results = mem.search(query, top_k=top_k)
         return [r.to_dict() for r in results]

@@ -1,6 +1,6 @@
 """SmartMemory CLI — daemon management + memory operations.
 
-DIST-DAEMON-1: All memory commands (persist, ingest, search, recall) try the
+DIST-DAEMON-1: All memory commands (add, ingest, search, recall) try the
 daemon HTTP API first (<200ms). Falls back to direct storage calls if daemon
 is not running (~22s cold start).
 """
@@ -161,18 +161,34 @@ def viewer_cmd(port: int | None) -> None:
 
 # ── Memory operations ───────────────────────────────────────────────────────
 
+_VALID_MEMORY_TYPES = {
+    "working", "semantic", "episodic", "procedural", "zettel",
+    "reasoning", "opinion", "observation", "decision",
+}
 
-@cli.command("persist", context_settings=dict(
+
+def _validate_memory_type(ctx, param, value: str) -> str:
+    if value not in _VALID_MEMORY_TYPES:
+        sorted_types = sorted(_VALID_MEMORY_TYPES)
+        raise click.BadParameter(
+            f"Invalid type '{value}'. Valid types: {', '.join(sorted_types)}"
+        )
+    return value
+
+
+@cli.command("add", context_settings=dict(
     ignore_unknown_options=True, allow_extra_args=True,
 ))
 @click.argument("text")
-@click.option("--type", "memory_type", default="episodic", show_default=True)
+@click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
 @click.pass_context
-def persist_cmd(ctx, text: str, memory_type: str) -> None:
-    """Persist text as a memory (Stop hook).
+def add_cmd(ctx, text: str, memory_type: str) -> None:
+    """Add text as a memory.
 
     Supports arbitrary property flags: --project atlas --domain legal
     """
+    if not text.strip():
+        raise click.ClickException("Content cannot be empty.")
     props = _parse_extra_props(ctx.args)
     body: dict = {"content": text, "memory_type": memory_type}
     if props:
@@ -190,13 +206,15 @@ def persist_cmd(ctx, text: str, memory_type: str) -> None:
     ignore_unknown_options=True, allow_extra_args=True,
 ))
 @click.argument("text")
-@click.option("--type", "memory_type", default="episodic", show_default=True)
+@click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
 @click.pass_context
 def ingest_cmd(ctx, text: str, memory_type: str) -> None:
     """Ingest text through the full pipeline.
 
     Supports arbitrary property flags: --project atlas --domain legal
     """
+    if not text.strip():
+        raise click.ClickException("Content cannot be empty.")
     props = _parse_extra_props(ctx.args)
     body: dict = {"content": text, "memory_type": memory_type}
     if props:
@@ -233,7 +251,7 @@ def recall_cmd(cwd: str, top_k: int) -> None:
 @click.option("--top-k", default=5, show_default=True)
 @click.pass_context
 def search_cmd(ctx, query: str, top_k: int) -> None:
-    """Search memories by semantic similarity.
+    """Search memories by semantic similarity. Use '*' to list all.
 
     Supports property filters: --project atlas --domain legal
     """
@@ -477,10 +495,15 @@ def config_cmd(key: str | None, value: str | None) -> None:
     click.echo(f"{key} = {value}")
 
 
-# ── Corpus import/export ───────────────────────────────────────────────────
+# ── Admin subgroup ─────────────────────────────────────────────────────────
 
 
-@cli.command("import")
+@cli.group("admin")
+def admin_group() -> None:
+    """Administrative commands (import, export, reindex, etc.)."""
+
+
+@admin_group.command("import")
 @click.argument("path", type=click.Path(exists=True))
 @click.option(
     "--mode",
@@ -567,7 +590,7 @@ def import_cmd(
     )
 
 
-@cli.command("export")
+@admin_group.command("export")
 @click.argument("path", type=click.Path())
 @click.option("--memory-type", default=None, help="Filter by memory type")
 @click.option(
@@ -604,7 +627,7 @@ def export_cmd(
 # ── Wikidata mining ────────────────────────────────────────────────────────
 
 
-@cli.command("mine")
+@admin_group.command("mine")
 @click.option(
     "--domain", "domain_qid", default=None, help="Single P31 QID (e.g. Q9143)"
 )
@@ -677,7 +700,7 @@ def mine_cmd(
 # ── REBEL conversion ───────────────────────────────────────────────────────
 
 
-@cli.command("convert-rebel")
+@admin_group.command("convert-rebel")
 @click.option(
     "--output", "-o", required=True, type=click.Path(), help="Output corpus JSONL path"
 )
@@ -699,7 +722,7 @@ def convert_rebel_cmd(output: str, limit: int, domain: str | None, split: str) -
 # ── Seed packs ─────────────────────────────────────────────────────────────
 
 
-@cli.command("list-packs")
+@admin_group.command("list-packs")
 def list_packs_cmd() -> None:
     """List available seed packs from the registry."""
     from smartmemory.corpus.registry import PackRegistry
@@ -718,7 +741,7 @@ def list_packs_cmd() -> None:
         )
 
 
-@cli.command("install-pack")
+@admin_group.command("install-pack")
 @click.argument("name")
 @click.option(
     "--source",
@@ -840,6 +863,30 @@ def clear_cmd() -> None:
 
     _seed_data_dir()
     click.echo("Re-seeded entity patterns.")
+
+
+# ── Admin: reindex ─────────────────────────────────────────────────────────
+
+
+@admin_group.command("reindex")
+def reindex_cmd() -> None:
+    """Re-embed all memories with the current embedding model."""
+    from smartmemory_app.config import load_config
+
+    cfg = load_config()
+    if cfg.mode == "remote":
+        raise click.ClickException("Reindex is only available in local mode.")
+    result = _daemon_request("POST", "/memory/reindex")
+    if result is not None:
+        click.echo(
+            f"Reindexed {result.get('reindexed', '?')} memories "
+            f"({result.get('dims', '?')}d, {result.get('provider', '?')}, "
+            f"{result.get('elapsed_s', '?')}s)"
+        )
+    else:
+        raise click.ClickException(
+            "Daemon is not running. Start it first: smartmemory start"
+        )
 
 
 # ── Hidden/internal ─────────────────────────────────────────────────────────

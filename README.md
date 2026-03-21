@@ -53,25 +53,35 @@ When an LLM API key is available, the daemon runs **two-tier ingestion**:
 - **Tier 1 (sync, ~4ms):** spaCy + EntityRuler extracts entities immediately, returns item_id
 - **Tier 2 (async, ~740ms):** Background drain thread runs LLM extraction, adds net-new entities and relations
 
-This means `smartmemory persist` returns instantly while quality improves in the background.
+This means `smartmemory add` returns instantly while quality improves in the background.
 
 ## Commands
 
 ```bash
-smartmemory setup            # First-run questionnaire (TUI or text)
-smartmemory start             # Start daemon
-smartmemory stop              # Stop daemon
-smartmemory status            # Daemon health + enrichment stats
-smartmemory persist "text"    # Ingest text as episodic memory
-smartmemory ingest "text"     # Ingest with full pipeline
-smartmemory search "query"    # Semantic search
-smartmemory recall            # Session context for Claude Code
-smartmemory viewer            # Open knowledge graph viewer
-smartmemory models            # List available LLM models
-smartmemory config            # View/edit settings
-smartmemory clear             # Delete all memories
-smartmemory server            # Start MCP server (used by Claude Code)
-smartmemory uninstall         # Remove hooks, plist, and optionally data
+smartmemory setup              # First-run questionnaire (TUI or text)
+smartmemory start              # Start daemon
+smartmemory stop               # Stop daemon
+smartmemory status             # Daemon health + enrichment stats
+smartmemory add "text"         # Add text as a memory
+smartmemory ingest "text"      # Ingest with full pipeline
+smartmemory search "query"     # Semantic search (use "*" for all)
+smartmemory recall             # Session context for Claude Code
+smartmemory get <item_id>      # Fetch a single memory by ID
+smartmemory viewer             # Open knowledge graph viewer
+smartmemory models             # List available LLM models
+smartmemory config             # View/edit settings
+smartmemory clear              # Delete all memories
+smartmemory server             # Start MCP server (used by Claude Code)
+smartmemory uninstall          # Remove hooks, plist, and optionally data
+
+# Admin commands
+smartmemory admin export out.jsonl   # Export memories
+smartmemory admin import data.jsonl  # Import memories
+smartmemory admin reindex            # Re-embed with current model
+smartmemory admin list-packs         # List seed packs
+smartmemory admin install-pack NAME  # Install a seed pack
+smartmemory admin mine               # Mine Wikidata entities
+smartmemory admin convert-rebel      # Convert REBEL dataset
 ```
 
 ## Non-interactive / CI
