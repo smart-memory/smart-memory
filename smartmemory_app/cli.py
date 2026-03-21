@@ -36,7 +36,7 @@ def _daemon_request(method: str, path: str, **kwargs):
             return r.json() if r.status_code != 204 else {}
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
             if attempt == 0:
-                time.sleep(6)  # wait for launchd to restart daemon
+                time.sleep(2)  # wait for launchd to restart daemon (~1.2s startup)
                 continue
             return None  # still down after retry — fall back to direct
         except httpx.ReadTimeout:
