@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import subprocess
+from pathlib import Path
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -273,6 +274,34 @@ def _apply_setup_result(result: SetupResult, on_step: Callable[[str], None] | No
 # ── Mode setup helpers ────────────────────────────────────────────────────────
 
 
+def _persist_env_var(name: str, value: str) -> None:
+    """Append an export line to the user's shell profile so the key persists."""
+    shell = os.environ.get("SHELL", "/bin/zsh")
+    if "zsh" in shell:
+        profile = Path.home() / ".zshrc"
+    elif "bash" in shell:
+        profile = Path.home() / ".bashrc"
+    else:
+        profile = Path.home() / ".profile"
+
+    line = f'\nexport {name}="{value}"\n'
+
+    # Don't duplicate if already in the file
+    try:
+        existing = profile.read_text() if profile.exists() else ""
+        if f"export {name}=" in existing:
+            return  # Already set in profile
+    except Exception:
+        pass
+
+    try:
+        with open(profile, "a") as f:
+            f.write(line)
+    except Exception as e:
+        click.echo(f"  Warning: could not write to {profile}: {e}")
+        click.echo(f"  Add this to your shell profile manually: export {name}=\"{value}\"")
+
+
 def _setup_local() -> None:
     """Ask pipeline questions, write config, wire Claude Code hooks.
 
@@ -298,6 +327,26 @@ def _setup_local() -> None:
         "LLM provider",
         default="groq",
     )
+
+    # Prompt for API key if the provider needs one
+    _LLM_KEY_ENVVAR = {
+        "groq": "GROQ_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+    }
+    key_envvar = _LLM_KEY_ENVVAR.get(llm)
+    if key_envvar and not os.environ.get(key_envvar):
+        api_key = click.prompt(
+            f"\n{key_envvar} not set. Enter your API key (stored in env config)",
+            hide_input=True,
+        )
+        if api_key.strip():
+            # Write to the shell profile so it persists
+            _persist_env_var(key_envvar, api_key.strip())
+            os.environ[key_envvar] = api_key.strip()
+            click.echo(f"  {key_envvar} saved.")
+
     # Default to openai embeddings if OPENAI_API_KEY is available, else local
     import os
     embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
