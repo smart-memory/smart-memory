@@ -336,16 +336,20 @@ def _setup_local() -> None:
         "deepseek": "DEEPSEEK_API_KEY",
     }
     key_envvar = _LLM_KEY_ENVVAR.get(llm)
-    if key_envvar and not os.environ.get(key_envvar):
-        api_key = click.prompt(
-            f"\n{key_envvar} not set. Enter your API key (stored in env config)",
-            hide_input=True,
-        )
-        if api_key.strip():
-            # Write to the shell profile so it persists
-            _persist_env_var(key_envvar, api_key.strip())
-            os.environ[key_envvar] = api_key.strip()
-            click.echo(f"  {key_envvar} saved.")
+    if key_envvar:
+        existing = os.environ.get(key_envvar, "").strip()
+        if existing:
+            masked = existing[:8] + "..." + existing[-4:] if len(existing) > 12 else "***"
+            click.echo(f"\n  {key_envvar} already set ({masked})")
+        else:
+            api_key = click.prompt(
+                f"\n{key_envvar} not set. Enter your API key",
+                default="",
+            )
+            if api_key.strip():
+                _persist_env_var(key_envvar, api_key.strip())
+                os.environ[key_envvar] = api_key.strip()
+                click.echo(f"  {key_envvar} saved to shell profile.")
 
     # Default to openai embeddings if OPENAI_API_KEY is available, else local
     embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
