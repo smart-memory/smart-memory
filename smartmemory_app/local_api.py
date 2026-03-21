@@ -194,6 +194,15 @@ def list_memories(limit: int = 200, offset: int = 0) -> dict:
 # FastAPI matches in declaration order — the bare /{memory_id} would otherwise
 # capture /neighbors as the memory_id value.
 
+@api.get("/recall")
+def recall_endpoint(cwd: str = None, top_k: int = 10) -> dict:
+    """Recall recent + relevant memories for session context."""
+    with _rw_lock:
+        from smartmemory_app.storage import recall
+        context = recall(cwd, top_k)
+    return {"context": context}
+
+
 @api.get("/{memory_id}/neighbors")
 def get_neighbors(memory_id: str) -> dict:
     """get_neighbors() uses _row_to_node() — output is already flat, no transformation needed.
@@ -421,13 +430,7 @@ def search_endpoint(body: SearchRequest) -> list:
         return search(body.query, body.top_k)
 
 
-@api.get("/recall")
-def recall_endpoint(cwd: str = None, top_k: int = 10) -> dict:
-    """Recall recent + relevant memories for session context."""
-    with _rw_lock:
-        from smartmemory_app.storage import recall
-        context = recall(cwd, top_k)
-    return {"context": context}
+# recall endpoint moved above /{memory_id} to avoid wildcard route capture
 
 
 # ── Read-only boundary ─────────────────────────────────────────────────────
