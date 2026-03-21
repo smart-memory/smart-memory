@@ -1,5 +1,21 @@
 # Changelog — smartmemory
 
+## [1.0.10] — 2026-03-21
+
+### Fixed
+
+- **Search returns only matching results.** Lite mode search no longer returns unrelated memories. Text-first fallback chain (substring + keyword) replaces unreliable vector search on small corpora.
+- **Persist no longer drops nodes with LLM key.** Batch evolution disabled in Tier 1 config — destructive evolvers were deleting nodes during rapid sequential ingests.
+- **Recall endpoint works.** `/recall` route moved before `/{memory_id}` wildcard to prevent 404 capture.
+- **Recall returns results.** Recency sort and empty-query handling fixed in search fallback.
+
+### Added
+
+- **`smartmemory get <item_id>`** — retrieve a memory by ID via CLI.
+- **Auto-restart on pip upgrade.** Daemon middleware checks installed package version every 10th request. Version mismatch triggers clean exit; launchd restarts with new code.
+- **CLI retry on daemon restart.** `_daemon_request` retries once with 2s wait on connection drop for seamless upgrades.
+- **Arbitrary persist properties.** `smartmemory persist "text" --project atlas --domain legal` passes extra properties.
+
 ## [1.0.5] — 2026-03-19
 
 ### Added
