@@ -287,7 +287,8 @@ def search(
                 "Use local mode or remove --<property> flags."
             )
         return mem.search(query, top_k)
-    # Wildcard: return all memory nodes (not entity/relation/pattern nodes)
+    # Wildcard: return ALL memory nodes (not entity/relation/pattern nodes).
+    # top_k is intentionally not applied — "*" means "list everything".
     if query.strip() == "*":
         all_items = _list_all_memories(mem)
         if filters:
