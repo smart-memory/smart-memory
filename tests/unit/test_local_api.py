@@ -34,8 +34,8 @@ def _make_serialize_node(
     memory_type: str = "semantic",
     label: str = "Test label",
     node_category: str = "memory",
-    entity_type: str = None,
-    extra_props: dict = None,
+    entity_type: str | None = None,
+    extra_props: dict | None = None,
 ) -> dict:
     """Return a node dict in the shape serialize() produces (properties nested)."""
     props = {"label": label, "content": "Test content", "confidence": 0.9}
@@ -237,6 +237,16 @@ class TestListMemories:
         assert body["limit"] == 2
         assert body["offset"] == 1
         assert len(body["items"]) == 2
+
+
+class TestRecallRoute:
+    def test_recall_named_route_is_not_captured_by_memory_id(self, client):
+        with patch("smartmemory_app.storage.recall", return_value="## SmartMemory Context\n- hello") as mock_recall:
+            r = client.get("/recall")
+
+        assert r.status_code == 200
+        assert r.json()["context"].startswith("## SmartMemory Context")
+        mock_recall.assert_called_once_with(None, 10)
 
 
 # ---------------------------------------------------------------------------

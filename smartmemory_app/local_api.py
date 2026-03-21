@@ -366,6 +366,7 @@ class IngestRequest(BaseModel):
     content: str
     memory_type: str = "episodic"
     context: Optional[dict] = None
+    properties: Optional[dict] = None  # user-supplied key-value properties
     profile_name: Optional[str] = None  # accepted for service contract alignment, ignored in lite
 
 
@@ -389,7 +390,7 @@ def ingest_endpoint(body: IngestRequest) -> dict:
         # Two-tier: Tier 1 sync, enqueue for Tier 2
         with _rw_lock:
             from smartmemory_app.storage import ingest
-            result = ingest(body.content, memory_type, sync=False)
+            result = ingest(body.content, memory_type, sync=False, properties=body.properties)
             # result is {"item_id": str, "entity_ids": dict, "queued": bool}
             item_id = result["item_id"] if isinstance(result, dict) else result
             raw_ids = result.get("entity_ids", {}) if isinstance(result, dict) else {}
@@ -413,21 +414,27 @@ def ingest_endpoint(body: IngestRequest) -> dict:
         # No LLM — full sync pipeline with lite config
         with _rw_lock:
             from smartmemory_app.storage import ingest
-            item_id = ingest(body.content, memory_type)
+            item_id = ingest(body.content, memory_type, properties=body.properties)
         return {"item_id": item_id}
 
 
 class SearchRequest(BaseModel):
     query: str
     top_k: int = 5
+    filters: Optional[dict] = None  # property filters (e.g. {"project": "atlas"})
 
 
 @api.post("/search")
 def search_endpoint(body: SearchRequest) -> list:
     """Search memories. Returns bare list matching service POST /memory/search."""
+    from fastapi import HTTPException
+
     with _rw_lock:
         from smartmemory_app.storage import search
-        return search(body.query, body.top_k)
+        try:
+            return search(body.query, body.top_k, filters=body.filters)
+        except NotImplementedError as e:
+            raise HTTPException(status_code=501, detail=str(e))
 
 
 # recall endpoint moved above /{memory_id} to avoid wildcard route capture

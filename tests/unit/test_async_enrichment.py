@@ -106,6 +106,7 @@ class TestDrainThread:
         q = AsyncEnrichmentQueue(maxlen=100)
         lock = threading.RLock()
         mem = MagicMock()
+        mem.get.return_value = {"content": "test content"}
 
         job = {"item_id": "test-1", "workspace_id": "", "entity_ids": {}, "enable_ontology": False}
         q.enqueue(job)
@@ -115,6 +116,9 @@ class TestDrainThread:
         _stop_event.clear()
 
         with patch(
+            "smartmemory.background.extraction_worker._run_llm_extraction",
+            return_value={"status": "ok", "extraction": {"entities": [], "relations": []}},
+        ), patch(
             "smartmemory.background.extraction_worker.process_extract_job",
             return_value=mock_result,
         ) as mock_pej:
@@ -133,7 +137,12 @@ class TestDrainThread:
             stop_drain()
             t.join(timeout=3)
 
-        mock_pej.assert_called_once_with(mem, job, redis_client=None)
+        mock_pej.assert_called_once()
+        called_args, called_kwargs = mock_pej.call_args
+        assert called_args[:2] == (mem, job)
+        assert called_kwargs["redis_client"] is None
+        assert called_kwargs["item_override"] == {"content": "test content"}
+        assert called_kwargs["extraction_override"] == {"entities": [], "relations": []}
         assert q.stats["total_processed"] == 1
 
     def test_drain_survives_job_failure(self):
@@ -141,13 +150,14 @@ class TestDrainThread:
         q = AsyncEnrichmentQueue(maxlen=100)
         lock = threading.RLock()
         mem = MagicMock()
+        mem.get.return_value = {"content": "test content"}
 
         q.enqueue({"item_id": "fail-1", "workspace_id": "", "entity_ids": {}})
         q.enqueue({"item_id": "ok-1", "workspace_id": "", "entity_ids": {}})
 
         call_count = 0
 
-        def side_effect(memory, payload, redis_client=None):
+        def side_effect(memory, payload, redis_client=None, **kwargs):
             nonlocal call_count
             call_count += 1
             if payload["item_id"] == "fail-1":
@@ -157,6 +167,9 @@ class TestDrainThread:
         _stop_event.clear()
 
         with patch(
+            "smartmemory.background.extraction_worker._run_llm_extraction",
+            return_value={"status": "ok", "extraction": {"entities": [], "relations": []}},
+        ), patch(
             "smartmemory.background.extraction_worker.process_extract_job",
             side_effect=side_effect,
         ):
@@ -201,14 +214,21 @@ class TestDrainThread:
         q = AsyncEnrichmentQueue(maxlen=100)
         lock = threading.RLock()
 
-        mem1 = MagicMock()
-        mem2 = MagicMock()
+        pre1 = MagicMock()
+        write1 = MagicMock()
+        pre2 = MagicMock()
+        write2 = MagicMock()
+        pre1.get.return_value = {"content": "item a"}
+        write1.get.return_value = {"content": "item a"}
+        pre2.get.return_value = {"content": "item b"}
+        write2.get.return_value = {"content": "item b"}
+        mems = [pre1, write1, pre2, write2]
         call_idx = 0
 
         def get_mem():
             nonlocal call_idx
             call_idx += 1
-            return mem1 if call_idx <= 1 else mem2
+            return mems[call_idx - 1]
 
         q.enqueue({"item_id": "a", "workspace_id": "", "entity_ids": {}})
         q.enqueue({"item_id": "b", "workspace_id": "", "entity_ids": {}})
@@ -216,6 +236,9 @@ class TestDrainThread:
         _stop_event.clear()
 
         with patch(
+            "smartmemory.background.extraction_worker._run_llm_extraction",
+            return_value={"status": "ok", "extraction": {"entities": [], "relations": []}},
+        ), patch(
             "smartmemory.background.extraction_worker.process_extract_job",
             return_value={"status": "ok", "new_entities": 0, "new_relations": 0, "new_patterns": 0},
         ) as mock_pej:
@@ -233,10 +256,58 @@ class TestDrainThread:
             stop_drain()
             t.join(timeout=3)
 
-        # Should have been called with mem1 for first item, mem2 for second
+        # Write phase should re-fetch memory for each item instead of reusing the pre-LLM snapshot.
         calls = mock_pej.call_args_list
-        assert calls[0][0][0] is mem1
-        assert calls[1][0][0] is mem2
+        assert calls[0][0][0] is write1
+        assert calls[1][0][0] is write2
+
+    def test_drain_releases_rw_lock_while_llm_runs(self):
+        """Slow LLM extraction must not hold the API lock for its whole duration."""
+        q = AsyncEnrichmentQueue(maxlen=100)
+        lock = threading.RLock()
+        mem = MagicMock()
+        mem.get.return_value = {"content": "slow item"}
+
+        q.enqueue({"item_id": "slow-1", "workspace_id": "", "entity_ids": {}, "enable_ontology": False})
+
+        started = threading.Event()
+        release = threading.Event()
+
+        def slow_extract(content):
+            started.set()
+            assert release.wait(timeout=5), "test did not release slow extractor"
+            return {"status": "ok", "extraction": {"entities": [], "relations": []}}
+
+        _stop_event.clear()
+
+        with patch(
+            "smartmemory.background.extraction_worker._run_llm_extraction",
+            side_effect=slow_extract,
+        ), patch(
+            "smartmemory.background.extraction_worker.process_extract_job",
+            return_value={"status": "ok", "new_entities": 0, "new_relations": 0, "new_patterns": 0},
+        ):
+            t = threading.Thread(
+                target=enrichment_drain_loop,
+                args=(lambda: mem, q, lock),
+                daemon=True,
+            )
+            t.start()
+
+            assert started.wait(timeout=5), "Drain thread never reached LLM extraction"
+            assert lock.acquire(timeout=0.2), "rw_lock stayed held during LLM extraction"
+            lock.release()
+
+            release.set()
+
+            deadline = time.time() + 5
+            while q.stats["total_processed"] < 1 and time.time() < deadline:
+                time.sleep(0.05)
+
+            stop_drain()
+            t.join(timeout=3)
+
+        assert q.stats["total_processed"] == 1
 
 
 class TestTwoTierIngest:

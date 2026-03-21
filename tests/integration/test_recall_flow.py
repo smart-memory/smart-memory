@@ -26,9 +26,19 @@ def test_ingest_and_recall(tmp_path, monkeypatch):
     assert item_id, "ingest must return a non-empty item_id"
 
     result = storage_mod.recall(cwd=str(tmp_path), top_k=5)
-    # recall returns a formatted string — empty string is valid when no results match
-    # but we expect at least the ingested item to surface
     assert isinstance(result, str)
+    assert "Claude Code is an AI-powered terminal coding assistant" in result
+
+
+@pytest.mark.integration
+def test_recall_top_k_one_still_returns_recent_memory(tmp_path, monkeypatch):
+    """top_k=1 should still allocate one slot to the recency pass."""
+    monkeypatch.setenv("SMARTMEMORY_DATA_DIR", str(tmp_path))
+
+    storage_mod.ingest("Only memory in the store")
+
+    result = storage_mod.recall(top_k=1)
+    assert "Only memory in the store" in result
 
 
 @pytest.mark.integration
@@ -62,6 +72,7 @@ def test_get_returns_dict_or_empty(tmp_path, monkeypatch):
     monkeypatch.setenv("SMARTMEMORY_DATA_DIR", str(tmp_path))
 
     item_id = storage_mod.ingest("SmartMemory stores episodic memories")
+    assert isinstance(item_id, str)
     result = storage_mod.get(item_id)
     # May return {} if get is not wired in Lite mode — both are acceptable
     assert isinstance(result, dict)

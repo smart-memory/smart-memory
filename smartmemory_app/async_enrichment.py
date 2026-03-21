@@ -149,7 +149,11 @@ def enrichment_drain_loop(
     _drain_running = True
     logger.info("Enrichment drain thread started")
 
-    from smartmemory.background.extraction_worker import process_extract_job
+    from smartmemory.background.extraction_worker import (
+        _get_content_from_item,
+        _run_llm_extraction,
+        process_extract_job,
+    )
 
     while not _stop_event.is_set():
         queue.wait(timeout=5.0)
@@ -167,10 +171,57 @@ def enrichment_drain_loop(
             item_id = job.get("item_id", "?")
             try:
                 with rw_lock:
-                    # Fetch singleton inside lock so /clear can't replace it
-                    # between get_mem_fn() and process_extract_job()
+                    # Snapshot the current item while /clear and foreground writes
+                    # are excluded. The expensive LLM call runs outside this lock.
                     mem = get_mem_fn()
-                    result = process_extract_job(mem, job, redis_client=None)
+                    item = mem.get(item_id)
+
+                if item is None:
+                    result = {
+                        "status": "item_not_found",
+                        "new_entities": 0,
+                        "new_relations": 0,
+                        "new_patterns": 0,
+                    }
+                else:
+                    content = _get_content_from_item(item)
+                    if not content.strip():
+                        result = {
+                            "status": "no_text",
+                            "new_entities": 0,
+                            "new_relations": 0,
+                            "new_patterns": 0,
+                        }
+                    else:
+                        llm_result = _run_llm_extraction(content)
+                        if llm_result["status"] != "ok":
+                            result = {
+                                "status": "llm_failed",
+                                "new_entities": 0,
+                                "new_relations": 0,
+                                "new_patterns": 0,
+                            }
+                        else:
+                            with rw_lock:
+                                # Re-fetch after the LLM call so /clear can replace the
+                                # singleton safely while extraction is in flight.
+                                mem = get_mem_fn()
+                                fresh_item = mem.get(item_id)
+                                if fresh_item is None:
+                                    result = {
+                                        "status": "item_not_found",
+                                        "new_entities": 0,
+                                        "new_relations": 0,
+                                        "new_patterns": 0,
+                                    }
+                                else:
+                                    result = process_extract_job(
+                                        mem,
+                                        job,
+                                        redis_client=None,
+                                        item_override=fresh_item,
+                                        extraction_override=llm_result.get("extraction"),
+                                    )
                 queue.record_processed()
                 status = result.get("status", "?")
                 new_e = result.get("new_entities", 0)

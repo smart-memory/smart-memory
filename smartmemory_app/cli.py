@@ -13,6 +13,19 @@ import click
 log = logging.getLogger(__name__)
 
 
+def _parse_extra_props(args: list[str]) -> dict[str, str]:
+    """Parse Click extra args (--key value pairs) into a property dict."""
+    props = {}
+    i = 0
+    while i < len(args):
+        if args[i].startswith("--") and i + 1 < len(args) and not args[i + 1].startswith("--"):
+            props[args[i][2:]] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+    return props
+
+
 def _daemon_url() -> str:
     from smartmemory_app.config import load_config
 
@@ -39,6 +52,13 @@ def _daemon_request(method: str, path: str, **kwargs):
                 time.sleep(2)  # wait for launchd to restart daemon (~1.2s startup)
                 continue
             return None  # still down after retry — fall back to direct
+        except httpx.HTTPStatusError as e:
+            # Surface server errors (e.g. 501 for unsupported filters) to caller
+            try:
+                detail = e.response.json().get("detail", str(e))
+            except Exception:
+                detail = str(e)
+            raise click.ClickException(detail)
         except httpx.ReadTimeout:
             return None
 
@@ -142,36 +162,52 @@ def viewer_cmd(port: int | None) -> None:
 # ── Memory operations ───────────────────────────────────────────────────────
 
 
-@cli.command("persist")
+@cli.command("persist", context_settings=dict(
+    ignore_unknown_options=True, allow_extra_args=True,
+))
 @click.argument("text")
 @click.option("--type", "memory_type", default="episodic", show_default=True)
-def persist_cmd(text: str, memory_type: str) -> None:
-    """Persist text as a memory (Stop hook)."""
-    result = _daemon_request(
-        "POST", "/memory/ingest", json={"content": text, "memory_type": memory_type}
-    )
+@click.pass_context
+def persist_cmd(ctx, text: str, memory_type: str) -> None:
+    """Persist text as a memory (Stop hook).
+
+    Supports arbitrary property flags: --project atlas --domain legal
+    """
+    props = _parse_extra_props(ctx.args)
+    body: dict = {"content": text, "memory_type": memory_type}
+    if props:
+        body["properties"] = props
+    result = _daemon_request("POST", "/memory/ingest", json=body)
     if result:
         click.echo(result.get("item_id", "?"))
     else:
         from smartmemory_app.storage import ingest
 
-        click.echo(ingest(text, memory_type))
+        click.echo(ingest(text, memory_type, properties=props))
 
 
-@cli.command("ingest")
+@cli.command("ingest", context_settings=dict(
+    ignore_unknown_options=True, allow_extra_args=True,
+))
 @click.argument("text")
 @click.option("--type", "memory_type", default="episodic", show_default=True)
-def ingest_cmd(text: str, memory_type: str) -> None:
-    """Ingest text through the full pipeline."""
-    result = _daemon_request(
-        "POST", "/memory/ingest", json={"content": text, "memory_type": memory_type}
-    )
+@click.pass_context
+def ingest_cmd(ctx, text: str, memory_type: str) -> None:
+    """Ingest text through the full pipeline.
+
+    Supports arbitrary property flags: --project atlas --domain legal
+    """
+    props = _parse_extra_props(ctx.args)
+    body: dict = {"content": text, "memory_type": memory_type}
+    if props:
+        body["properties"] = props
+    result = _daemon_request("POST", "/memory/ingest", json=body)
     if result:
         click.echo(result.get("item_id", "?"))
     else:
         from smartmemory_app.storage import ingest
 
-        click.echo(ingest(text, memory_type))
+        click.echo(ingest(text, memory_type, properties=props))
 
 
 @cli.command("recall")
@@ -190,18 +226,29 @@ def recall_cmd(cwd: str, top_k: int) -> None:
         click.echo(recall(cwd, top_k))
 
 
-@cli.command("search")
+@cli.command("search", context_settings=dict(
+    ignore_unknown_options=True, allow_extra_args=True,
+))
 @click.argument("query")
 @click.option("--top-k", default=5, show_default=True)
-def search_cmd(query: str, top_k: int) -> None:
-    """Search memories by semantic similarity."""
-    results = _daemon_request(
-        "POST", "/memory/search", json={"query": query, "top_k": top_k}
-    )
+@click.pass_context
+def search_cmd(ctx, query: str, top_k: int) -> None:
+    """Search memories by semantic similarity.
+
+    Supports property filters: --project atlas --domain legal
+    """
+    props = _parse_extra_props(ctx.args)
+    body: dict = {"query": query, "top_k": top_k}
+    if props:
+        body["filters"] = props
+    results = _daemon_request("POST", "/memory/search", json=body)
     if results is None:
         from smartmemory_app.storage import search
 
-        results = search(query, top_k)
+        try:
+            results = search(query, top_k, filters=props)
+        except NotImplementedError as e:
+            raise click.ClickException(str(e))
     if not results:
         click.echo("No results.")
         return
@@ -218,6 +265,8 @@ def get_cmd(item_id: str) -> None:
     """Fetch a single memory by item ID."""
     try:
         result = _daemon_request("GET", f"/memory/{item_id}")
+    except click.ClickException:
+        raise  # surface daemon HTTP errors cleanly
     except Exception:
         result = None
 

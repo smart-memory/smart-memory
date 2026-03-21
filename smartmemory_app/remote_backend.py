@@ -176,8 +176,11 @@ class RemoteMemory:
         Remote has no sort_by="recency" support so both calls use semantic search;
         the first call uses an empty query to surface recent results by relevance.
         """
-        recent = self.search("", top_k=top_k // 2)
-        semantic = self.search(cwd or "", top_k=top_k // 2) if cwd else []
+        requested = max(1, top_k)
+        recent_k = max(1, (requested + 1) // 2)
+        semantic_k = max(0, requested - recent_k)
+        recent = self.search("", top_k=recent_k)
+        semantic = self.search(cwd or "", top_k=semantic_k) if cwd and semantic_k else []
         seen: set[str] = set()
         items = []
         for r in recent + semantic:
