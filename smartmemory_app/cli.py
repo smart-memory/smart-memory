@@ -712,7 +712,8 @@ def list_packs_cmd() -> None:
     click.echo("Fetching pack registry...")
     packs = registry.fetch()
     if not packs:
-        click.echo("No packs available (or registry unreachable).")
+        click.echo("No seed packs available yet. Pack registry coming soon.")
+        click.echo("Track progress: https://docs.smartmemory.ai/smartmemory/seed-packs")
         return
     click.echo(f"\n{'Name':<25} {'Version':<10} {'Size':<8} {'Domain':<15} Description")
     click.echo("-" * 80)
