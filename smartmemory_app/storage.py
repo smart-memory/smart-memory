@@ -148,7 +148,11 @@ def _shutdown() -> None:
     try:
         if hasattr(_memory, "_vector_backend") and _memory._vector_backend is not None:
             _memory._vector_backend._save()
-        if hasattr(_memory, "_graph") and hasattr(_memory._graph, "backend"):
+        # Use SmartMemory.close() which shuts down evolution worker, ontology
+        # store, and graph backend in the correct order.
+        if hasattr(_memory, "close"):
+            _memory.close()
+        elif hasattr(_memory, "_graph") and hasattr(_memory._graph, "backend"):
             _memory._graph.backend.close()
     except Exception as exc:
         log.warning(
