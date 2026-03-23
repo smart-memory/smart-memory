@@ -404,6 +404,13 @@ def config_cmd(key: str | None, value: str | None) -> None:
     cfg = load_config()
 
     if key is None:
+        from smartmemory_app import __version__ as wrapper_version
+        try:
+            from importlib.metadata import version as _pkg_version
+            core_version = _pkg_version("smartmemory-core")
+        except Exception:
+            core_version = "?"
+        click.echo(f"SmartMemory v{wrapper_version} (core {core_version})")
         click.echo(f"Config: {config_path()}\n")
         click.echo(f"  mode              = {cfg.mode}")
         click.echo(f"  llm_provider      = {cfg.llm_provider}")
