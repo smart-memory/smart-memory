@@ -32,7 +32,7 @@ def _daemon_url() -> str:
     return f"http://127.0.0.1:{load_config().daemon_port}"
 
 
-def _daemon_request(method: str, path: str, **kwargs):
+def _daemon_request(method: str, path: str, timeout: int = 120, **kwargs):
     """Try daemon HTTP API. Returns parsed JSON or None if daemon unreachable.
 
     Retries once on connection drop — handles the case where the daemon
@@ -44,7 +44,7 @@ def _daemon_request(method: str, path: str, **kwargs):
 
     for attempt in range(2):
         try:
-            r = httpx.request(method, f"{_daemon_url()}{path}", timeout=120, **kwargs)
+            r = httpx.request(method, f"{_daemon_url()}{path}", timeout=timeout, **kwargs)
             r.raise_for_status()
             return r.json() if r.status_code != 204 else {}
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
@@ -864,6 +864,33 @@ def reindex_cmd() -> None:
             f"Reindexed {result.get('reindexed', '?')} memories "
             f"({result.get('dims', '?')}d, {result.get('provider', '?')}, "
             f"{result.get('elapsed_s', '?')}s)"
+        )
+    else:
+        raise click.ClickException(
+            "Daemon is not running. Start it first: smartmemory start"
+        )
+
+
+@admin_group.command("reextract")
+def reextract_cmd() -> None:
+    """Re-run entity extraction on all memories to populate the knowledge graph.
+
+    Use after upgrading to rebuild entity nodes and edges for memories that
+    were stored before entity extraction was available on lite mode.
+    """
+    from smartmemory_app.config import load_config
+
+    cfg = load_config()
+    if cfg.mode == "remote":
+        raise click.ClickException("Reextract is only available in local mode.")
+    click.echo("Re-extracting entities from all memories...")
+    result = _daemon_request("POST", "/memory/reextract", timeout=300)
+    if result is not None:
+        click.echo(
+            f"Done: {result.get('extracted', 0)} memories processed, "
+            f"{result.get('entities_created', 0)} new entity nodes, "
+            f"{result.get('skipped', 0)} skipped, "
+            f"{result.get('elapsed_s', '?')}s"
         )
     else:
         raise click.ClickException(

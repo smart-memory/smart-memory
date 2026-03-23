@@ -359,6 +359,143 @@ def reindex() -> dict:
     }
 
 
+@api.post("/reextract")
+def reextract_entities() -> dict:
+    """Re-run entity extraction on all stored memories and create entity nodes.
+
+    Use after upgrading from a version that didn't create entity nodes on SQLite.
+    Reads each memory, runs EntityRuler (spaCy + seed patterns), creates entity
+    nodes and CONTAINS_ENTITY/MENTIONED_IN edges via add_dual_node.
+    """
+    import json
+    import os
+    import sqlite3
+    import time
+
+    with _rw_lock:
+        from smartmemory_app.storage import _resolve_data_dir, _get_memory
+
+        data_dir = str(_resolve_data_dir())
+        mem = _get_memory()
+
+        # Read all user memory nodes (skip entity/relation/Version)
+        db_path = os.path.join(data_dir, "memory.db")
+        db = sqlite3.connect(db_path)
+        user_types = ("semantic", "episodic", "procedural", "working", "zettel",
+                      "reasoning", "opinion", "observation", "decision")
+        placeholders = ",".join("?" * len(user_types))
+        rows = db.execute(
+            f"SELECT item_id, properties, memory_type FROM nodes "
+            f"WHERE memory_type IN ({placeholders})",
+            user_types,
+        ).fetchall()
+        db.close()
+
+        if not rows:
+            return {"extracted": 0, "entities_created": 0, "total": 0, "elapsed_s": 0}
+
+        # Get EntityRuler stage from the pipeline
+        from smartmemory.pipeline.stages.entity_ruler import EntityRulerStage, _get_nlp
+        from smartmemory.pipeline.state import PipelineState
+
+        nlp = _get_nlp()
+        pattern_manager = getattr(mem, "_entity_ruler_patterns", None)
+        ruler = EntityRulerStage(nlp=nlp, pattern_manager=pattern_manager)
+
+        # Build a minimal pipeline config for entity_ruler
+        pipeline_config = mem._build_pipeline_config()
+
+        t0 = time.time()
+        extracted = 0
+        entities_created = 0
+        skipped = 0
+        backend = mem._graph.backend
+
+        for item_id, props_json, memory_type in rows:
+            props = json.loads(props_json) if props_json else {}
+            content = props.get("content", "")
+            if not content or len(content.strip()) < 3:
+                skipped += 1
+                continue
+
+            # Check if this memory already has entity edges
+            existing_edges = backend.get_edges_for_node(item_id)
+            has_entities = any(
+                e.get("edge_type") in ("CONTAINS_ENTITY", "MENTIONED_IN")
+                for e in existing_edges
+            )
+            if has_entities:
+                skipped += 1
+                continue
+
+            # Run EntityRuler on the content
+            try:
+                state = PipelineState(text=content, memory_type=memory_type)
+                state = ruler.execute(state, pipeline_config)
+                entities = state.ruler_entities or []
+
+                if not entities:
+                    skipped += 1
+                    continue
+
+                # Build entity_nodes for add_dual_node
+                entity_nodes = []
+                for ent in entities:
+                    name = ent.get("name", "")
+                    etype = ent.get("entity_type", "concept")
+                    if not name:
+                        continue
+                    entity_nodes.append({
+                        "entity_type": etype,
+                        "properties": {
+                            "name": name,
+                            "confidence": ent.get("confidence", 0.85),
+                            "source": "reextract",
+                        },
+                    })
+
+                if entity_nodes:
+                    # Create entity nodes + edges (memory node already exists)
+                    for en in entity_nodes:
+                        ename = en["properties"]["name"]
+                        etype = en["entity_type"]
+                        canonical_key = f"{ename.lower()}::{etype.lower()}"
+
+                        # Find or create entity node
+                        existing_eid = backend._find_entity_by_canonical_key(canonical_key)
+                        if existing_eid:
+                            eid = existing_eid
+                        else:
+                            import uuid
+                            eid = str(uuid.uuid4())
+                            backend.add_node(eid, {
+                                "content": ename,
+                                "name": ename,
+                                "entity_type": etype,
+                                "canonical_key": canonical_key,
+                                "memory_type": "entity",
+                            }, memory_type="entity")
+                            entities_created += 1
+
+                        backend.add_edge(item_id, eid, "CONTAINS_ENTITY", {})
+                        backend.add_edge(eid, item_id, "MENTIONED_IN", {})
+
+                    extracted += 1
+            except Exception as e:
+                logger.warning("Re-extraction failed for %s: %s", item_id, e)
+                skipped += 1
+
+        elapsed = time.time() - t0
+
+    return {
+        "extracted": extracted,
+        "entities_created": entities_created,
+        "skipped": skipped,
+        "total": len(rows),
+        "elapsed_s": round(elapsed, 1),
+    }
+
+
 # ── DIST-DAEMON-1: Memory operation endpoints ──────────────────────────────
 
 
