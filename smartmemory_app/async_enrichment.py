@@ -215,13 +215,20 @@ def enrichment_drain_loop(
                                         "new_patterns": 0,
                                     }
                                 else:
-                                    result = process_extract_job(
-                                        mem,
-                                        job,
-                                        redis_client=None,
-                                        item_override=fresh_item,
-                                        extraction_override=llm_result.get("extraction"),
-                                    )
+                                    # Wrap in _di_context so _crud.add() inside
+                                    # process_extract_job sees the correct vector
+                                    # backend, cache, and observability ContextVars.
+                                    # Without this, each entity write creates a
+                                    # temporary VectorStore that can clobber the
+                                    # main backend's usearch state on _save().
+                                    with mem._di_context():
+                                        result = process_extract_job(
+                                            mem,
+                                            job,
+                                            redis_client=None,
+                                            item_override=fresh_item,
+                                            extraction_override=llm_result.get("extraction"),
+                                        )
                 queue.record_processed()
                 status = result.get("status", "?")
                 new_e = result.get("new_entities", 0)
