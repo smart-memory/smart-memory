@@ -543,7 +543,7 @@ def ingest_endpoint(body: IngestRequest) -> dict:
                     "item_id": item_id,
                     "workspace_id": "",
                     "entity_ids": entity_ids,
-                    "enable_ontology": getattr(mem, "_enable_ontology", False),
+                    "enable_ontology": getattr(get_memory(), "_enable_ontology", False),
                     "enqueued_at": time.time(),
                 })
         return {"item_id": item_id}
