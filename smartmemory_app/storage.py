@@ -83,6 +83,13 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
         if not os.environ.get("SMARTMEMORY_EMBEDDING_PROVIDER"):
             os.environ["SMARTMEMORY_EMBEDDING_PROVIDER"] = cfg.embedding_provider
 
+        # DIST-FULL-LOCAL-1 Phase 2b: apply coreference config to pipeline profile
+        from smartmemory.pipeline.config import PipelineConfig
+
+        profile = PipelineConfig.default()
+        if not cfg.coreference:
+            profile.coreference.enabled = False
+
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
         _data_path = data_path  # cache so ingest() uses the same path as the singleton
@@ -90,6 +97,7 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
         _memory = create_lite_memory(
             data_dir=str(data_path),
             entity_ruler_patterns=pattern_manager,
+            pipeline_profile=profile,
             event_sink=get_event_sink(),    # DIST-LITE-3
         )
         atexit.register(_shutdown)
