@@ -1,5 +1,11 @@
 # Changelog — smartmemory
 
+## [1.1.5] — 2026-03-24
+
+### Fixed
+
+- **Real-time graph viewer updates work.** Lite WebSocket events server now negotiates the `sm.v1` subprotocol. Browser WebSocket API (per RFC 6455) closes connections when the server doesn't echo back a requested subprotocol — the viewer showed "disconnected" and real-time node animations never fired.
+
 ## [Unreleased]
 
 ### Changed
