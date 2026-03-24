@@ -179,14 +179,25 @@ def _validate_memory_type(ctx, param, value: str) -> str:
 @cli.command("add", context_settings=dict(
     ignore_unknown_options=True, allow_extra_args=True,
 ))
-@click.argument("text")
+@click.argument("text", default="-")
 @click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
 @click.pass_context
 def add_cmd(ctx, text: str, memory_type: str) -> None:
-    """Add text as a memory.
+    """Add text as a memory. Use - or pipe stdin to read from a file.
+
+    Examples:
+        smartmemory add "Alice leads Project Atlas"
+        echo "some text" | smartmemory add -
+        smartmemory add - < notes.txt
 
     Supports arbitrary property flags: --project atlas --domain legal
     """
+    import sys
+
+    if text == "-":
+        if sys.stdin.isatty():
+            raise click.ClickException("No input. Pipe text or use: smartmemory add \"text\"")
+        text = sys.stdin.read()
     if not text.strip():
         raise click.ClickException("Content cannot be empty.")
     props = _parse_extra_props(ctx.args)
@@ -211,11 +222,13 @@ def recall_cmd(cwd: str, top_k: int) -> None:
         "GET", "/memory/recall", params={"cwd": cwd or "", "top_k": top_k}
     )
     if result:
-        click.echo(result.get("context", ""))
+        context = result.get("context", "")
     else:
         from smartmemory_app.storage import recall
 
-        click.echo(recall(cwd, top_k))
+        context = recall(cwd, top_k)
+    if context:
+        click.echo(context)
 
 
 @cli.command("search", context_settings=dict(
