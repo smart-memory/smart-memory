@@ -181,14 +181,19 @@ def _validate_memory_type(ctx, param, value: str) -> str:
 ))
 @click.argument("text", default="-")
 @click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
+@click.option("--all", "as_whole", is_flag=True, help="Add stdin as one memory instead of line-by-line.")
 @click.pass_context
-def add_cmd(ctx, text: str, memory_type: str) -> None:
+def add_cmd(ctx, text: str, memory_type: str, as_whole: bool) -> None:
     """Add text as a memory. Use - or pipe stdin to read from a file.
+
+    When reading from stdin, each non-empty line becomes a separate memory.
+    Use --all to add the entire input as a single memory instead.
 
     Examples:
         smartmemory add "Alice leads Project Atlas"
+        smartmemory add - < notes.txt              # line-by-line
+        smartmemory add --all - < document.txt     # whole file
         echo "some text" | smartmemory add -
-        smartmemory add - < notes.txt
 
     Supports arbitrary property flags: --project atlas --domain legal
     """
@@ -197,7 +202,29 @@ def add_cmd(ctx, text: str, memory_type: str) -> None:
     if text == "-":
         if sys.stdin.isatty():
             raise click.ClickException("No input. Pipe text or use: smartmemory add \"text\"")
-        text = sys.stdin.read()
+        raw = sys.stdin.read()
+        if not raw.strip():
+            raise click.ClickException("Content cannot be empty.")
+        chunks = [raw.strip()] if as_whole else [l.strip() for l in raw.splitlines() if l.strip()]
+        if not chunks:
+            raise click.ClickException("Content cannot be empty.")
+        props = _parse_extra_props(ctx.args)
+        ids = []
+        for chunk in chunks:
+            body: dict = {"content": chunk, "memory_type": memory_type}
+            if props:
+                body["properties"] = props
+            result = _daemon_request("POST", "/memory/ingest", json=body)
+            if result:
+                ids.append(result.get("item_id", "?"))
+            else:
+                from smartmemory_app.storage import ingest
+
+                ids.append(ingest(chunk, memory_type, properties=props))
+        click.echo(f"Added {len(ids)} memories")
+        for item_id in ids:
+            click.echo(item_id)
+        return
     if not text.strip():
         raise click.ClickException("Content cannot be empty.")
     props = _parse_extra_props(ctx.args)
