@@ -123,7 +123,7 @@ async def _serve(port: int = 9015) -> None:
                 clients.discard(ws)
                 log.info("events-server: client disconnected (total: %d)", len(clients))
 
-        async with websockets.serve(_handler, "localhost", port):
+        async with websockets.serve(_handler, "localhost", port, subprotocols=["sm.v1"]):
             log.info("events-server: listening on ws://localhost:%d", port)
             while not _stop_event.is_set():
                 await _broadcast(sink, clients)
