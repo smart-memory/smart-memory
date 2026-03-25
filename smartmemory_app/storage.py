@@ -89,6 +89,12 @@ def _get_local_memory(data_dir: str | None = None) -> "SmartMemory":
         profile = PipelineConfig.default()
         if not cfg.coreference:
             profile.coreference.enabled = False
+        # Disable evolution — evolvers crash with missing typed configs
+        # (EpisodicDecayEvolver, EpisodicToSemanticEvolver, etc.)
+        # and ExponentialDecayEvolver hits datetime serialization errors.
+        # These crash the daemon process silently.
+        profile.evolve.run_evolution = False
+        profile.evolve.run_clustering = False
 
         data_path = _resolve_data_dir(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)

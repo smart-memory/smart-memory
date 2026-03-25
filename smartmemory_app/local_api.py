@@ -521,38 +521,14 @@ def ingest_endpoint(body: IngestRequest) -> dict:
     if body.context and "memory_type" in body.context:
         memory_type = body.context["memory_type"]
 
-    has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
-
-    if has_llm:
-        # Two-tier: Tier 1 sync, enqueue for Tier 2
-        with _rw_lock:
-            from smartmemory_app.storage import ingest
-            result = ingest(body.content, memory_type, sync=False, properties=body.properties)
-            # result is {"item_id": str, "entity_ids": dict, "queued": bool}
-            item_id = result["item_id"] if isinstance(result, dict) else result
-            raw_ids = result.get("entity_ids", {}) if isinstance(result, dict) else {}
-            # Normalize entity_ids to lowercase keys — extraction_worker expects
-            # lowercase for dedup against ruler entities (extraction_worker.py:97)
-            entity_ids = {k.lower(): v for k, v in raw_ids.items()} if raw_ids else {}
-            # Enqueue locally only if Redis didn't already queue it (prevents
-            # double-processing when Redis is available alongside the daemon)
-            already_queued = result.get("queued", False) if isinstance(result, dict) else False
-            from smartmemory_app.async_enrichment import get_queue, _drain_running
-            if _drain_running and not already_queued:
-                get_queue().enqueue({
-                    "item_id": item_id,
-                    "workspace_id": "",
-                    "entity_ids": entity_ids,
-                    "enable_ontology": getattr(get_memory(), "_enable_ontology", False),
-                    "enqueued_at": time.time(),
-                })
-        return {"item_id": item_id}
-    else:
-        # No LLM — full sync pipeline with lite config
-        with _rw_lock:
-            from smartmemory_app.storage import ingest
-            item_id = ingest(body.content, memory_type, properties=body.properties)
-        return {"item_id": item_id}
+    # Run full pipeline synchronously. The direct OpenAI SDK path for Groq
+    # (bypassing litellm) is fast enough (~1-2s) that two-tier async is unnecessary.
+    # Two-tier enqueue is disabled until the _drain_running import bug is fixed
+    # and litellm supply chain issues are resolved.
+    with _rw_lock:
+        from smartmemory_app.storage import ingest
+        item_id = ingest(body.content, memory_type, properties=body.properties)
+    return {"item_id": item_id}
 
 
 class SearchRequest(BaseModel):
