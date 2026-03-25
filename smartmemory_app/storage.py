@@ -270,15 +270,16 @@ def _list_all_memories(mem) -> list[dict]:
         metadata = {k: v for k, v in props.items()
                     if k not in {"content", "label", "memory_type", "node_category",
                                  "entity_type", "embedding", "category",
-                                 "confidence", "stale"}}
+                                 "confidence", "stale", "reference"}}
         item = {
             "item_id": raw.get("item_id", ""),
             "content": props.get("content", props.get("label", "")),
             "memory_type": mt or props.get("memory_type", ""),
             "created_at": raw.get("created_at", props.get("created_at", "")),
-            # CORE-PROPS-1: Include confidence and stale as top-level keys
+            # CORE-PROPS-1: Include confidence, stale, reference as top-level keys
             "confidence": props.get("confidence", 1.0),
             "stale": props.get("stale", False),
+            "reference": props.get("reference", False),
         }
         if metadata:
             item["metadata"] = metadata
@@ -290,6 +291,7 @@ def search(
     query: str,
     top_k: int = 5,
     filters: dict[str, str] | None = None,
+    include_reference: bool = False,
 ) -> list[dict]:
     """Search memories by semantic similarity with optional property filters.
 
@@ -321,9 +323,12 @@ def search(
                     for k, v in filters.items()
                 )
             ]
+        # CORE-PROPS-1 Phase 6: exclude reference data from wildcard by default
+        if not include_reference:
+            all_items = [r for r in all_items if not r.get("reference", False)]
         return all_items
     if not filters:
-        results = mem.search(query, top_k=top_k)
+        results = mem.search(query, top_k=top_k, include_reference=include_reference)
         return [r.to_dict() for r in results]
     # With filters: fetch a wider window, then post-filter. If still short,
     # widen progressively to avoid missing sparse matches.
@@ -370,6 +375,8 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
     # CORE-PROPS-1: Recall confidence floor
     recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
     items = [r for r in items if getattr(r, "confidence", 1.0) >= recall_floor]
+    # CORE-PROPS-1 Phase 6: recall always excludes reference data
+    items = [r for r in items if not getattr(r, "reference", False)]
     if not items:
         return ""
     lines = ["## SmartMemory Context"]

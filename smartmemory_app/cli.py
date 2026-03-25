@@ -281,8 +281,9 @@ def recall_cmd(cwd: str, top_k: int) -> None:
 ))
 @click.argument("query")
 @click.option("--top-k", default=5, show_default=True)
+@click.option("--include-reference", is_flag=True, default=False, help="Include reference data in results")
 @click.pass_context
-def search_cmd(ctx, query: str, top_k: int) -> None:
+def search_cmd(ctx, query: str, top_k: int, include_reference: bool) -> None:
     """Search memories by semantic similarity. Use '*' to list all.
 
     Supports property filters: --project atlas --domain legal
@@ -291,12 +292,14 @@ def search_cmd(ctx, query: str, top_k: int) -> None:
     body: dict = {"query": query, "top_k": top_k}
     if props:
         body["filters"] = props
+    if include_reference:
+        body["include_reference"] = True
     results = _daemon_request("POST", "/memory/search", json=body)
     if results is None:
         from smartmemory_app.storage import search
 
         try:
-            results = search(query, top_k, filters=props)
+            results = search(query, top_k, filters=props, include_reference=include_reference)
         except NotImplementedError as e:
             raise click.ClickException(str(e))
     if not results:

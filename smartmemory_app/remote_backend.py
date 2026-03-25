@@ -195,6 +195,8 @@ class RemoteMemory:
             r for r in items
             if (r.get("confidence") if r.get("confidence") is not None else 1.0) >= recall_floor
         ]
+        # CORE-PROPS-1 Phase 6: recall always excludes reference data
+        items = [r for r in items if not r.get("reference", False)]
         if not items:
             return ""
         lines = ["## SmartMemory Context\n"]
