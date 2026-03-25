@@ -79,8 +79,9 @@ cli.add_command(_uninstall_cmd, name="uninstall")
 
 
 @cli.command("start")
-def start_cmd() -> None:
-    """Start the SmartMemory daemon."""
+@click.option("--num-workers", default=1, show_default=True, help="Number of enrichment worker processes.")
+def start_cmd(num_workers: int) -> None:
+    """Start the SmartMemory daemon and enrichment workers."""
     from smartmemory_app.daemon import start_daemon, is_running
 
     if is_running():
@@ -88,7 +89,7 @@ def start_cmd() -> None:
         return
     click.echo("Starting SmartMemory daemon (loading models)...")
     try:
-        start_daemon()
+        start_daemon(num_workers=num_workers)
         click.echo("Daemon ready.")
     except Exception as e:
         click.echo(f"Failed to start daemon: {e}", err=True)
@@ -108,15 +109,16 @@ def stop_cmd() -> None:
 
 
 @cli.command("restart")
-def restart_cmd() -> None:
-    """Restart the SmartMemory daemon."""
+@click.option("--num-workers", default=1, show_default=True, help="Number of enrichment worker processes.")
+def restart_cmd(num_workers: int) -> None:
+    """Restart the SmartMemory daemon and enrichment workers."""
     from smartmemory_app.daemon import stop_daemon, start_daemon, is_running
 
     if is_running(require_healthy=False):
         click.echo("Stopping daemon...")
         stop_daemon()
     click.echo("Starting daemon...")
-    start_daemon()
+    start_daemon(num_workers=num_workers)
     click.echo("Daemon ready.")
 
 

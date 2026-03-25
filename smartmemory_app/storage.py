@@ -39,7 +39,7 @@ _init_lock = threading.Lock()
 _remote_memory: "RemoteMemory | None" = None
 _remote_init_lock = threading.Lock()
 
-WRITE_LOCK_TIMEOUT = 5.0  # seconds
+WRITE_LOCK_TIMEOUT = 2.0  # seconds — daemon ingest only, worker uses SmartMemory.add() (no lock)
 
 
 # --- Directory & lock resolution -------------------------------------------------

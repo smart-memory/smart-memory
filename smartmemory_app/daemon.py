@@ -48,8 +48,11 @@ def is_running(require_healthy: bool = True) -> bool:
         return False
 
 
-def start_daemon() -> None:
-    """Start the daemon. Blocks until ready (health check passes) or timeout.
+def start_daemon(num_workers: int = 1) -> None:
+    """Start the daemon and enrichment workers.
+
+    Blocks until daemon is ready (health check passes) or timeout.
+    Then starts num_workers background enrichment worker processes.
 
     Warmup takes ~22s cold (first run), ~2s warm (model cached).
     Idempotent — returns immediately if already running.
@@ -98,9 +101,65 @@ def start_daemon() -> None:
         proc.terminate()
         raise RuntimeError(f"Port {port} is open but health check failed. Check {log_path}")
 
+    # Phase 3: Start enrichment worker(s)
+    _start_workers(num_workers)
+
+
+def _start_workers(num_workers: int = 1) -> None:
+    """Start enrichment worker(s) as detached background processes.
+
+    Each worker polls the SQLite enrichment_queue and runs Tier 2 LLM extraction.
+    Multiple workers process jobs in parallel (SQLite row-level locking prevents
+    double-processing via the 'processing' status).
+
+    Args:
+        num_workers: Number of worker processes to start (default 1).
+    """
+    if not (os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")):
+        return
+
+    data = _data_dir()
+    data.mkdir(parents=True, exist_ok=True)
+    worker_log = data / "worker.log"
+    env = os.environ.copy()
+
+    for i in range(num_workers):
+        pid_file = data / f"worker.{i}.pid"
+
+        # Check if this slot is already running
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+                os.kill(pid, 0)
+                continue  # already running
+            except (ProcessLookupError, ValueError):
+                pid_file.unlink(missing_ok=True)
+
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "smartmemory_app.enrichment_worker", "--loop"],
+            stdout=open(worker_log, "a"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=env,
+        )
+        pid_file.write_text(str(proc.pid))
+
+
+def _stop_workers() -> None:
+    """Stop all enrichment workers. Idempotent."""
+    data = _data_dir()
+    for pid_file in data.glob("worker.*.pid"):
+        try:
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, ValueError):
+            pass
+        pid_file.unlink(missing_ok=True)
+
 
 def stop_daemon() -> None:
-    """Stop the daemon. Idempotent — no-op if not running."""
+    """Stop the daemon and all workers. Idempotent — no-op if not running."""
+    _stop_workers()
     import httpx
 
     # Prefer health-check-based stop — confirms we're killing SmartMemory, not a reused PID
