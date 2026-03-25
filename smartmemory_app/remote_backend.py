@@ -201,7 +201,9 @@ class RemoteMemory:
         for item in items[:top_k]:
             conf = item.get("confidence", 1.0)
             conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
-            lines.append(f"- {conf_marker}[{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
+            # CORE-PROPS-1 Phase 2: stale marker
+            stale_marker = "⚠" if item.get("stale") else ""
+            lines.append(f"- {stale_marker}{conf_marker}[{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
         return "\n".join(lines)
 
     # ── Graph methods — called by local_api.py for viewer ──────────────────

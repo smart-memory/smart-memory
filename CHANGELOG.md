@@ -11,6 +11,7 @@
 ### Added
 
 - **CORE-PROPS-1 Phase 1b: Confidence surface wiring.** Recall excludes items below configurable confidence floor (default 0.3, `SMARTMEMORY_RECALL_FLOOR` env var). Low-confidence items (< 0.5) show `~` prefix in both CLI search and recall output. Remote recall path has parity with local path.
+- **CORE-PROPS-1 Phase 2: Staleness wiring.** Stale items show `⚠` prefix in CLI search, recall, and remote recall. Wildcard search (`*`) now includes `confidence` and `stale` fields in results.
 
 ### Changed
 

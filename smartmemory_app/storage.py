@@ -269,12 +269,16 @@ def _list_all_memories(mem) -> list[dict]:
         # Include user metadata so property filters work on wildcard results
         metadata = {k: v for k, v in props.items()
                     if k not in {"content", "label", "memory_type", "node_category",
-                                 "entity_type", "embedding", "category", "confidence"}}
+                                 "entity_type", "embedding", "category",
+                                 "confidence", "stale"}}
         item = {
             "item_id": raw.get("item_id", ""),
             "content": props.get("content", props.get("label", "")),
             "memory_type": mt or props.get("memory_type", ""),
             "created_at": raw.get("created_at", props.get("created_at", "")),
+            # CORE-PROPS-1: Include confidence and stale as top-level keys
+            "confidence": props.get("confidence", 1.0),
+            "stale": props.get("stale", False),
         }
         if metadata:
             item["metadata"] = metadata
