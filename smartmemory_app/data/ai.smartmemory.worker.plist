@@ -3,13 +3,14 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>ai.smartmemory.daemon</string>
+    <string>ai.smartmemory.worker</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>{PYTHON_PATH}</string>
-        <string>-c</string>
-        <string>from smartmemory_app.viewer_server import main; main(port={DAEMON_PORT}, open_browser=False)</string>
+        <string>-m</string>
+        <string>smartmemory_app.enrichment_worker</string>
+        <string>--loop</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -22,10 +23,10 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>{DATA_DIR}/daemon.log</string>
+    <string>{DATA_DIR}/worker.log</string>
 
     <key>StandardErrorPath</key>
-    <string>{DATA_DIR}/daemon.log</string>
+    <string>{DATA_DIR}/worker.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>

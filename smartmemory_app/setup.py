@@ -38,18 +38,21 @@ class SetupResult:
     llm_provider: str = "groq"
     llm_model: str = ""
     embedding_provider: str = "local"
+    spacy_model: str = "en_core_web_sm"
     coreference: bool = False
     data_dir: str = "~/.smartmemory"
 
 HOOKS_SRC = Path(__file__).parent / "hooks"
 SKILLS_SRC = Path(__file__).parent / "skills"
 PLIST_TEMPLATE = Path(__file__).parent / "data" / "ai.smartmemory.daemon.plist"
+WORKER_PLIST_TEMPLATE = Path(__file__).parent / "data" / "ai.smartmemory.worker.plist"
 CLAUDE_DIR = Path.home() / ".claude"
 HOOKS_DEST = CLAUDE_DIR / "hooks"
 SETTINGS = CLAUDE_DIR / "settings.json"
 DATA_DIR = Path.home() / ".smartmemory"
 LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 PLIST_NAME = "ai.smartmemory.daemon.plist"
+WORKER_PLIST_NAME = "ai.smartmemory.worker.plist"
 
 # Maps source filename (in package) → namespaced dest filename (in ~/.claude/hooks/)
 _HOOK_FILE_MAP = {
@@ -244,13 +247,14 @@ def _apply_setup_result(result: SetupResult, on_step: Callable[[str], None] | No
         llm_provider=result.llm_provider,
         llm_model=result.llm_model,
         embedding_provider=result.embedding_provider,
+        spacy_model=result.spacy_model,
         data_dir=data_dir,
     )
     save_config(cfg)
     if on_step:
         on_step("Config written")
 
-    _ensure_spacy()
+    _ensure_spacy(result.spacy_model)
     if on_step:
         on_step("spaCy model ready")
 
@@ -409,12 +413,22 @@ def _setup_local() -> None:
             except Exception:
                 pass  # keyring optional — shell profile is the primary store
 
-    # Default to openai embeddings if OPENAI_API_KEY is available, else local
-    embedding_default = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
     embedding = click.prompt(
-        "Embedding provider? (openai / local / ollama)",
-        default=embedding_default,
+        "Embedding provider? (local / openai / ollama)",
+        default="local",
     )
+
+    click.echo("\nspaCy model (used for entity extraction):")
+    click.echo("  sm  — 15MB, fast, good for most use cases")
+    click.echo("  md  — 45MB, better NER accuracy")
+    click.echo("  lg  — 590MB, best accuracy, slower to download")
+    spacy_size = click.prompt(
+        "Which size?",
+        type=click.Choice(["sm", "md", "lg"], case_sensitive=False),
+        default="sm",
+    )
+    spacy_model = f"en_core_web_{spacy_size}"
+
     data_dir = click.prompt("Default data directory", default="~/.smartmemory")
 
     cfg = SmartMemoryConfig(
@@ -422,12 +436,13 @@ def _setup_local() -> None:
         coreference=coref,
         llm_provider=llm,
         embedding_provider=embedding,
+        spacy_model=spacy_model,
         data_dir=data_dir,
     )
     save_config(cfg)
 
     # Wire Claude Code hooks (preserved from original setup.py)
-    _ensure_spacy()
+    _ensure_spacy(spacy_model)
     _copy_hooks()
     _copy_skills()
     _register_hooks()
@@ -515,20 +530,28 @@ def uninstall(keep_data: bool) -> None:
 # ── Install helpers ───────────────────────────────────────────────────────────
 
 
-def _ensure_spacy() -> None:
+_SPACY_MODEL_SIZES = {
+    "en_core_web_sm": "~15MB",
+    "en_core_web_md": "~45MB",
+    "en_core_web_lg": "~590MB",
+}
+
+
+def _ensure_spacy(model: str = "en_core_web_sm") -> None:
     try:
         import spacy
-        spacy.load("en_core_web_sm")
+        spacy.load(model)
     except (ImportError, OSError):
-        click.echo("Downloading en_core_web_sm (~15MB)...")
+        size = _SPACY_MODEL_SIZES.get(model, "")
+        click.echo(f"Downloading {model} ({size})...")
         result = subprocess.run(
-            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+            [sys.executable, "-m", "spacy", "download", model],
             capture_output=True,
         )
         if result.returncode != 0:
             click.echo(
-                "WARNING: spaCy model download failed. Run manually:\n"
-                "  python -m spacy download en_core_web_sm",
+                f"WARNING: spaCy model download failed. Run manually:\n"
+                f"  python -m spacy download {model}",
                 err=True,
             )
 
@@ -642,54 +665,91 @@ def _install_launchd_plist() -> bool:
     # override that shouldn't be baked into a persistent plist.
     data_dir = str(Path(cfg.data_dir).expanduser())
 
-    content = PLIST_TEMPLATE.read_text()
-    content = content.replace("{PYTHON_PATH}", python_path)
-    content = content.replace("{DAEMON_PORT}", str(cfg.daemon_port))
-    content = content.replace("{DATA_DIR}", data_dir)
-    content = content.replace("{BIN_DIR}", bin_dir)
+    # Resolve GROQ_API_KEY from env or keyring
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_key:
+        try:
+            import keyring
+            groq_key = keyring.get_password("smartmemory", "groq_api_key") or ""
+        except Exception:
+            pass
+
+    replacements = {
+        "{PYTHON_PATH}": python_path,
+        "{DAEMON_PORT}": str(cfg.daemon_port),
+        "{DATA_DIR}": data_dir,
+        "{BIN_DIR}": bin_dir,
+        "{GROQ_API_KEY}": groq_key,
+    }
 
     LAUNCH_AGENTS_DIR.mkdir(parents=True, exist_ok=True)
-    plist_dest = LAUNCH_AGENTS_DIR / PLIST_NAME
+    all_ok = True
 
-    # Unload existing plist before overwriting (launchctl requires this)
-    if plist_dest.exists():
-        subprocess.run(
-            ["launchctl", "unload", str(plist_dest)],
-            capture_output=True,
+    # Install both daemon and worker plists
+    templates = [
+        (PLIST_TEMPLATE, PLIST_NAME, "daemon"),
+    ]
+    if WORKER_PLIST_TEMPLATE.exists():
+        templates.append((WORKER_PLIST_TEMPLATE, WORKER_PLIST_NAME, "worker"))
+
+    for template_path, plist_name, label in templates:
+        if not template_path.exists():
+            click.echo(f"Warning: {label} plist template not found — skipping.")
+            continue
+
+        content = template_path.read_text()
+        for placeholder, value in replacements.items():
+            content = content.replace(placeholder, value)
+
+        plist_dest = LAUNCH_AGENTS_DIR / plist_name
+
+        # Unload existing plist before overwriting (launchctl requires this)
+        if plist_dest.exists():
+            subprocess.run(
+                ["launchctl", "unload", str(plist_dest)],
+                capture_output=True,
+            )
+
+        plist_dest.write_text(content)
+
+        result = subprocess.run(
+            ["launchctl", "load", str(plist_dest)],
+            capture_output=True, text=True,
         )
+        if result.returncode == 0:
+            click.echo(f"Installed launchd plist: {plist_dest}")
+        else:
+            click.echo(f"Warning: launchctl load failed for {label}: {result.stderr.strip()}")
+            click.echo(f"Load manually: launchctl load {plist_dest}")
+            all_ok = False
 
-    plist_dest.write_text(content)
-
-    result = subprocess.run(
-        ["launchctl", "load", str(plist_dest)],
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        click.echo(f"Installed launchd plist: {plist_dest}")
+    if all_ok:
         click.echo("SmartMemory will auto-start on login and restart on crash.")
-        return True
-    else:
-        click.echo(f"Warning: launchctl load failed: {result.stderr.strip()}")
-        click.echo(f"Plist written to {plist_dest} — load manually: launchctl load {plist_dest}")
-        return False
+        if groq_key:
+            click.echo("Enrichment worker enabled (GROQ_API_KEY found).")
+        else:
+            click.echo("Warning: GROQ_API_KEY not found — enrichment worker won't extract relations.")
+    return all_ok
 
 
 def _uninstall_launchd_plist() -> None:
-    """Unload and remove the launchd plist (macOS only)."""
+    """Unload and remove daemon + worker launchd plists (macOS only)."""
     import platform
     if platform.system() != "Darwin":
         return
 
-    plist_dest = LAUNCH_AGENTS_DIR / PLIST_NAME
-    if not plist_dest.exists():
-        return
+    for plist_name, label in [(PLIST_NAME, "daemon"), (WORKER_PLIST_NAME, "worker")]:
+        plist_dest = LAUNCH_AGENTS_DIR / plist_name
+        if not plist_dest.exists():
+            continue
+        subprocess.run(
+            ["launchctl", "unload", str(plist_dest)],
+            capture_output=True,
+        )
+        plist_dest.unlink(missing_ok=True)
+        click.echo(f"Removed {label} launchd plist.")
 
-    subprocess.run(
-        ["launchctl", "unload", str(plist_dest)],
-        capture_output=True,
-    )
-    plist_dest.unlink(missing_ok=True)
-    click.echo("Removed launchd plist — daemon will no longer auto-start.")
+    click.echo("SmartMemory will no longer auto-start.")
 
 
 # ── Uninstall helpers ─────────────────────────────────────────────────────────
