@@ -521,14 +521,28 @@ def ingest_endpoint(body: IngestRequest) -> dict:
     if body.context and "memory_type" in body.context:
         memory_type = body.context["memory_type"]
 
-    # Run full pipeline synchronously. The direct OpenAI SDK path for Groq
-    # (bypassing litellm) is fast enough (~1-2s) that two-tier async is unnecessary.
-    # Two-tier enqueue is disabled until the _drain_running import bug is fixed
-    # and litellm supply chain issues are resolved.
-    with _rw_lock:
-        from smartmemory_app.storage import ingest
-        item_id = ingest(body.content, memory_type, properties=body.properties)
-    return {"item_id": item_id}
+    has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
+
+    if has_llm:
+        # Two-tier: Tier 1 sync (spaCy), enqueue Tier 2 (LLM) via SQLite queue.
+        # A separate worker process drains the queue — no threading issues.
+        with _rw_lock:
+            from smartmemory_app.storage import ingest
+            result = ingest(body.content, memory_type, sync=False, properties=body.properties)
+            item_id = result["item_id"] if isinstance(result, dict) else result
+            raw_ids = result.get("entity_ids", {}) if isinstance(result, dict) else {}
+            entity_ids = {k.lower(): v for k, v in raw_ids.items()} if raw_ids else {}
+            already_queued = result.get("queued", False) if isinstance(result, dict) else False
+            if not already_queued:
+                from smartmemory_app.enrichment_queue import enqueue
+                enqueue(item_id, entity_ids)
+        return {"item_id": item_id}
+    else:
+        # No LLM — full sync pipeline
+        with _rw_lock:
+            from smartmemory_app.storage import ingest
+            item_id = ingest(body.content, memory_type, properties=body.properties)
+        return {"item_id": item_id}
 
 
 class SearchRequest(BaseModel):

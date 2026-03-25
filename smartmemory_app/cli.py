@@ -138,11 +138,11 @@ def status_cmd() -> None:
     async_info = info.get("async_enrichment", {})
     if async_info.get("enabled"):
         pending = async_info.get("pending", 0)
-        processed = async_info.get("total_processed", 0)
-        failed = async_info.get("total_failed", 0)
-        click.echo(f"  Enrichment: active (pending={pending}, processed={processed}, failed={failed})")
+        done = async_info.get("done", 0)
+        failed = async_info.get("failed", 0)
+        click.echo(f"  Queue:      pending={pending}, done={done}, failed={failed}")
     else:
-        click.echo("  Enrichment: disabled")
+        click.echo("  Queue:      (no table)")
 
 
 @cli.command("viewer")
@@ -157,6 +157,22 @@ def viewer_cmd(port: int | None) -> None:
         start_daemon()
     p = port or _port()
     webbrowser.open(f"http://localhost:{p}")
+
+
+@cli.command("worker")
+@click.option("--loop", is_flag=True, help="Poll continuously instead of drain-and-exit.")
+def worker_cmd(loop: bool) -> None:
+    """Run the enrichment worker (Tier 2 LLM extraction).
+
+    Drains the SQLite enrichment queue. Use --loop for continuous polling.
+    """
+    from smartmemory_app.enrichment_worker import drain_queue, run_loop
+
+    if loop:
+        run_loop()
+    else:
+        n = drain_queue()
+        click.echo(f"Processed {n} jobs")
 
 
 # ── Memory operations ───────────────────────────────────────────────────────
@@ -291,7 +307,9 @@ def search_cmd(ctx, query: str, top_k: int) -> None:
         # CORE-PROPS-1: Tilde marker for low-confidence memories
         conf = r.get("confidence", 1.0)
         conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
-        click.echo(f"{conf_marker}[{mem_type}] {item_id[:8]}  {content}")
+        # CORE-PROPS-1 Phase 2: stale marker
+        stale_marker = "⚠" if r.get("stale") else ""
+        click.echo(f"{stale_marker}{conf_marker}[{mem_type}] {item_id[:8]}  {content}")
 
 
 @cli.command("get")

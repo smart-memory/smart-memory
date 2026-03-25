@@ -89,13 +89,12 @@ def _build_app() -> FastAPI:
                     node_count = 0  # backend exists but empty/new — still healthy
         except Exception:
             pass
-        # Async enrichment status
-        async_info = {"enabled": False}
+        # Enrichment queue status (SQLite-backed, separate worker process)
+        async_info: dict = {"enabled": False}
         try:
-            from smartmemory_app.async_enrichment import _drain_running
-            if _drain_running:
-                from smartmemory_app.async_enrichment import get_queue
-                async_info = {"enabled": True, **get_queue().stats}
+            from smartmemory_app.enrichment_queue import stats as queue_stats
+            qs = queue_stats()
+            async_info = {"enabled": True, **qs}
         except Exception:
             pass
 
@@ -204,33 +203,11 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     from smartmemory_app.events_server import start_background
     start_background()
 
-    # Start background LLM enrichment drain thread if:
-    # 1. LLM API key available, AND
-    # 2. Backend is local (not RemoteMemory — drain thread uses SmartMemory internals)
-    _has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
-    _is_local = True
-    try:
-        from smartmemory_app.remote_backend import RemoteMemory
-        _is_local = not isinstance(get_memory(), RemoteMemory)
-    except Exception:
-        pass
-    if _has_llm and _is_local:
-        from smartmemory_app.async_enrichment import (
-            get_queue, enrichment_drain_loop, stop_drain, _stop_event,
-        )
-        from smartmemory_app.local_api import _rw_lock
-        _stop_event.clear()
-        drain_thread = threading.Thread(
-            target=enrichment_drain_loop,
-            args=(get_memory, get_queue(), _rw_lock),
-            daemon=True,
-            name="enrichment-drain",
-        )
-        drain_thread.start()
-        atexit.register(stop_drain)
-        print("Background LLM enrichment enabled", flush=True)
-    else:
-        print("Background enrichment disabled (no LLM API key)", flush=True)
+    # Enrichment is handled by a separate worker process (smartmemory worker --loop).
+    # The ingest endpoint enqueues to a SQLite table; the worker drains it.
+    # No in-process threading — avoids the _drain_running import bug and
+    # keeps the daemon process stable.
+    print("Enrichment queue: SQLite-backed (run `smartmemory worker --loop` for Tier 2)", flush=True)
 
     if open_browser:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()

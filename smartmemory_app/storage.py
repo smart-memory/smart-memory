@@ -371,7 +371,9 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
     lines = ["## SmartMemory Context"]
     for item in items[:top_k]:
         conf_marker = "~" if getattr(item, "confidence", 1.0) < 0.5 else ""
-        lines.append(f"- {conf_marker}[{item.memory_type}] {item.content[:200]}")
+        # CORE-PROPS-1 Phase 2: stale marker
+        stale_marker = "⚠" if getattr(item, "stale", False) else ""
+        lines.append(f"- {stale_marker}{conf_marker}[{item.memory_type}] {item.content[:200]}")
     return "\n".join(lines)
 
 

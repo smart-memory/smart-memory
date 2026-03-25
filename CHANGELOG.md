@@ -23,8 +23,8 @@
 
 ### Fixed
 
+- **SQLite enrichment queue replaces in-memory threading.** New `enrichment_queue.py` persists Tier 2 jobs to SQLite. Separate `smartmemory worker` process drains queue — no threading, no `_drain_running` import bug, survives daemon restarts. Queue stats visible via `smartmemory status` and `/health`.
 - **Daemon no longer crashes after ingest.** Disabled evolution worker in daemon pipeline profile — evolvers crash with missing typed configs (EpisodicDecayEvolver, ExponentialDecayEvolver datetime serialization). Evolution re-enabled when configs are wired properly.
-- **Sync ingest for reliable LLM extraction.** Ingest endpoint uses sync pipeline instead of two-tier async. The `_drain_running` bool was captured by value on import (Python immutable import semantics), so async enrichment never enqueued jobs. Sync path works correctly with the direct Groq SDK.
 - **Launchd plist has GROQ_API_KEY.** Daemon managed by launchd didn't inherit shell env vars — LLM enrichment was silently disabled.
 - **Async enrichment no longer drops nodes on SQLite.** Tier 2 LLM entities used deterministic SHA256[:16] item_ids that could collide with existing nodes via SQLite's `ON CONFLICT DO UPDATE`. Entity IDs are now stripped before persist on backends without dual-node support.
 - **Recall works with few memories.** Recency sort key returned `""` for `None` created_at, pushing items with missing timestamps to the end. Fixed to use `"0000-00-00"` fallback.
