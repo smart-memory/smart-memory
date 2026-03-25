@@ -188,11 +188,20 @@ class RemoteMemory:
             if iid and iid not in seen:
                 seen.add(iid)
                 items.append(r)
+        # CORE-PROPS-1: Recall confidence floor
+        import os
+        recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
+        items = [
+            r for r in items
+            if (r.get("confidence") if r.get("confidence") is not None else 1.0) >= recall_floor
+        ]
         if not items:
             return ""
         lines = ["## SmartMemory Context\n"]
         for item in items[:top_k]:
-            lines.append(f"- [{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
+            conf = item.get("confidence", 1.0)
+            conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
+            lines.append(f"- {conf_marker}[{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
         return "\n".join(lines)
 
     # ── Graph methods — called by local_api.py for viewer ──────────────────

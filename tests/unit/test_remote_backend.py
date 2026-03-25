@@ -129,3 +129,28 @@ def test_recall_returns_empty_string_when_no_results(remote):
     with patch.object(remote, "search", return_value=[]):
         result = remote.recall(cwd="/project")
     assert result == ""
+
+
+def test_recall_filters_zero_confidence(remote, monkeypatch):
+    """Regression: confidence=0.0 must NOT be coerced to 1.0 and must be filtered."""
+    monkeypatch.setenv("SMARTMEMORY_RECALL_FLOOR", "0.3")
+    items = [
+        {"item_id": "zero-conf", "content": "zero confidence item", "memory_type": "semantic", "confidence": 0.0},
+        {"item_id": "high-conf", "content": "high confidence item", "memory_type": "semantic", "confidence": 0.9},
+    ]
+    with patch.object(remote, "search", return_value=items):
+        result = remote.recall(cwd="/project", top_k=10)
+    assert "zero confidence item" not in result, "confidence=0.0 must be filtered by recall floor"
+    assert "high confidence item" in result
+
+
+def test_recall_tilde_marker_on_low_confidence(remote, monkeypatch):
+    """Items with confidence < 0.5 get a ~ prefix in remote recall output."""
+    monkeypatch.setenv("SMARTMEMORY_RECALL_FLOOR", "0.1")
+    items = [
+        {"item_id": "low-conf", "content": "low confidence memory", "memory_type": "episodic", "confidence": 0.4},
+    ]
+    with patch.object(remote, "search", return_value=items):
+        result = remote.recall(cwd="/project", top_k=10)
+    assert "~[" in result, "Low-confidence items should have ~ prefix"
+    assert "low confidence memory" in result

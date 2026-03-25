@@ -357,11 +357,15 @@ def recall(cwd: str | None = None, top_k: int = 10) -> str:
         if r.item_id not in seen:
             seen.add(r.item_id)
             items.append(r)
+    # CORE-PROPS-1: Recall confidence floor
+    recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
+    items = [r for r in items if getattr(r, "confidence", 1.0) >= recall_floor]
     if not items:
         return ""
     lines = ["## SmartMemory Context"]
     for item in items[:top_k]:
-        lines.append(f"- [{item.memory_type}] {item.content[:200]}")
+        conf_marker = "~" if getattr(item, "confidence", 1.0) < 0.5 else ""
+        lines.append(f"- {conf_marker}[{item.memory_type}] {item.content[:200]}")
     return "\n".join(lines)
 
 

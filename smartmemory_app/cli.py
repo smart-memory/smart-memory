@@ -288,7 +288,10 @@ def search_cmd(ctx, query: str, top_k: int) -> None:
         content = r.get("content", "")[:200]
         mem_type = r.get("memory_type", "?")
         item_id = r.get("item_id", "?")
-        click.echo(f"[{mem_type}] {item_id[:8]}  {content}")
+        # CORE-PROPS-1: Tilde marker for low-confidence memories
+        conf = r.get("confidence", 1.0)
+        conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
+        click.echo(f"{conf_marker}[{mem_type}] {item_id[:8]}  {content}")
 
 
 @cli.command("get")
