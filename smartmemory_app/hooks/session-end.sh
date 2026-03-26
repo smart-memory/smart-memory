@@ -9,7 +9,7 @@ LAST_MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // empty')
 if [[ -n "$LAST_MSG" ]]; then
     # Try daemon, fall back to CLI — entire block runs in background
     {
-        PAYLOAD="{\"content\": $(echo "$LAST_MSG" | jq -Rs .), \"memory_type\": \"episodic\"}"
+        PAYLOAD="{\"content\": $(echo "$LAST_MSG" | jq -Rs .), \"memory_type\": \"episodic\", \"origin\": \"hook:session_end\"}"
         if ! curl -sf -X POST "http://localhost:${PORT}/memory/ingest" \
              -H "Content-Type: application/json" -d "$PAYLOAD" >>"$LOG" 2>&1; then
             python -m smartmemory_app add "$LAST_MSG" >>"$LOG" 2>&1
