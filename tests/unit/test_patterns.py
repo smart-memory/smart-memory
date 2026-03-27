@@ -4,6 +4,19 @@ import json
 import pytest
 
 
+def _suppress_seed_sync(tmp_path):
+    """Write a seeds_applied.json to prevent seed sync during store init.
+
+    Use in tests that need an empty or custom-only pattern file.
+    """
+    from smartmemory_app.patterns import SEEDS_MANIFEST
+    if SEEDS_MANIFEST.exists():
+        applied = json.loads(SEEDS_MANIFEST.read_text())
+        (tmp_path / "seeds_applied.json").write_text(json.dumps(applied))
+    else:
+        (tmp_path / "seeds_applied.json").write_text('{"version":"1.0.0","files":{}}')
+
+
 def test_seeds_on_first_run(tmp_path):
     """JSONLPatternStore seeds entity_patterns.jsonl on first run."""
     from smartmemory_app.patterns import JSONLPatternStore
@@ -68,6 +81,7 @@ def test_save_count_2_visible_immediately(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")  # empty file, no seeds
+    _suppress_seed_sync(tmp_path)
 
     store = JSONLPatternStore(tmp_path)
     store.save("FastAPI", "Technology", 0.9, 2, "default", "test")
@@ -82,6 +96,7 @@ def test_save_preserves_original_source(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     store = JSONLPatternStore(tmp_path)
     store.save("FastAPI", "Technology", 0.9, 2, "default", "original_source")
@@ -98,6 +113,7 @@ def test_save_count_1_needs_second_call(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     store = JSONLPatternStore(tmp_path)
     store.save("Flask", "Technology", 0.9, 1, "default")
@@ -115,6 +131,7 @@ def test_save_persists_to_file(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     store = JSONLPatternStore(tmp_path)
     store.save("FastAPI", "Technology", 0.9, 2, "default")
@@ -160,6 +177,7 @@ def test_pattern_manager_blocklist_rejection(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     pm = PatternManager(store=JSONLPatternStore(tmp_path))
     accepted = pm.add_patterns({"the": "Concept", "python": "Technology"}, initial_count=2)
@@ -176,6 +194,7 @@ def test_pattern_manager_short_name_rejection(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     pm = PatternManager(store=JSONLPatternStore(tmp_path))
     accepted = pm.add_patterns({"a": "Concept", "qt": "Technology"}, initial_count=2)
@@ -192,6 +211,7 @@ def test_pattern_manager_add_patterns_count_2_survives_reload(tmp_path):
 
     pattern_file = tmp_path / "entity_patterns.jsonl"
     pattern_file.write_text("")
+    _suppress_seed_sync(tmp_path)
 
     pm = PatternManager(store=JSONLPatternStore(tmp_path))
     pm.add_patterns({"FastAPI": "Technology"}, initial_count=2)
@@ -232,3 +252,103 @@ def test_jsonl_store_satisfies_protocol(tmp_path):
     from smartmemory.ontology.pattern_manager import PatternStore
 
     assert isinstance(JSONLPatternStore(tmp_path), PatternStore)
+
+
+# ------------------------------------------------------------------ #
+# SEED-1d: Versioned seed sync
+# ------------------------------------------------------------------ #
+
+
+def test_seed_sync_creates_applied_manifest(tmp_path):
+    """First run writes seeds_applied.json tracking what was synced."""
+    from smartmemory_app.patterns import JSONLPatternStore
+
+    JSONLPatternStore(tmp_path)
+    applied = tmp_path / "seeds_applied.json"
+    assert applied.exists(), "seeds_applied.json must be created after first sync"
+    data = json.loads(applied.read_text())
+    assert "version" in data
+    assert "files" in data
+
+
+def test_seed_sync_additive_on_upgrade(tmp_path):
+    """New seed patterns are merged additively; existing patterns preserved."""
+    from smartmemory_app.patterns import JSONLPatternStore, SEEDS_DIR, SEEDS_MANIFEST
+
+    # First run: initial seed
+    store = JSONLPatternStore(tmp_path)
+    initial_count = len(store.load("default"))
+    assert initial_count > 0
+
+    # Simulate user adding a custom pattern
+    store.save("MyCustomLib", "FRAMEWORK", 0.99, 2, "default", "user")
+    assert ("MyCustomLib", "FRAMEWORK") in store.load("default")
+
+    # Simulate package upgrade: change a seed file checksum
+    applied = json.loads((tmp_path / "seeds_applied.json").read_text())
+    # Invalidate one file's checksum to trigger re-sync
+    first_file = list(applied["files"].keys())[0]
+    applied["files"][first_file]["checksum"] = "stale"
+    (tmp_path / "seeds_applied.json").write_text(json.dumps(applied))
+
+    # Re-init: should sync new patterns additively
+    store2 = JSONLPatternStore(tmp_path)
+    patterns = store2.load("default")
+    names = [n.lower() for n, _ in patterns]
+    assert "mycustomlib" in names, "user-added pattern must survive seed sync"
+    assert len(patterns) >= initial_count, "seed sync must not remove patterns"
+
+
+def test_seed_sync_preserves_user_customizations(tmp_path):
+    """User-modified patterns (e.g. changed label) are never overwritten by seeds."""
+    from smartmemory_app.patterns import JSONLPatternStore
+
+    # First run
+    store = JSONLPatternStore(tmp_path)
+
+    # User overrides a seed pattern's label
+    entries = store._read_all()
+    if entries:
+        first_key = next(iter(entries))
+        entries[first_key]["label"] = "USER_CUSTOM"
+        entries[first_key]["source"] = "user_override"
+        store._write_all(entries)
+
+        # Clear applied manifest to force re-sync
+        (tmp_path / "seeds_applied.json").unlink()
+
+        # Re-init: should NOT overwrite the user's customization
+        store2 = JSONLPatternStore(tmp_path)
+        entries2 = store2._read_all()
+        assert entries2[first_key]["label"] == "USER_CUSTOM"
+        assert entries2[first_key]["source"] == "user_override"
+
+
+def test_seed_sync_no_applied_means_full_sync(tmp_path):
+    """Missing seeds_applied.json triggers full sync."""
+    from smartmemory_app.patterns import JSONLPatternStore
+
+    # Create an existing patterns file with just one entry
+    (tmp_path / "entity_patterns.jsonl").write_text(
+        json.dumps({"name": "Solo", "label": "TOOL", "confidence": 0.99, "frequency": 2}) + "\n"
+    )
+    # No seeds_applied.json — should trigger full seed sync
+
+    store = JSONLPatternStore(tmp_path)
+    patterns = store.load("default")
+    names = [n.lower() for n, _ in patterns]
+    assert "solo" in names, "existing pattern must survive"
+    assert len(patterns) > 1, "seeds must have been merged in"
+
+
+def test_seed_sync_idempotent(tmp_path):
+    """Running sync twice produces the same result."""
+    from smartmemory_app.patterns import JSONLPatternStore
+
+    store1 = JSONLPatternStore(tmp_path)
+    count1 = len(store1.load("default"))
+
+    store2 = JSONLPatternStore(tmp_path)
+    count2 = len(store2.load("default"))
+
+    assert count1 == count2, "second sync must not add duplicates"

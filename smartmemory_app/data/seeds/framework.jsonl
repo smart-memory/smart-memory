@@ -1,0 +1,181 @@
+{"name": "React", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "ReactJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "React.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Next.js", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "NextJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Next", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Vue", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Vue.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "VueJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Nuxt", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Nuxt.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "NuxtJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Angular", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "AngularJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Svelte", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "SvelteKit", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Solid", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "SolidJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Solid.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Astro", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Remix", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Gatsby", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "GatsbyJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Express", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Express.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "ExpressJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Fastify", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Koa", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Koa.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Hono", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Nest.js", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "NestJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Django", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Flask", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "FastAPI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Starlette", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Litestar", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Tornado", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Sanic", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Rails", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Ruby on Rails", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "RoR", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Sinatra", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Spring", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Spring Boot", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "SpringBoot", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Quarkus", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Micronaut", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Laravel", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Symfony", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Gin", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Echo", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Fiber", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Chi", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Actix", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Actix Web", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Axum", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Rocket", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Phoenix", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "ASP.NET", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "ASP.NET Core", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Blazor", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "htmx", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "HTMX", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "React Native", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Flutter", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "SwiftUI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Jetpack Compose", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Expo", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Ionic", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Capacitor", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Tailwind CSS", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Tailwind", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "TailwindCSS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Bootstrap", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Bulma", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Material UI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "MUI", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Chakra UI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Chakra", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Ant Design", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "AntD", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "shadcn/ui", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "shadcn", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Radix", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Radix UI", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Headless UI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "DaisyUI", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "TensorFlow", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "TF", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "PyTorch", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "JAX", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Keras", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "scikit-learn", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "sklearn", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "XGBoost", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "LightGBM", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "CatBoost", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Hugging Face Transformers", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Transformers", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "LangChain", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "LlamaIndex", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "DSPy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "spaCy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "NLTK", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "pandas", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "NumPy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "SciPy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Matplotlib", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Plotly", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Seaborn", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Polars", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "DuckDB", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Apache Spark", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Spark", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "PySpark", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Apache Flink", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Flink", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Apache Kafka", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Kafka", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Apache Airflow", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Airflow", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Prefect", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Dagster", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "MLflow", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Weights & Biases", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "W&B", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "WandB", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Ray", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Dask", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Celery", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Jest", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Vitest", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Mocha", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Cypress", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Playwright", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Selenium", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Puppeteer", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "pytest", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "unittest", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "JUnit", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "TestNG", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "RSpec", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Vite", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Webpack", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "esbuild", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Rollup", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Turbopack", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Parcel", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Bun", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Redux", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Zustand", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "MobX", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Jotai", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Recoil", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "XState", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "TanStack Query", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "React Query", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "SWR", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Prisma", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Drizzle", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Drizzle ORM", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "SQLAlchemy", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "TypeORM", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Sequelize", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Mongoose", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Knex", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Knex.js", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Alembic", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Electron", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Tauri", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Qt", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "GTK", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "OpenCV", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "Three.js", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "ThreeJS", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "D3.js", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "D3", "label": "FRAMEWORK", "confidence": 0.95, "frequency": 2}
+{"name": "Socket.IO", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "tRPC", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}
+{"name": "gRPC", "label": "FRAMEWORK", "confidence": 0.99, "frequency": 2}

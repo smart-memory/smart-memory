@@ -1,0 +1,79 @@
+{"name": "PostgreSQL", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Postgres", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "MySQL", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "MariaDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "SQLite", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Oracle Database", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Oracle DB", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Oracle", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Microsoft SQL Server", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "MSSQL", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "SQL Server", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "MongoDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Mongo", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Redis", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Elasticsearch", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "ES", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Elastic", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "DynamoDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon DynamoDB", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Cassandra", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Apache Cassandra", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "CockroachDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "TiDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Vitess", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "PlanetScale", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Supabase", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Neon", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Neo4j", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "FalkorDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "ArangoDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon Neptune", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Neptune", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "ClickHouse", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Apache Druid", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Druid", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "TimescaleDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "InfluxDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Prometheus", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Pinecone", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Weaviate", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Milvus", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Qdrant", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "ChromaDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Chroma", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "pgvector", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Couchbase", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "CouchDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Apache CouchDB", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "RethinkDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "ScyllaDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Memcached", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Valkey", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "etcd", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "FoundationDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "YugabyteDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Firestore", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Cloud Firestore", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Firebase Realtime Database", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Firebase RTDB", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon RDS", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "RDS", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon Aurora", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Aurora", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon Redshift", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Redshift", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Google BigQuery", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "BigQuery", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Snowflake", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Databricks", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Apache HBase", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "HBase", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Apache Hive", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Hive", "label": "DATABASE", "confidence": 0.95, "frequency": 2}
+{"name": "Dolt", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "SurrealDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "EdgeDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "LanceDB", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "Turso", "label": "DATABASE", "confidence": 0.99, "frequency": 2}
+{"name": "libSQL", "label": "DATABASE", "confidence": 0.99, "frequency": 2}

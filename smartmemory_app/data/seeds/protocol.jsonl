@@ -1,0 +1,75 @@
+{"name": "HTTP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "HTTPS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "HTTP/2", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "H2", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "HTTP/3", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "H3", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "QUIC", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "WebSocket", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "WebSockets", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "WS", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "Server-Sent Events", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "SSE", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "REST", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "RESTful", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "SOAP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "TCP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "UDP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "DNS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "FTP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "SFTP", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "SSH", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "SMTP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "IMAP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "MQTT", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "AMQP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "NATS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "ZeroMQ", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "ZMQ", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "0MQ", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "RSocket", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "OAuth 2.0", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "OAuth2", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "OAuth", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "OpenID Connect", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "OIDC", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "SAML", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "JWT", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "JSON Web Token", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "JWE", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "PKCE", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "SCIM", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "LDAP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Kerberos", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "TLS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "TLS 1.3", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "mTLS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "mutual TLS", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "SSL", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "CORS", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "CSP", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Content Security Policy", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "JSON-RPC", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "XML-RPC", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "MessagePack", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "msgpack", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "Avro", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Thrift", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Cap'n Proto", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "FlatBuffers", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "CBOR", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "BSON", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Raft", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Paxos", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "CRDT", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "CRDTs", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "Gossip Protocol", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Two-Phase Commit", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "2PC", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "OpenAPI", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Swagger", "label": "PROTOCOL", "confidence": 0.95, "frequency": 2}
+{"name": "AsyncAPI", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "JSON Schema", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "JSON-LD", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "OData", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}
+{"name": "Webhooks", "label": "PROTOCOL", "confidence": 0.99, "frequency": 2}

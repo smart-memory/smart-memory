@@ -1,0 +1,78 @@
+{"name": "Google", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Alphabet", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Microsoft", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Apple", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Meta", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Facebook", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Netflix", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Nvidia", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "NVIDIA", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Intel", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "AMD", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Qualcomm", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Samsung", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "IBM", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Salesforce", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Adobe", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Spotify", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Uber", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Airbnb", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Twitter", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "X", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "LinkedIn", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Snap", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Snapchat", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Pinterest", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Shopify", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Square", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Block", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Palantir", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Anthropic", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "OpenAI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "DeepMind", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Google DeepMind", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Mistral AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Cohere", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Stability AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Hugging Face", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "HuggingFace", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Runway", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "xAI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Inflection AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Adept AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Character AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Perplexity", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Perplexity AI", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Together AI", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Groq", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Cerebras", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Anyscale", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Modal", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Replicate", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "HashiCorp", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Confluent", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "MongoDB Inc", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Datadog", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Twilio", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Stripe", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "JetBrains", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Atlassian", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Canonical", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Red Hat", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "SUSE", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Grafana Labs", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Kong", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "LaunchDarkly", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "PostHog", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Linux Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Apache Software Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Apache Foundation", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "ASF", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "CNCF", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Cloud Native Computing Foundation", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "OpenJS Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Python Software Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "PSF", "label": "ORGANIZATION", "confidence": 0.95, "frequency": 2}
+{"name": "Rust Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}
+{"name": "Eclipse Foundation", "label": "ORGANIZATION", "confidence": 0.99, "frequency": 2}

@@ -1,0 +1,109 @@
+{"name": "AWS", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon Web Services", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GCP", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Platform", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Microsoft Azure", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "DigitalOcean", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Linode", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Akamai Cloud", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Hetzner", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Hetzner Cloud", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Oracle Cloud", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "OCI", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "IBM Cloud", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Alibaba Cloud", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Aliyun", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon EC2", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "EC2", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon S3", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "S3", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Lambda", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Lambda", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon ECS", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "ECS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon EKS", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "EKS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Fargate", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Fargate", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon SQS", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "SQS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon SNS", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "SNS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon CloudFront", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "CloudFront", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS IAM", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "IAM", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon VPC", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "VPC", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS CloudFormation", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "CloudFormation", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon Route 53", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Route 53", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon ElastiCache", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "ElastiCache", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Step Functions", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Step Functions", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon EventBridge", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "EventBridge", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Cognito", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cognito", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon Kinesis", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Kinesis", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Secrets Manager", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon SageMaker", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "SageMaker", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "AWS Bedrock", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Bedrock", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Amazon ECR", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "ECR", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Run", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cloud Run", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Functions", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cloud Functions", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Storage", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GCS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Compute Engine", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GCE", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Kubernetes Engine", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GKE", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Pub/Sub", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Pub/Sub", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud SQL", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cloud SQL", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Google Cloud Spanner", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Spanner", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Vertex AI", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Google Cloud CDN", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure Functions", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure App Service", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure Blob Storage", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure Kubernetes Service", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "AKS", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Azure DevOps", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure Cosmos DB", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cosmos DB", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Azure OpenAI Service", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Azure Container Apps", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Vercel", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Netlify", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cloudflare", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Cloudflare Workers", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Railway", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Render", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Fly.io", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Fly", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}
+{"name": "Heroku", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Deno Deploy", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Coolify", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GitHub", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "GitLab", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Bitbucket", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Gitea", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Docker Hub", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "npm Registry", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "PyPI", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "crates.io", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "Nomad", "label": "PLATFORM", "confidence": 0.99, "frequency": 2}
+{"name": "HashiCorp Nomad", "label": "PLATFORM", "confidence": 0.95, "frequency": 2}

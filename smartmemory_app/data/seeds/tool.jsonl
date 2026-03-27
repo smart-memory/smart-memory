@@ -1,0 +1,125 @@
+{"name": "npm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pnpm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Yarn", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pip", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "uv", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Poetry", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Conda", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Homebrew", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "brew", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "apt", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "apt-get", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Cargo", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Maven", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Gradle", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "NuGet", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Composer", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "CocoaPods", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "RubyGems", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "gem", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Make", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "GNU Make", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "CMake", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Bazel", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Ninja", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Docker", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Docker Compose", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Podman", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Kubernetes", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "K8s", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "k8s", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Helm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Pulumi", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Ansible", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Chef", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Puppet", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Vagrant", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "GitHub Actions", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "GHA", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "GitLab CI", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "GitLab CI/CD", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Jenkins", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "CircleCI", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Travis CI", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Buildkite", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Argo CD", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "ArgoCD", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Flux", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Tekton", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Dagger", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "ESLint", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Prettier", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Biome", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Ruff", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Black", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Flake8", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "mypy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Pyright", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "RuboCop", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Clippy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "golangci-lint", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "ShellCheck", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "hadolint", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "oxlint", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Visual Studio Code", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "VS Code", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "VSCode", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Neovim", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "nvim", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Vim", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Emacs", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "IntelliJ IDEA", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "IntelliJ", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "PyCharm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "WebStorm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Xcode", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Android Studio", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Zed", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Cursor", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Windsurf", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Git", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "GitHub CLI", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "gh", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "curl", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "wget", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "jq", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "ripgrep", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "rg", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "fd", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "fzf", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "tmux", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Zellij", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "htop", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Nix", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "direnv", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "asdf", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "mise", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "fnm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "nvm", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "pyenv", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "nodemon", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "PM2", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Supervisor", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "systemd", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Nginx", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Caddy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Apache HTTP Server", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "httpd", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "HAProxy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Traefik", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Envoy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Istio", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Linkerd", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Grafana", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Loki", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Jaeger", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "OpenTelemetry", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "OTel", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Zipkin", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Vault", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "HashiCorp Vault", "label": "TOOL", "confidence": 0.95, "frequency": 2}
+{"name": "Trivy", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Snyk", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "SonarQube", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Dependabot", "label": "TOOL", "confidence": 0.99, "frequency": 2}
+{"name": "Renovate", "label": "TOOL", "confidence": 0.99, "frequency": 2}

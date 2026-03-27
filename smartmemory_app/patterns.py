@@ -14,6 +14,8 @@ log = logging.getLogger(__name__)
 
 
 SEED_PATTERNS_FILE = Path(__file__).parent / "data" / "seed_patterns.jsonl"
+SEEDS_DIR = Path(__file__).parent / "data" / "seeds"
+SEEDS_MANIFEST = SEEDS_DIR / "manifest.json"
 QUALITY_MIN_CONFIDENCE = 0.8
 QUALITY_MIN_NAME_LEN = 3
 QUALITY_MIN_FREQUENCY = 2  # pattern activates at frequency >= 2
@@ -35,11 +37,89 @@ class JSONLPatternStore:
     def __init__(self, data_dir: str | Path) -> None:
         self._path = Path(data_dir) / "entity_patterns.jsonl"
         self._lock_path = Path(str(self._path) + self._LOCK_SUFFIX)
+        self._applied_path = Path(data_dir) / "seeds_applied.json"
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._seed_if_absent()
+        self._sync_seeds()
 
-    def _seed_if_absent(self) -> None:
-        """Write seed patterns from bundled data/seed_patterns.jsonl if file absent."""
+    def _sync_seeds(self) -> None:
+        """Sync bundled seed patterns into user's entity_patterns.jsonl.
+
+        SEED-1d: Versioned additive merge. On first run, copies all seeds.
+        On upgrade, merges only new/changed seed files additively (never
+        removes user-added patterns).
+        """
+        if not SEEDS_MANIFEST.exists():
+            # Fall back to legacy monolithic seed if split seeds not available
+            self._seed_legacy()
+            return
+
+        # Load bundled manifest
+        try:
+            bundled = json.loads(SEEDS_MANIFEST.read_text())
+        except (json.JSONDecodeError, OSError):
+            log.warning("Failed to read seed manifest — skipping seed sync")
+            return
+
+        # Load applied manifest (what was already synced)
+        applied: dict = {}
+        if self._applied_path.exists():
+            try:
+                applied = json.loads(self._applied_path.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass  # treat as fresh
+
+        applied_files = applied.get("files", {})
+        bundled_files = bundled.get("files", {})
+
+        # Find files that are new or changed since last sync
+        to_sync = []
+        for filename, info in bundled_files.items():
+            prev = applied_files.get(filename, {})
+            if prev.get("checksum") != info["checksum"]:
+                to_sync.append(filename)
+
+        if not to_sync and self._path.exists():
+            return  # everything up to date
+
+        # First run: create file if missing
+        if not self._path.exists():
+            self._path.touch()
+
+        # Additive merge: load existing patterns, add new seed patterns
+        with FileLock(str(self._lock_path)):
+            existing = self._read_all()
+            added = 0
+            for filename in to_sync:
+                seed_path = SEEDS_DIR / filename
+                if not seed_path.exists():
+                    continue
+                with open(seed_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        entry = json.loads(line)
+                        key = entry["name"].lower()
+                        if key not in existing:
+                            # New pattern — add it
+                            existing[key] = entry
+                            added += 1
+                        # Existing pattern — never overwrite (preserves user customizations)
+
+            if added > 0 or not applied_files:
+                self._write_all(existing)
+
+            if added > 0:
+                log.info("Seed sync: added %d new patterns from %d files", added, len(to_sync))
+
+        # Record applied state
+        try:
+            self._applied_path.write_text(json.dumps(bundled) + "\n")
+        except OSError as e:
+            log.warning("Failed to write seeds_applied.json: %s", e)
+
+    def _seed_legacy(self) -> None:
+        """Legacy fallback: copy monolithic seed_patterns.jsonl if absent."""
         if self._path.exists():
             return
         if not SEED_PATTERNS_FILE.exists():

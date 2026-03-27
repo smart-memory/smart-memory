@@ -1,0 +1,212 @@
+{"name": "Singleton", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Singleton Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Factory", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Factory Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Factory Method", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Abstract Factory", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Builder", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Builder Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Prototype", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Prototype Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Adapter", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Adapter Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Decorator", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Decorator Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Observer", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Observer Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Strategy", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Strategy Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Command", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Command Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Iterator", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Iterator Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "State", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "State Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Proxy", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Proxy Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Facade", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Facade Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Mediator", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Mediator Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Chain of Responsibility", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Template Method", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Visitor", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Visitor Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Flyweight", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Flyweight Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Composite", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Composite Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Bridge", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Bridge Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Repository Pattern", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Unit of Work", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Dependency Injection", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "DI", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Inversion of Control", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "IoC", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Microservices", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Microservice", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Monolith", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Monolithic", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Modular Monolith", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Service-Oriented Architecture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "SOA", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Event-Driven Architecture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "EDA", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "CQRS", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Command Query Responsibility Segregation", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Event Sourcing", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Domain-Driven Design", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "DDD", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Hexagonal Architecture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Ports and Adapters", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Clean Architecture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Layered Architecture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Serverless", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Serverless Architecture", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Jamstack", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "JAMstack", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Micro Frontends", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Micro Frontend", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Backend for Frontend", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "BFF", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "API Gateway", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Service Mesh", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Sidecar Pattern", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Strangler Fig", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Strangler Fig Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Saga Pattern", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Saga", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Outbox Pattern", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Circuit Breaker", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Circuit Breaker Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Bulkhead", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Bulkhead Pattern", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Retry Pattern", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Backpressure", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Rate Limiting", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Load Balancing", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "CAP Theorem", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "CAP", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "ACID", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "BASE", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Eventual Consistency", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Strong Consistency", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Linearizability", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Serializability", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Idempotency", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Idempotent", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Sharding", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Horizontal Partitioning", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Replication", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Leader Election", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Consensus", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Vector Clock", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Vector Clocks", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Bloom Filter", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Consistent Hashing", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Write-Ahead Log", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "WAL", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "LSM Tree", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Log-Structured Merge Tree", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "B-Tree", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "B+ Tree", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Merkle Tree", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "CI/CD", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Continuous Integration", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Continuous Deployment", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Infrastructure as Code", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "IaC", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "GitOps", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "DevOps", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "SRE", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Site Reliability Engineering", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Platform Engineering", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Trunk-Based Development", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Feature Flags", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Feature Toggles", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Blue-Green Deployment", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Canary Deployment", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Canary Release", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Rolling Deployment", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "A/B Testing", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Chaos Engineering", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Observability", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Three Pillars of Observability", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "SLI", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Service Level Indicator", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "SLO", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Service Level Objective", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "SLA", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Service Level Agreement", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Twelve-Factor App", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "12-Factor", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "SOLID Principles", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "SOLID", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "DRY", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Don't Repeat Yourself", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "KISS", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Keep It Simple", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "YAGNI", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "You Aren't Gonna Need It", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "TDD", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Test-Driven Development", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "BDD", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Behavior-Driven Development", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Pair Programming", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Code Review", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Technical Debt", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Tech Debt", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Refactoring", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Semantic Versioning", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "SemVer", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Monorepo", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Polyrepo", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "ETL", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Extract Transform Load", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "ELT", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Data Lake", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Data Warehouse", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Data Mesh", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Data Pipeline", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Streaming", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Stream Processing", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Batch Processing", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "MapReduce", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Materialized View", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Change Data Capture", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "CDC", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "RAG", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Retrieval Augmented Generation", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Fine-tuning", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Fine Tuning", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Prompt Engineering", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Few-Shot Learning", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Few-Shot", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Zero-Shot Learning", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Zero-Shot", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Chain of Thought", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "CoT", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Embeddings", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Vector Embeddings", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Attention Mechanism", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Attention", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Transformer", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Transformer Architecture", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Tokenization", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Tokenizer", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "RLHF", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Reinforcement Learning from Human Feedback", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "LoRA", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Low-Rank Adaptation", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Quantization", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Distillation", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Knowledge Distillation", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Agentic AI", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "AI Agents", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Tool Use", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Function Calling", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "MCP", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "Model Context Protocol", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}
+{"name": "Guardrails", "label": "CONCEPT", "confidence": 0.99, "frequency": 2}
+{"name": "AI Guardrails", "label": "CONCEPT", "confidence": 0.95, "frequency": 2}

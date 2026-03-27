@@ -1,0 +1,70 @@
+{"name": "Auth0", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Clerk", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Okta", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Firebase Auth", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Supabase Auth", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "FusionAuth", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Keycloak", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "WorkOS", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Stytch", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Plaid", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Braintree", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Adyen", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "PayPal", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Paddle", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "LemonSqueezy", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Lemon Squeezy", "label": "SERVICE", "confidence": 0.95, "frequency": 2}
+{"name": "SendGrid", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Postmark", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Mailgun", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Amazon SES", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "SES", "label": "SERVICE", "confidence": 0.95, "frequency": 2}
+{"name": "Resend", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "MessageBird", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "New Relic", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "PagerDuty", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Sentry", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "LogRocket", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Honeycomb", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Axiom", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "BetterStack", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Better Stack", "label": "SERVICE", "confidence": 0.95, "frequency": 2}
+{"name": "Checkly", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Segment", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Mixpanel", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Amplitude", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Google Analytics", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "GA4", "label": "SERVICE", "confidence": 0.95, "frequency": 2}
+{"name": "Plausible", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Heap", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Contentful", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Sanity", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Strapi", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Directus", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Payload CMS", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Payload", "label": "SERVICE", "confidence": 0.95, "frequency": 2}
+{"name": "WordPress", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Ghost", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Unleash", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "ConfigCat", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Split", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Statsig", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Algolia", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Typesense", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Meilisearch", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Cloudinary", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Imgix", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Uploadthing", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Fastly", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Akamai", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Bunny CDN", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Notion", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Slack", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Discord", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Linear", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Jira", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Confluence", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Figma", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Retool", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Upstash", "label": "SERVICE", "confidence": 0.99, "frequency": 2}
+{"name": "Convex", "label": "SERVICE", "confidence": 0.99, "frequency": 2}

@@ -1,0 +1,55 @@
+{
+  "version": "1.0.0",
+  "files": {
+    "ai-model.jsonl": {
+      "checksum": "69f732dc62380da0",
+      "count": 94,
+      "label": "AI_MODEL"
+    },
+    "concept.jsonl": {
+      "checksum": "773afa783e4c26b6",
+      "count": 212,
+      "label": "CONCEPT"
+    },
+    "database.jsonl": {
+      "checksum": "67cf8e73ad9316e9",
+      "count": 79,
+      "label": "DATABASE"
+    },
+    "framework.jsonl": {
+      "checksum": "f2fee0f9649867d3",
+      "count": 181,
+      "label": "FRAMEWORK"
+    },
+    "language.jsonl": {
+      "checksum": "9cf82499be8da0cf",
+      "count": 107,
+      "label": "LANGUAGE"
+    },
+    "organization.jsonl": {
+      "checksum": "7fcd23cd863a49fc",
+      "count": 78,
+      "label": "ORGANIZATION"
+    },
+    "platform.jsonl": {
+      "checksum": "29f213ef898d84f8",
+      "count": 109,
+      "label": "PLATFORM"
+    },
+    "protocol.jsonl": {
+      "checksum": "f1f47eb1853ff3d1",
+      "count": 75,
+      "label": "PROTOCOL"
+    },
+    "service.jsonl": {
+      "checksum": "40569fdb361004fc",
+      "count": 70,
+      "label": "SERVICE"
+    },
+    "tool.jsonl": {
+      "checksum": "df3c949bcdcec6e9",
+      "count": 125,
+      "label": "TOOL"
+    }
+  }
+}
