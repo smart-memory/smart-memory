@@ -346,7 +346,11 @@ class MemoryLifecycle:
         return d
 
     def _state_path(self) -> Path:
-        return self._state_dir() / f"{self.session_id}.json"
+        # Sanitize session_id to prevent path traversal
+        safe_id = "".join(c for c in self.session_id if c.isalnum() or c in "-_")
+        if not safe_id:
+            safe_id = "unknown"
+        return self._state_dir() / f"{safe_id}.json"
 
     def _load_state(self) -> None:
         path = self._state_path()
