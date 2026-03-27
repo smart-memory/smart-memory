@@ -340,6 +340,137 @@ def get_cmd(item_id: str) -> None:
     click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
+# ── Lifecycle (DIST-AGENT-HOOKS-1) ──────────────────────────────────────────
+
+
+@cli.group("lifecycle")
+def lifecycle_group() -> None:
+    """Automatic memory lifecycle commands (called by hooks)."""
+
+
+@lifecycle_group.command("orient")
+def lifecycle_orient() -> None:
+    """Orient phase: recall context at session start."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+    cwd = body.get("cwd")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    result = lc.orient(cwd=cwd)
+    if result:
+        click.echo(result)
+
+
+@lifecycle_group.command("recall")
+def lifecycle_recall() -> None:
+    """Recall phase: inject prompt-relevant context."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+    prompt = body.get("prompt", "")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    result = lc.recall(prompt)
+    if result:
+        click.echo(result)
+
+
+@lifecycle_group.command("observe")
+def lifecycle_observe() -> None:
+    """Observe phase: capture tool call."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc.observe(
+        tool_name=body.get("tool_name", "unknown"),
+        tool_input=body.get("tool_input", {}),
+        tool_result=body.get("tool_response", ""),
+    )
+
+
+@lifecycle_group.command("distill")
+def lifecycle_distill() -> None:
+    """Distill phase: pair response with stored prompt."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc.distill(response=body.get("last_assistant_message", ""))
+
+
+@lifecycle_group.command("learn")
+def lifecycle_learn() -> None:
+    """Learn phase: capture error pattern."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc.learn(
+        tool_name=body.get("tool_name", "unknown"),
+        error=body.get("error", body.get("tool_response", "")),
+    )
+
+
+@lifecycle_group.command("persist")
+def lifecycle_persist() -> None:
+    """Persist phase: save session summary."""
+    import sys
+    body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
+    session_id = body.get("session_id", "unknown")
+
+    from smartmemory_app.lifecycle import MemoryLifecycle
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+
+    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc.persist()
+
+
+@lifecycle_group.command("status")
+def lifecycle_status() -> None:
+    """Show lifecycle configuration and session stats."""
+    from smartmemory_app.lifecycle_config import LifecycleConfig
+    cfg = LifecycleConfig.from_config(_load_lifecycle_toml())
+    click.echo(f"Lifecycle enabled: {cfg.enabled}")
+    click.echo(f"Recall strategy: {cfg.recall_strategy.value}")
+    click.echo(f"Orient budget: {cfg.orient_budget} tokens")
+    click.echo(f"Recall budget: {cfg.recall_budget} tokens")
+    click.echo(f"Observe: {cfg.observe_tool_calls}, Distill: {cfg.distill_turns}, Learn: {cfg.learn_from_errors}")
+
+
+def _load_lifecycle_toml() -> dict:
+    """Load [lifecycle] section from config.toml."""
+    try:
+        import tomllib
+        from smartmemory_app.config import config_path
+        path = config_path()
+        if path.exists():
+            with open(path, "rb") as f:
+                return tomllib.load(f).get("lifecycle", {})
+    except Exception:
+        pass
+    return {}
+
+
 # ── Discovery + config ──────────────────────────────────────────────────────
 
 

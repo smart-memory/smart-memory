@@ -108,6 +108,10 @@ def _build_app() -> FastAPI:
             "async_enrichment": async_info,
         }
 
+    # DIST-AGENT-HOOKS-1: Mount lifecycle API at /lifecycle on root app
+    from smartmemory_app.lifecycle_api import lifecycle_router
+    app.include_router(lifecycle_router, prefix="/lifecycle")
+
     # Mount local_api at /memory — sub-app routes (e.g. /graph/full) become /memory/graph/full,
     # matching createFetchAdapter's expected paths (fetchAdapter.js:34-49).
     app.mount("/memory", _local_api)

@@ -56,18 +56,27 @@ WORKER_PLIST_NAME = "ai.smartmemory.worker.plist"
 
 # Maps source filename (in package) → namespaced dest filename (in ~/.claude/hooks/)
 _HOOK_FILE_MAP = {
-    "session-start.sh": "smartmemory-session-start.sh",
-    "session-end.sh": "smartmemory-session-end.sh",
-    "post-tool-failure.sh": "smartmemory-post-tool-failure.sh",
+    # DIST-AGENT-HOOKS-1: 6-phase lifecycle hooks
+    "orient.sh": "smartmemory-orient.sh",
+    "recall.sh": "smartmemory-recall.sh",
+    "observe.sh": "smartmemory-observe.sh",
+    "distill.sh": "smartmemory-distill.sh",
+    "learn.sh": "smartmemory-learn.sh",
+    "persist.sh": "smartmemory-persist.sh",
 }
 HOOK_NAMES = list(_HOOK_FILE_MAP.values())
 SKILL_NAMES = ["remember.md", "search.md", "ingest.md", "orient.md"]
 
 # Legacy entries to clean up during install (pre-namespacing)
 _LEGACY_HOOK_REGISTRATIONS = {
+    # Pre-DIST-AGENT-HOOKS-1 registrations to clean up
     "SessionStart": {"command": "bash", "args": [str(HOOKS_DEST / "session-start.sh")]},
     "Stop": {"command": "bash", "args": [str(HOOKS_DEST / "session-end.sh")]},
     "PostToolUseFailure": {"command": "bash", "args": [str(HOOKS_DEST / "post-tool-failure.sh")]},
+    # Also clean old namespaced variants
+    "_legacy_SessionStart": {"command": "bash", "args": [str(HOOKS_DEST / "smartmemory-session-start.sh")]},
+    "_legacy_Stop": {"command": "bash", "args": [str(HOOKS_DEST / "smartmemory-session-end.sh")]},
+    "_legacy_PostToolUseFailure": {"command": "bash", "args": [str(HOOKS_DEST / "smartmemory-post-tool-failure.sh")]},
 }
 
 
@@ -81,15 +90,27 @@ def _get_hook_registrations() -> dict:
     return {
         "SessionStart": {
             "matcher": "",
-            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-session-start.sh'}"}],
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-orient.sh'}"}],
+        },
+        "UserPromptSubmit": {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-recall.sh'}"}],
+        },
+        "PostToolUse": {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-observe.sh'}"}],
         },
         "Stop": {
             "matcher": "",
-            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-session-end.sh'}"}],
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-distill.sh'}"}],
         },
         "PostToolUseFailure": {
             "matcher": "",
-            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-post-tool-failure.sh'}"}],
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-learn.sh'}"}],
+        },
+        "SessionEnd": {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": f"bash {HOOKS_DEST / 'smartmemory-persist.sh'}"}],
         },
     }
 
@@ -492,6 +513,13 @@ def _setup_remote(api_key: str | None) -> None:
     set_api_key(api_key)  # persist to OS keychain (warns if unavailable, never raises)
     cfg = SmartMemoryConfig(mode="remote", api_key_set=True, team_id=team_id)
     save_config(cfg)
+
+    # DIST-AGENT-HOOKS-1: Wire hooks for remote mode too.
+    # Hooks call CLI which falls back to remote API via storage dispatch.
+    _copy_hooks()
+    _copy_skills()
+    _register_hooks()
+    click.echo("Lifecycle hooks installed. Auto-recall and observation active.")
 
 
 def _setup_tool_config(tool: str) -> None:
