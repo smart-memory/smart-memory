@@ -6,6 +6,12 @@
 
 - **Real-time graph viewer updates work.** Lite WebSocket events server now negotiates the `sm.v1` subprotocol. Browser WebSocket API (per RFC 6455) closes connections when the server doesn't echo back a requested subprotocol — the viewer showed "disconnected" and real-time node animations never fired.
 
+## [1.1.9] — 2026-03-27
+
+### Changed
+
+- **TUI is now a default dependency.** `textual` moved from `[tui]` optional extra to base install. The setup questionnaire TUI is the first-run experience and should work out of the box. `smartmemory[tui]` still works for backward compat (no-op).
+
 ## [Unreleased]
 
 ### Added

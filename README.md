@@ -13,13 +13,7 @@ AI memory for Claude Code and other MCP-compatible tools. Stores memories locall
 pip install smartmemory
 ```
 
-Includes everything for local mode: core library, spaCy NLP, USearch vectors, MCP server, viewer, CLI, persistent daemon.
-
-For the interactive setup TUI (arrow-key selection, model discovery):
-
-```bash
-pip install smartmemory[tui]
-```
+Includes everything for local mode: core library, spaCy NLP, USearch vectors, MCP server, viewer, CLI, persistent daemon, and interactive setup TUI.
 
 ## First run
 
@@ -27,7 +21,7 @@ pip install smartmemory[tui]
 smartmemory setup
 ```
 
-With `smartmemory[tui]` installed, this launches a Textual TUI with arrow-key selection for LLM provider, live model discovery from ollama/lmstudio, embedding provider, and a summary screen. Without `[tui]`, falls back to text prompts.
+Launches a Textual TUI with arrow-key selection for LLM provider, live model discovery from ollama/lmstudio, embedding provider, and a summary screen. Falls back to text prompts in non-interactive environments (Docker, CI).
 
 **Local mode** wires Claude Code hooks, downloads the spaCy language model (~15MB), and starts a persistent daemon.
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartmemory"
-version = "1.1.8"
+version = "1.1.9"
 requires-python = ">=3.11"
 dependencies = [
     "smartmemory-core[lite]==0.7.4",   # EXACT pin — wrapper and core versions move in lockstep
@@ -17,10 +17,11 @@ dependencies = [
     "click>=8.0",
     "keyring>=24.0",           # DIST-LITE-5: OS credential store for API keys
     "tomli-w>=1.0",            # DIST-LITE-5: TOML config writing (tomllib stdlib reads only)
+    "textual>=8.0",            # TUI for setup questionnaire
 ]
 
 [project.optional-dependencies]
-tui = ["textual>=8.0"]
+tui = ["textual>=8.0"]         # kept for backward compat (now included by default)
 
 [project.scripts]
 smartmemory = "smartmemory_app.cli:cli"
