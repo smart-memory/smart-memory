@@ -970,9 +970,8 @@ def reextract_cmd() -> None:
 @cli.command("server", hidden=True)
 def server_cmd() -> None:
     """Start the SmartMemory MCP server (called by MCP clients, not users)."""
-    from smartmemory_app.server import main
-
-    main()
+    click.echo("MCP server is now 'smartmemory-mcp'. It's included in your installation.")
+    click.echo("Run: smartmemory-mcp")
 
 
 @cli.command("events-server", hidden=True)
