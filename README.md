@@ -57,30 +57,66 @@ This means `smartmemory add` returns instantly while quality improves in the bac
 
 ## Commands
 
-```bash
-smartmemory setup              # First-run questionnaire (TUI or text)
-smartmemory start              # Start daemon
-smartmemory stop               # Stop daemon
-smartmemory status             # Daemon health + enrichment stats
-smartmemory add "text"         # Add text as a memory
-smartmemory search "query"     # Semantic search (use "*" for all)
-smartmemory recall             # Session context for Claude Code
-smartmemory get <item_id>      # Fetch a single memory by ID
-smartmemory viewer             # Open knowledge graph viewer
-smartmemory models             # List available LLM models
-smartmemory config             # View/edit settings
-smartmemory clear              # Delete all memories
-smartmemory server             # Start MCP server (used by Claude Code)
-smartmemory uninstall          # Remove hooks, plist, and optionally data
+### Core
 
-# Admin commands
-smartmemory admin export out.jsonl   # Export memories
-smartmemory admin import data.jsonl  # Import memories
-smartmemory admin reindex            # Re-embed with current model
-smartmemory admin list-packs         # List seed packs
-smartmemory admin install-pack NAME  # Install a seed pack
-smartmemory admin mine               # Mine Wikidata entities
-smartmemory admin convert-rebel      # Convert REBEL dataset
+```bash
+smartmemory add "text"                # Add a memory (default type: episodic)
+smartmemory add --type semantic "..."  # Add with specific memory type
+smartmemory add - < notes.txt          # Add from stdin, one memory per line
+smartmemory add --all - < doc.txt      # Add entire stdin as one memory
+smartmemory add --project atlas "..."  # Add with arbitrary property flags
+
+smartmemory search "query"             # Semantic search
+smartmemory search "*"                 # List all memories
+smartmemory search --top-k 20 "query"  # Control result count (default: 5)
+smartmemory search --project atlas "q" # Filter by property
+
+smartmemory get <item_id>              # Fetch a single memory by ID
+smartmemory recall                     # Session context for Claude Code hooks
+smartmemory recall --cwd /path         # Recall with working directory context
+smartmemory viewer                     # Open knowledge graph viewer in browser
+smartmemory viewer --port 8080         # Custom port for viewer
+smartmemory models                     # List available LLM models
+smartmemory config                     # View all settings
+smartmemory config llm_provider        # View one setting
+smartmemory config llm_provider groq   # Change a setting
+smartmemory clear                      # Delete all memories and reset vectors
+```
+
+### Daemon
+
+```bash
+smartmemory start                      # Start daemon + enrichment workers
+smartmemory stop                       # Stop daemon
+smartmemory restart                    # Restart daemon
+smartmemory status                     # Daemon health + enrichment stats
+smartmemory worker                     # Run enrichment worker (drain and exit)
+smartmemory worker --loop              # Run enrichment worker continuously
+```
+
+### Setup & Lifecycle
+
+```bash
+smartmemory setup                      # Interactive first-run questionnaire
+smartmemory setup --mode local         # Skip questionnaire, set local mode
+smartmemory setup --mode remote --api-key sk_...  # Non-interactive remote setup
+smartmemory setup --for cursor         # Configure for Cursor instead of Claude Code
+smartmemory server                     # Start MCP server (called by MCP clients)
+smartmemory uninstall                  # Remove hooks, skills, plist, and data
+smartmemory uninstall --keep-data      # Remove hooks/plist but keep memories
+```
+
+### Admin
+
+```bash
+smartmemory admin export out.jsonl     # Export memories to corpus JSONL
+smartmemory admin import data.jsonl    # Import corpus JSONL into SmartMemory
+smartmemory admin reindex              # Re-embed all memories with current model
+smartmemory admin reextract            # Re-run entity extraction on all memories
+smartmemory admin list-packs           # List available seed packs
+smartmemory admin install-pack NAME    # Install a seed pack
+smartmemory admin mine                 # Mine Wikidata entities via SPARQL
+smartmemory admin convert-rebel        # Convert REBEL dataset to corpus JSONL
 ```
 
 ## Non-interactive / CI
