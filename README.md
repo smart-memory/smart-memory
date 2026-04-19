@@ -154,7 +154,7 @@ SmartMemory implements a multi-layered memory architecture:
 
 ### Memory Types
 
-- **Working Memory**: Short-term context buffer (in-memory, capacity=10)
+- **Pending Memory**: Short-term buffer for items awaiting consolidation (formerly "working"; routed at ingest by the `ConsolidationRouter`)
 - **Semantic Memory**: Facts and concepts with vector embeddings
 - **Episodic Memory**: Personal experiences and learning history
 - **Procedural Memory**: Skills, strategies, and learned patterns
@@ -183,7 +183,7 @@ Each stage implements the `StageCommand` protocol (`execute(state, config) -> st
 
 ## Key Features
 
-- **9 Memory Types**: Working, Semantic, Episodic, Procedural, Zettelkasten, Reasoning, Opinion, Observation, Decision
+- **9 Memory Types**: Pending, Semantic, Episodic, Procedural, Zettelkasten, Reasoning, Opinion, Observation, Decision
 - **11-Stage NLP Pipeline**: classify -> coreference -> simplify -> entity_ruler -> llm_extract -> ontology_constrain -> store -> link -> enrich -> ground -> evolve
 - **Self-Learning EntityRuler**: Pattern-matching NER that improves with use — LLM discoveries feed back into rules (96.9% entity F1 at 4ms)
 - **Evolver Framework**: Core auto-registered evolvers plus specialist lifecycle evolvers for decay, consolidation, opinion synthesis, retrieval-based strengthening, Hebbian co-retrieval, and stale memory detection
@@ -206,8 +206,6 @@ SmartMemory includes built-in evolvers that automatically transform memories. In
 ### Available Evolvers
 
 **Core evolvers** — memory type transitions and lifecycle:
-- **WorkingToEpisodicEvolver**: Converts working memory to episodic when buffer is full
-- **WorkingToProceduralEvolver**: Extracts repeated patterns as procedures
 - **EpisodicToSemanticEvolver**: Promotes stable facts to semantic memory
 - **EpisodicToZettelEvolver**: Converts episodic events to Zettelkasten notes
 - **EpisodicDecayEvolver**: Archives old episodic memories
@@ -224,7 +222,10 @@ SmartMemory includes built-in evolvers that automatically transform memories. In
 - **RetrievalBasedStrengtheningEvolver**: Memories accessed more frequently become harder to forget
 - **HebbianCoRetrievalEvolver**: Reinforces edges between memories retrieved together ("neurons that fire together wire together")
 - **InterferenceBasedConsolidationEvolver**: Similar competing memories interfere, strengthening the dominant one
-- **EnhancedWorkingToEpisodicEvolver**: Context-aware working-to-episodic transition with richer metadata
+- **EnhancedWorkingToEpisodicEvolver**: Context-aware pending→episodic transition with richer metadata
+
+**Replaced by ConsolidationRouter (CORE-MEMORY-DYNAMICS-1 M1):**
+- The former `WorkingToEpisodicEvolver` and `WorkingToProceduralEvolver` were retired. Routing from the `pending` bucket to `episodic` / `procedural` now happens at ingest time via the `ConsolidationRouter` pipeline stage.
 
 ## Plugin System
 
@@ -235,7 +236,7 @@ SmartMemory features a unified, extensible plugin architecture. All plugins foll
 **Auto-registered by default** (loaded by `PluginManager`):
 - **4 Extractors**: `LLMExtractor`, `LLMSingleExtractor`, `ConversationAwareLLMExtractor`, `SpacyExtractor`
 - **5 Enrichers**: `BasicEnricher`, `SentimentEnricher`, `TemporalEnricher`, `ExtractSkillsToolsEnricher`, `TopicEnricher`
-- **10 Evolvers**: `WorkingToEpisodicEvolver`, `WorkingToProceduralEvolver`, `EpisodicToSemanticEvolver`, `EpisodicToZettelEvolver`, `EpisodicDecayEvolver`, `SemanticDecayEvolver`, `ZettelPruneEvolver`, `ExponentialDecayEvolver`, `InterferenceBasedConsolidationEvolver`, `RetrievalBasedStrengtheningEvolver`
+- **8 Evolvers**: `EpisodicToSemanticEvolver`, `EpisodicToZettelEvolver`, `EpisodicDecayEvolver`, `SemanticDecayEvolver`, `ZettelPruneEvolver`, `ExponentialDecayEvolver`, `InterferenceBasedConsolidationEvolver`, `RetrievalBasedStrengtheningEvolver`
 - **1 Grounder**: `WikipediaGrounder`
 
 **Specialist plugins** (used by specific pipeline stages or opt-in features):

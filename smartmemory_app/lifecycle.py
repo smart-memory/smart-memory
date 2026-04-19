@@ -176,7 +176,7 @@ class MemoryLifecycle:
         from smartmemory_app.storage import ingest
 
         try:
-            ingest(pair, memory_type="working", properties={"origin": "lifecycle:distill"})
+            ingest(pair, memory_type="pending", properties={"origin": "lifecycle:distill"})
         except Exception as e:
             log.warning("Distill ingest failed: %s", e)
 
