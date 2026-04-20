@@ -14,6 +14,11 @@
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **CORE-MEMORY-DYNAMICS-1 M1b: `working` → `pending` rename (wrapper).** `smartmemory_app/lifecycle.py` distill path now writes `memory_type="pending"` (was `"working"`; the core validator rejects the old value post-rename). `smartmemory_app/cli.py` `_VALID_MEMORY_TYPES` set rebuilt with `"pending"`. `smartmemory_app/local_api.py` user_types tuple in SELECT-by-type query updated. Test fixture in `tests/integration/test_local_api_integration.py::test_node_fields_correct` updated. README evolver listing removed `WorkingToEpisodicEvolver` / `WorkingToProceduralEvolver` (retired in core M1b); "Working Memory" type description replaced with "Pending Memory".
+
+
 ### Added
 
 - **CORE-PROPS-1 Phase 1b: Confidence surface wiring.** Recall excludes items below configurable confidence floor (default 0.3, `SMARTMEMORY_RECALL_FLOOR` env var). Low-confidence items (< 0.5) show `~` prefix in both CLI search and recall output. Remote recall path has parity with local path.
