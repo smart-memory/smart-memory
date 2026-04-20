@@ -381,7 +381,7 @@ def reextract_entities() -> dict:
         # Read all user memory nodes (skip entity/relation/Version)
         db_path = os.path.join(data_dir, "memory.db")
         db = sqlite3.connect(db_path)
-        user_types = ("semantic", "episodic", "procedural", "working", "zettel",
+        user_types = ("semantic", "episodic", "procedural", "pending", "zettel",
                       "reasoning", "opinion", "observation", "decision")
         placeholders = ",".join("?" * len(user_types))
         rows = db.execute(

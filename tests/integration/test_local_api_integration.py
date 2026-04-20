@@ -153,10 +153,10 @@ class TestGetMemoryItemIntegration:
         assert r.status_code == 404
 
     def test_node_fields_correct(self, client, backend):
-        _add_node(backend, "my-id", "My Label", "working")
+        _add_node(backend, "my-id", "My Label", "pending")
         body = client.get("/memory/my-id").json()
         assert body["item_id"] == "my-id"
-        assert body["memory_type"] == "working"
+        assert body["memory_type"] == "pending"
         # get_node() returns _row_to_node() output — label is spread to top level
         assert body["label"] == "My Label"
 

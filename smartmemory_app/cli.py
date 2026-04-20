@@ -180,7 +180,7 @@ def worker_cmd(loop: bool) -> None:
 # ── Memory operations ───────────────────────────────────────────────────────
 
 _VALID_MEMORY_TYPES = {
-    "working", "semantic", "episodic", "procedural", "zettel",
+    "pending", "semantic", "episodic", "procedural", "zettel",
     "reasoning", "opinion", "observation", "decision",
 }
 
