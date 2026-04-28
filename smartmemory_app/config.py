@@ -40,6 +40,7 @@ class SmartMemoryConfig:
     llm_provider: str = "none"
     llm_model: str = ""
     embedding_provider: str = "local"  # "local" | "openai" | "ollama"
+    spacy_model: str = "en_core_web_sm"  # "en_core_web_sm" | "en_core_web_md" | "en_core_web_lg"
     daemon_port: int = 9014
     data_dir: str = "~/.smartmemory"
 
