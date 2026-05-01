@@ -169,44 +169,118 @@ class RemoteMemory:
             return None
         return result
 
-    def recall(self, cwd: str | None = None, top_k: int = 10) -> str:
-        """Client-side recall — no /memory/recall endpoint exists in the hosted API.
+    def recall(
+        self,
+        cwd: str | None = None,
+        top_k: int = 10,
+        *,
+        query: str | None = None,
+        include_snapshot: bool = True,
+        workspace_id: str | None = None,
+    ) -> str:
+        """HOOK-RECALL-RELEVANCE-1: workspace-scoped, ranked, deduped recall (remote).
 
-        Mirrors local storage.recall() logic: merge recent + semantic, dedup, format.
-        Remote has no sort_by="recency" support so both calls use semantic search;
-        the first call uses an empty query to surface recent results by relevance.
+        Mirrors local storage.recall(). Remote has no /memory/recall endpoint and
+        no sort_by="recency" support, so candidate selection runs through the
+        hosted /memory/search.
         """
-        requested = max(1, top_k)
-        recent_k = max(1, (requested + 1) // 2)
-        semantic_k = max(0, requested - recent_k)
-        recent = self.search("", top_k=recent_k)
-        semantic = self.search(cwd or "", top_k=semantic_k) if cwd and semantic_k else []
-        seen: set[str] = set()
-        items = []
-        for r in recent + semantic:
-            iid = r.get("item_id") or r.get("id") or ""
-            if iid and iid not in seen:
-                seen.add(iid)
-                items.append(r)
-        # CORE-PROPS-1: Recall confidence floor
         import os
+        from smartmemory.origin_policy import get_default_tiers, get_tier
+        from smartmemory_app.recall_format import (
+            _trace, derive_workspace_id, format_recall_lines, time_ms,
+        )
+
+        t0 = time_ms()
+        workspace_id = workspace_id or derive_workspace_id(cwd)
+        recall_tiers = get_default_tiers("recall")
+
+        # 1. Optional snapshot frame (graph-mirrored)
+        frame = ""
+        if include_snapshot:
+            try:
+                snaps = self._request(
+                    "POST", "/memory/search",
+                    workspace_id=workspace_id,
+                    json={"query": "", "memory_type": "snapshot",
+                          "sort_by": "recency", "top_k": 1},
+                )
+                rows = snaps if isinstance(snaps, list) else (snaps or {}).get("results", [])
+                if rows:
+                    snap = rows[0]
+                    snap_meta = snap.get("metadata") or {}
+                    ws_match = (
+                        workspace_id is None
+                        or snap_meta.get("workspace_id") in (None, workspace_id)
+                    )
+                    if ws_match:
+                        frame = (snap.get("content") or "").strip()
+            except Exception:
+                pass  # snapshot is best-effort
+
+        # 2. Candidates
+        if query:
+            results = self.search(query, top_k=top_k * 2) or []
+        else:
+            requested = max(1, top_k)
+            recent_k = max(1, (requested + 1) // 2)
+            semantic_k = max(0, requested - recent_k)
+            recent = self.search("", top_k=recent_k) or []
+            semantic = self.search(cwd or "", top_k=semantic_k) if cwd and semantic_k else []
+            results = list(recent) + list(semantic)
+        results = [r for r in results if r.get("memory_type") != "snapshot"]
+
+        # 3. Origin tier filter (dict-aware; legacy "unknown" / missing pass through)
+        def _tier_ok(r: dict) -> bool:
+            origin = r.get("origin") or "unknown"
+            if origin == "unknown":
+                return True
+            return get_tier(origin) in recall_tiers
+        results = [r for r in results if _tier_ok(r)]
+
+        # 4. Workspace metadata filter
+        if workspace_id:
+            scoped = []
+            for r in results:
+                meta = r.get("metadata") or {}
+                ws = meta.get("workspace_id") if isinstance(meta, dict) else None
+                if ws in (None, workspace_id):
+                    scoped.append(r)
+            results = scoped
+
+        # 5. Confidence floor + reference exclusion (preserved)
         recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
-        items = [
-            r for r in items
+        results = [
+            r for r in results
             if (r.get("confidence") if r.get("confidence") is not None else 1.0) >= recall_floor
         ]
-        # CORE-PROPS-1 Phase 6: recall always excludes reference data
-        items = [r for r in items if not r.get("reference", False)]
-        if not items:
-            return ""
-        lines = ["## SmartMemory Context\n"]
-        for item in items[:top_k]:
-            conf = item.get("confidence", 1.0)
-            conf_marker = "~" if isinstance(conf, (int, float)) and conf < 0.5 else ""
-            # CORE-PROPS-1 Phase 2: stale marker
-            stale_marker = "⚠" if item.get("stale") else ""
-            lines.append(f"- {stale_marker}{conf_marker}[{item.get('memory_type', '?')}] {item.get('content', '')[:200]}")
-        return "\n".join(lines)
+        results = [r for r in results if not r.get("reference", False)]
+
+        # 6. Format (dedup + empty-suppress + top_k cap inside)
+        body = format_recall_lines(results, top_k=top_k)
+        emitted = body.count("\n- ") if body else 0
+
+        # 7. Compose
+        if body and frame:
+            out = f"{body}\n\n{frame}"
+        elif body:
+            out = body
+        elif frame:
+            out = f"## SmartMemory Context\n\n{frame}"
+        else:
+            out = ""
+
+        # 8. Trace
+        _trace(
+            phase="user_prompt" if query else "session_start",
+            workspace_id=workspace_id,
+            cwd=cwd,
+            query=query,
+            candidate_count=len(results),
+            emitted=emitted,
+            snapshot_used=bool(frame),
+            latency_ms=time_ms() - t0,
+        )
+        return out
 
     # ── Graph methods — called by local_api.py for viewer ──────────────────
 

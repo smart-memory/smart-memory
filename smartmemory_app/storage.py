@@ -348,44 +348,144 @@ def search(
     return matched[:top_k]
 
 
-def recall(cwd: str | None = None, top_k: int = 10) -> str:
-    """Recall recent and relevant memories. Remote delegates to RemoteMemory.recall().
+def recall(
+    cwd: str | None = None,
+    top_k: int = 10,
+    *,
+    query: str | None = None,
+    include_snapshot: bool = True,
+    workspace_id: str | None = None,
+) -> str:
+    """HOOK-RECALL-RELEVANCE-1: workspace-scoped, ranked, deduped recall.
 
-    Local uses sort_by="recency" which is not supported in the remote search API,
-    so recall() cannot be unified — explicit branch required.
+    Bug fixes vs legacy:
+      - empty-content items skipped
+      - dedup by item_id (then content) — collapses `[concept] smartmemory` × 3
+      - origin tier filter (default {1, 2}) — excludes tier-4 system noise
+      - workspace metadata filter — Lite SQLiteBackend can't scope at storage layer
+      - optional CORE-SUMMARY-1 snapshot frame (≤7d) prepended for SessionStart
+      - optional `query` for UserPromptSubmit semantic search
+      - JSONL trace at ~/.smartmemory/hook-recall.jsonl
+
+    Remote mode delegates to RemoteMemory.recall (same param contract).
     """
+    from smartmemory.origin_policy import filter_by_tiers, get_default_tiers
+    from smartmemory_app.recall_format import (
+        _item_to_recall_dict, _trace, derive_workspace_id,
+        format_recall_lines, time_ms,
+    )
+
+    t0 = time_ms()
     mem = get_memory()
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
-        return mem.recall(cwd, top_k)
-    if cwd:
+        return mem.recall(
+            cwd, top_k,
+            query=query, include_snapshot=include_snapshot, workspace_id=workspace_id,
+        )
+
+    workspace_id = workspace_id or derive_workspace_id(cwd)
+
+    # 1. Optional snapshot frame (graph-mirrored markdown from CORE-SUMMARY-1)
+    frame = ""
+    if include_snapshot:
+        try:
+            snaps = mem.search("", memory_type="snapshot", sort_by="recency", top_k=1)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("snapshot lookup failed: %s", exc)
+            snaps = []
+        if snaps:
+            snap = snaps[0]
+            # Defensive: only honor results that are actually snapshots.
+            # `mem.search(memory_type="snapshot")` should filter, but a mocked
+            # backend may not — and we don't want to render a non-snapshot as a frame.
+            if getattr(snap, "memory_type", None) == "snapshot":
+                snap_meta = getattr(snap, "metadata", None) or {}
+                ws_match = (
+                    workspace_id is None
+                    or snap_meta.get("workspace_id") in (None, workspace_id)
+                )
+                if ws_match and _snapshot_is_fresh(snap, max_days=7):
+                    frame = (getattr(snap, "content", "") or "").strip()
+
+    # 2. Recency + semantic candidates
+    if query:
+        results = mem.search(query, top_k=top_k * 2)
+    elif cwd:
         recent_k, semantic_k = _split_recall_counts(top_k)
         recent = mem.search("", top_k=recent_k, sort_by="recency")
         semantic = mem.search(cwd, top_k=semantic_k) if semantic_k else []
+        results = list(recent) + list(semantic)
     else:
-        # No cwd — give full budget to recency
-        recent = mem.search("", top_k=top_k, sort_by="recency")
-        semantic = []
-    seen: set[str] = set()
-    items = []
-    for r in recent + semantic:
-        if r.item_id not in seen:
-            seen.add(r.item_id)
-            items.append(r)
-    # CORE-PROPS-1: Recall confidence floor
+        results = list(mem.search("", top_k=top_k, sort_by="recency"))
+
+    # Drop snapshot rows from candidate set (the frame already covers them)
+    results = [r for r in results if getattr(r, "memory_type", "") != "snapshot"]
+
+    # 3. Origin tier filter (default {1, 2}; excludes tier-4 system noise)
+    results = filter_by_tiers(results, get_default_tiers("recall"))
+
+    # 4. Workspace metadata filter — items without workspace_id are visible
+    #    (legacy backward compat; SQLiteBackend single-tenant can't scope at storage)
+    if workspace_id:
+        scoped = []
+        for r in results:
+            r_meta = getattr(r, "metadata", None) or {}
+            r_ws = r_meta.get("workspace_id") if isinstance(r_meta, dict) else None
+            if r_ws in (None, workspace_id):
+                scoped.append(r)
+        results = scoped
+
+    # 5. Confidence floor + reference exclusion (preserved from legacy)
     recall_floor = float(os.environ.get("SMARTMEMORY_RECALL_FLOOR", "0.3"))
-    items = [r for r in items if getattr(r, "confidence", 1.0) >= recall_floor]
-    # CORE-PROPS-1 Phase 6: recall always excludes reference data
-    items = [r for r in items if not getattr(r, "reference", False)]
-    if not items:
-        return ""
-    lines = ["## SmartMemory Context"]
-    for item in items[:top_k]:
-        conf_marker = "~" if getattr(item, "confidence", 1.0) < 0.5 else ""
-        # CORE-PROPS-1 Phase 2: stale marker
-        stale_marker = "⚠" if getattr(item, "stale", False) else ""
-        lines.append(f"- {stale_marker}{conf_marker}[{item.memory_type}] {item.content[:200]}")
-    return "\n".join(lines)
+    results = [r for r in results if getattr(r, "confidence", 1.0) >= recall_floor]
+    results = [r for r in results if not getattr(r, "reference", False)]
+
+    # 6. Format (dedup + empty-suppress + top_k cap inside)
+    item_dicts = [_item_to_recall_dict(r) for r in results]
+    body = format_recall_lines(item_dicts, top_k=top_k)
+    emitted = body.count("\n- ") if body else 0
+
+    # 7. Compose: body + optional snapshot frame
+    if body and frame:
+        out = f"{body}\n\n{frame}"
+    elif body:
+        out = body
+    elif frame:
+        out = f"## SmartMemory Context\n\n{frame}"
+    else:
+        out = ""
+
+    # 8. Trace (never raises)
+    _trace(
+        phase="user_prompt" if query else "session_start",
+        workspace_id=workspace_id,
+        cwd=cwd,
+        query=query,
+        candidate_count=len(results),
+        emitted=emitted,
+        snapshot_used=bool(frame),
+        latency_ms=time_ms() - t0,
+    )
+
+    return out
+
+
+def _snapshot_is_fresh(snap, max_days: int = 7) -> bool:
+    """True if the snapshot's created_at is within max_days. Defaults open on parse failure."""
+    from datetime import datetime, timezone
+    meta = getattr(snap, "metadata", None) or {}
+    created_str = meta.get("created_at") if isinstance(meta, dict) else None
+    if not created_str:
+        return True  # no timestamp recorded → don't suppress
+    try:
+        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - created).days
+        return age <= max_days
+    except (ValueError, AttributeError):
+        return True
 
 
 def get(item_id: str) -> dict:

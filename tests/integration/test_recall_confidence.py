@@ -50,20 +50,26 @@ def test_recall_includes_above_confidence_floor(tmp_path, monkeypatch):
 
 @pytest.mark.integration
 def test_recall_tilde_marker_on_low_confidence(tmp_path, monkeypatch):
-    """Items with confidence < 0.5 get a ~ prefix in recall output."""
+    """Items with confidence < 0.5 get a ~ prefix in recall output.
+
+    HOOK-RECALL-RELEVANCE-1 filters tier-4 origins (hook:*, structured:*) by
+    default at recall time. Use origin="unknown" instead — it survives the
+    tier filter (legacy untagged-data passthrough per origin_policy) and
+    receives the 0.3 confidence ceiling per CORE-PROPS-1.
+    """
     monkeypatch.setenv("SMARTMEMORY_DATA_DIR", str(tmp_path))
     # Set floor low enough to include the item
     monkeypatch.setenv("SMARTMEMORY_RECALL_FLOOR", "0.1")
 
-    # hook:test → ceiling 0.4, which is < 0.5 → should get ~ marker
+    # unknown → ceiling 0.3, < 0.5 → ~ marker; survives tier filter as legacy
     storage_mod.ingest(
-        "hook generated item with low confidence",
-        properties={"origin": "hook:test"},
+        "low confidence item with tilde marker",
+        properties={"origin": "unknown"},
     )
 
     result = storage_mod.recall(top_k=5)
-    assert "~[" in result, "Low-confidence items should have ~ prefix"
-    assert "hook generated item with low confidence" in result
+    assert "~[" in result, f"Low-confidence items should have ~ prefix; got: {result!r}"
+    assert "low confidence item with tilde marker" in result
 
 
 @pytest.mark.integration

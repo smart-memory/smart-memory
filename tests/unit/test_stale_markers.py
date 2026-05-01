@@ -10,14 +10,23 @@ def _reset_singleton():
     storage_mod._remote_memory = None
 
 
-def _make_item(content, memory_type="semantic", confidence=1.0, stale=False):
-    """Create a mock MemoryItem for recall output tests."""
-    item = MagicMock()
+def _make_item(content, memory_type="semantic", confidence=1.0, stale=False, origin="user:test"):
+    """Create a mock MemoryItem for recall output tests.
+
+    HOOK-RECALL-RELEVANCE-1 added origin tier filtering at recall time —
+    items must have a real string .origin to survive `filter_by_tiers`.
+    Default to a tier-1 origin so the existing tests keep their semantics.
+    """
+    item = MagicMock(spec=["item_id", "content", "memory_type", "confidence",
+                            "stale", "origin", "metadata", "reference"])
     item.item_id = "test-" + content[:8]
     item.content = content
     item.memory_type = memory_type
     item.confidence = confidence
     item.stale = stale
+    item.origin = origin
+    item.metadata = {}
+    item.reference = False
     return item
 
 

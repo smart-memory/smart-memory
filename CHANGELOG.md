@@ -14,6 +14,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **HOOK-RECALL-RELEVANCE-1 (G1+G2+G4): Claude Code session-start and per-prompt hook recall payloads.** Empty `[type]` lines, duplicate concept lines, tier-4 hook noise, and unscoped recall all eliminated. New `smartmemory_app/recall_format.py` provides `format_recall_lines()` (dedup by item_id then content, empty-content suppression, top_k cap), `derive_workspace_id()` (env-var → realpath(git-toplevel) → sha1[:12]), and `_trace()` (JSONL append at `~/.smartmemory/hook-recall.jsonl`). Both `storage.recall()` and `RemoteMemory.recall()` rewritten to share the formatter, apply `origin_policy.filter_by_tiers` (excludes tier 4 by default), and post-filter by `metadata.workspace_id` (legacy items without workspace_id pass through). Daemon `/memory/recall` accepts new params: `query`, `workspace_id`, `include_snapshot`. `~/.claude/hooks/smartmemory-session-start.sh` passes `workspace_id` + `include_snapshot=true`. `~/.claude/hooks/smartmemory-prompt-recall.sh` rewritten to route through the local daemon (single fix surface). `UserPromptSubmit` hook wired in `~/.claude/settings.json` for the first time. 20 new unit tests; pre-existing recall_confidence + recall_flow suites green. Report: [`smart-memory-docs/docs/features/HOOK-RECALL-RELEVANCE-1/report.md`](../smart-memory-docs/docs/features/HOOK-RECALL-RELEVANCE-1/report.md).
+- **`test_shutdown_calls_save_and_close` updated** to assert `SmartMemory.close()` (current code path) instead of stale `_graph.backend.close()`.
+
 ### Changed — BREAKING
 
 - **CORE-MEMORY-DYNAMICS-1 M1b: `working` → `pending` rename (wrapper).** `smartmemory_app/lifecycle.py` distill path now writes `memory_type="pending"` (was `"working"`; the core validator rejects the old value post-rename). `smartmemory_app/cli.py` `_VALID_MEMORY_TYPES` set rebuilt with `"pending"`. `smartmemory_app/local_api.py` user_types tuple in SELECT-by-type query updated. Test fixture in `tests/integration/test_local_api_integration.py::test_node_fields_correct` updated. README evolver listing removed `WorkingToEpisodicEvolver` / `WorkingToProceduralEvolver` (retired in core M1b); "Working Memory" type description replaced with "Pending Memory".

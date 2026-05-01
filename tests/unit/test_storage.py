@@ -62,20 +62,23 @@ def test_get_memory_registers_atexit(tmp_path):
 
 
 def test_shutdown_calls_save_and_close():
-    """_shutdown() calls _save() and backend.close() on the memory instance."""
+    """_shutdown() calls _save() and SmartMemory.close() on the memory instance.
+
+    _shutdown() prefers SmartMemory.close() (which orchestrates evolution worker,
+    ontology store, and graph backend shutdown). Only falls back to
+    _graph.backend.close() when close() is unavailable.
+    """
     import smartmemory_app.storage as storage
 
     mock_vector = MagicMock()
-    mock_graph = MagicMock()
     mock_mem = MagicMock()
     mock_mem._vector_backend = mock_vector
-    mock_mem._graph = mock_graph
     storage._memory = mock_mem
 
     storage._shutdown()
 
     mock_vector._save.assert_called_once()
-    mock_graph.backend.close.assert_called_once()
+    mock_mem.close.assert_called_once()
 
 
 def test_shutdown_clears_singleton():

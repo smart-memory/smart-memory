@@ -195,11 +195,26 @@ def list_memories(limit: int = 200, offset: int = 0) -> dict:
 # capture /neighbors as the memory_id value.
 
 @api.get("/recall")
-def recall_endpoint(cwd: str = None, top_k: int = 10) -> dict:
-    """Recall recent + relevant memories for session context."""
+def recall_endpoint(
+    cwd: str = None,
+    top_k: int = 10,
+    query: str = None,
+    workspace_id: str = None,
+    include_snapshot: bool = True,
+) -> dict:
+    """Recall recent + relevant memories for session context.
+
+    HOOK-RECALL-RELEVANCE-1: workspace_id, query, include_snapshot params added.
+    Backward compatible — existing callers passing only cwd+top_k still work.
+    """
     with _rw_lock:
         from smartmemory_app.storage import recall
-        context = recall(cwd, top_k)
+        context = recall(
+            cwd, top_k,
+            query=query,
+            workspace_id=workspace_id or None,
+            include_snapshot=include_snapshot,
+        )
     return {"context": context}
 
 

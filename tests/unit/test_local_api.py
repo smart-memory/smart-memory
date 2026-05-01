@@ -246,7 +246,11 @@ class TestRecallRoute:
 
         assert r.status_code == 200
         assert r.json()["context"].startswith("## SmartMemory Context")
-        mock_recall.assert_called_once_with(None, 10)
+        # HOOK-RECALL-RELEVANCE-1: /recall accepts query/workspace_id/include_snapshot kwargs
+        mock_recall.assert_called_once_with(
+            None, 10,
+            query=None, workspace_id=None, include_snapshot=True,
+        )
 
 
 # ---------------------------------------------------------------------------
