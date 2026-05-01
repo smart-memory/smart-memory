@@ -261,19 +261,101 @@ def add_cmd(ctx, text: str, memory_type: str, as_whole: bool) -> None:
 @cli.command("recall")
 @click.option("--cwd", default=None, help="Current working directory for context.")
 @click.option("--top-k", default=10, show_default=True)
-def recall_cmd(cwd: str, top_k: int) -> None:
-    """Recall memories (SessionStart hook)."""
-    result = _daemon_request(
-        "GET", "/memory/recall", params={"cwd": cwd or "", "top_k": top_k}
-    )
+@click.option("--query", default=None, help="Optional prompt query (UserPromptSubmit hook).")
+@click.option("--workspace", "workspace_id", default=None, help="Workspace ID override.")
+@click.option("--strict/--no-strict", default=False,
+              help="Drop legacy items without workspace_id (kills cross-workspace leak).")
+@click.option("--no-snapshot", "no_snapshot", is_flag=True, default=False,
+              help="Skip snapshot frame.")
+def recall_cmd(cwd: str, top_k: int, query: str, workspace_id: str,
+               strict: bool, no_snapshot: bool) -> None:
+    """Recall memories (SessionStart / UserPromptSubmit hook)."""
+    params = {
+        "cwd": cwd or "",
+        "top_k": top_k,
+        "query": query or "",
+        "workspace_id": workspace_id or "",
+        "include_snapshot": "false" if no_snapshot else "true",
+        "strict": "true" if strict else "false",
+    }
+    result = _daemon_request("GET", "/memory/recall", params=params)
     if result:
         context = result.get("context", "")
     else:
         from smartmemory_app.storage import recall
 
-        context = recall(cwd, top_k)
+        context = recall(
+            cwd, top_k,
+            query=query, workspace_id=workspace_id,
+            include_snapshot=not no_snapshot, strict=strict,
+        )
     if context:
         click.echo(context)
+
+
+@cli.command("retag")
+@click.option("--content", "content_substring", required=True,
+              help="Substring to match in item content (case-insensitive).")
+@click.option("--origin", "new_origin", required=True,
+              help='New origin value, e.g. "seed:demo" (tier 4, hidden from recall).')
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Show items that would be retagged without modifying.")
+@click.option("--limit", default=100, show_default=True,
+              help="Max items to retag in one run.")
+def retag_cmd(content_substring: str, new_origin: str, dry_run: bool, limit: int) -> None:
+    """Retag items by content match (HOOK-RECALL-RELEVANCE-1 G3.C).
+
+    Use to clean up legacy seed/fixture data that leaks into recall:
+
+      smartmemory retag --content "Alice leads Project Atlas" --origin seed:demo
+
+    seed:* is tier 4, so retagged items disappear from recall but stay in
+    storage for audit / re-classification later.
+    """
+    from smartmemory_app.storage import get_memory
+
+    mem = get_memory()
+    backend = getattr(getattr(mem, "_graph", None), "backend", None)
+    if backend is None:
+        click.echo("error: no graph backend available", err=True)
+        raise SystemExit(1)
+
+    needle = content_substring.lower()
+    matched, updated = [], 0
+    snapshot = backend.serialize() if hasattr(backend, "serialize") else {"nodes": []}
+    for raw in snapshot.get("nodes", []):
+        # Content lives in `properties.content` for SQLite/FalkorDB serialize shape;
+        # fall back to top-level `content` for forward-compat.
+        props = raw.get("properties") or {}
+        content = (props.get("content") if isinstance(props, dict) else None) or raw.get("content") or ""
+        if needle not in content.lower():
+            continue
+        item_id = raw.get("item_id") or raw.get("id")
+        if not item_id:
+            continue
+        matched.append((item_id, content[:80]))
+        if len(matched) >= limit:
+            break
+
+    if not matched:
+        click.echo(f"No items match content substring {content_substring!r}.")
+        return
+
+    click.echo(f"Found {len(matched)} item(s) matching {content_substring!r}:")
+    for iid, preview in matched:
+        click.echo(f"  {iid[:12]} {preview!r}")
+
+    if dry_run:
+        click.echo(f"(dry run — pass --no-dry-run to retag with origin={new_origin!r})")
+        return
+
+    for iid, _ in matched:
+        try:
+            backend.set_properties(iid, {"origin": new_origin})
+            updated += 1
+        except Exception as exc:
+            click.echo(f"  failed to retag {iid[:12]}: {exc}", err=True)
+    click.echo(f"Retagged {updated}/{len(matched)} items with origin={new_origin!r}.")
 
 
 @cli.command("search", context_settings=dict(

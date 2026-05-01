@@ -355,6 +355,7 @@ def recall(
     query: str | None = None,
     include_snapshot: bool = True,
     workspace_id: str | None = None,
+    strict: bool | None = None,
 ) -> str:
     """HOOK-RECALL-RELEVANCE-1: workspace-scoped, ranked, deduped recall.
 
@@ -381,10 +382,13 @@ def recall(
     if isinstance(mem, RemoteMemory):
         return mem.recall(
             cwd, top_k,
-            query=query, include_snapshot=include_snapshot, workspace_id=workspace_id,
+            query=query, include_snapshot=include_snapshot,
+            workspace_id=workspace_id, strict=strict,
         )
 
     workspace_id = workspace_id or derive_workspace_id(cwd)
+    if strict is None:
+        strict = os.environ.get("SMARTMEMORY_RECALL_STRICT", "").lower() in ("1", "true", "yes")
 
     # 1. Optional snapshot frame (graph-mirrored markdown from CORE-SUMMARY-1)
     frame = ""
@@ -425,14 +429,20 @@ def recall(
     # 3. Origin tier filter (default {1, 2}; excludes tier-4 system noise)
     results = filter_by_tiers(results, get_default_tiers("recall"))
 
-    # 4. Workspace metadata filter — items without workspace_id are visible
-    #    (legacy backward compat; SQLiteBackend single-tenant can't scope at storage)
+    # 4. Workspace metadata filter.
+    # Default: items without workspace_id pass through (legacy backward compat;
+    # SQLiteBackend single-tenant can't scope at storage layer).
+    # Strict mode (SMARTMEMORY_RECALL_STRICT or strict=True): drop items whose
+    # workspace_id is None when a workspace_id is set on the recall — eliminates
+    # legacy-leak items like Alice/Atlas that predate workspace tagging.
     if workspace_id:
         scoped = []
         for r in results:
             r_meta = getattr(r, "metadata", None) or {}
             r_ws = r_meta.get("workspace_id") if isinstance(r_meta, dict) else None
-            if r_ws in (None, workspace_id):
+            if r_ws == workspace_id:
+                scoped.append(r)
+            elif r_ws is None and not strict:
                 scoped.append(r)
         results = scoped
 

@@ -201,11 +201,14 @@ def recall_endpoint(
     query: str = None,
     workspace_id: str = None,
     include_snapshot: bool = True,
+    strict: bool = False,
 ) -> dict:
     """Recall recent + relevant memories for session context.
 
-    HOOK-RECALL-RELEVANCE-1: workspace_id, query, include_snapshot params added.
-    Backward compatible — existing callers passing only cwd+top_k still work.
+    HOOK-RECALL-RELEVANCE-1: workspace_id, query, include_snapshot, strict
+    params added. Backward compatible — existing callers passing only
+    cwd+top_k still work. strict=True drops legacy items with no
+    workspace_id (eliminates Alice/Atlas-style cross-workspace leak).
     """
     with _rw_lock:
         from smartmemory_app.storage import recall
@@ -214,6 +217,7 @@ def recall_endpoint(
             query=query,
             workspace_id=workspace_id or None,
             include_snapshot=include_snapshot,
+            strict=strict,
         )
     return {"context": context}
 
@@ -520,6 +524,8 @@ class IngestRequest(BaseModel):
     context: Optional[dict] = None
     properties: Optional[dict] = None  # user-supplied key-value properties
     profile_name: Optional[str] = None  # accepted for service contract alignment, ignored in lite
+    cwd: Optional[str] = None  # HOOK-RECALL-RELEVANCE-1 G3.B: workspace_id derivation source
+    workspace_id: Optional[str] = None  # explicit override; else derived from cwd
 
 
 @api.post("/ingest")
@@ -528,13 +534,25 @@ def ingest_endpoint(body: IngestRequest) -> dict:
 
     Tier 1 (sync, ~4ms): spaCy + EntityRuler → returns item_id immediately.
     Tier 2 (async, ~740ms): background LLM extraction if API key is set.
+
+    HOOK-RECALL-RELEVANCE-1 G3.B: stamps `metadata.workspace_id` on the item
+    so future workspace-scoped recall can filter. Derivation priority:
+      explicit body.workspace_id > derive_workspace_id(body.cwd) >
+      SMARTMEMORY_WORKSPACE_ID env var > None (legacy untagged).
     """
     import os
     import time
+    from smartmemory_app.recall_format import derive_workspace_id
 
     memory_type = body.memory_type
     if body.context and "memory_type" in body.context:
         memory_type = body.context["memory_type"]
+
+    # Auto-stamp workspace_id so this item is filterable in scoped recall.
+    workspace_id = body.workspace_id or derive_workspace_id(body.cwd)
+    properties = dict(body.properties or {})
+    if workspace_id and "workspace_id" not in properties:
+        properties["workspace_id"] = workspace_id
 
     has_llm = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY"))
 
@@ -543,7 +561,7 @@ def ingest_endpoint(body: IngestRequest) -> dict:
         # A separate worker process drains the queue — no threading issues.
         with _rw_lock:
             from smartmemory_app.storage import ingest
-            result = ingest(body.content, memory_type, sync=False, properties=body.properties)
+            result = ingest(body.content, memory_type, sync=False, properties=properties)
             item_id = result["item_id"] if isinstance(result, dict) else result
             raw_ids = result.get("entity_ids", {}) if isinstance(result, dict) else {}
             entity_ids = {k.lower(): v for k, v in raw_ids.items()} if raw_ids else {}
@@ -556,7 +574,7 @@ def ingest_endpoint(body: IngestRequest) -> dict:
         # No LLM — full sync pipeline
         with _rw_lock:
             from smartmemory_app.storage import ingest
-            item_id = ingest(body.content, memory_type, properties=body.properties)
+            item_id = ingest(body.content, memory_type, properties=properties)
         return {"item_id": item_id}
 
 

@@ -177,6 +177,7 @@ class RemoteMemory:
         query: str | None = None,
         include_snapshot: bool = True,
         workspace_id: str | None = None,
+        strict: bool | None = None,
     ) -> str:
         """HOOK-RECALL-RELEVANCE-1: workspace-scoped, ranked, deduped recall (remote).
 
@@ -192,6 +193,9 @@ class RemoteMemory:
 
         t0 = time_ms()
         workspace_id = workspace_id or derive_workspace_id(cwd)
+        if strict is None:
+            strict = os.environ.get(
+                "SMARTMEMORY_RECALL_STRICT", "").lower() in ("1", "true", "yes")
         recall_tiers = get_default_tiers("recall")
 
         # 1. Optional snapshot frame (graph-mirrored)
@@ -237,13 +241,15 @@ class RemoteMemory:
             return get_tier(origin) in recall_tiers
         results = [r for r in results if _tier_ok(r)]
 
-        # 4. Workspace metadata filter
+        # 4. Workspace metadata filter (strict drops legacy untagged items).
         if workspace_id:
             scoped = []
             for r in results:
                 meta = r.get("metadata") or {}
                 ws = meta.get("workspace_id") if isinstance(meta, dict) else None
-                if ws in (None, workspace_id):
+                if ws == workspace_id:
+                    scoped.append(r)
+                elif ws is None and not strict:
                     scoped.append(r)
             results = scoped
 
