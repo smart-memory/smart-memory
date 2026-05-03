@@ -14,6 +14,12 @@
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-05-04
+
+### Changed
+
+- **Track core 0.9.0.** Pin updated from `smartmemory-core[lite]==0.8.0` to `==0.9.0`. Wrapper itself unchanged; bump pairs with the core release that landed ONTO-RECONCILE-1 Phase 4 Tier 1 (5 tasks shipped + 1 deferral) and Tier 2 audit half (6 missing indexes closed). Per `feedback_bump_wrapper_with_core` policy.
+
 ### Fixed
 
 - **HOOK-RECALL-RELEVANCE-1 (COMPLETE): Claude Code session-start and per-prompt hook recall payloads.** Empty `[type]` lines, duplicate concept lines, tier-4 hook noise, and unscoped recall all eliminated. **G1 (formatter primitives):** new `smartmemory_app/recall_format.py` provides `format_recall_lines()` (dedup by item_id then content, empty-content suppression, top_k cap), `derive_workspace_id()` (env-var → realpath(git-toplevel) → sha1[:12]), and `_trace()` (JSONL append at `~/.smartmemory/hook-recall.jsonl`). **G2 (recall paths):** both `storage.recall()` and `RemoteMemory.recall()` rewritten to share the formatter, apply `origin_policy.filter_by_tiers` (excludes tier 4 by default), and post-filter by `metadata.workspace_id`. **G3 (workspace propagation + retag):** daemon `/ingest` auto-derives `workspace_id` from request `cwd` and stamps it on `metadata.workspace_id`; new `--strict` recall flag (and `SMARTMEMORY_RECALL_STRICT` env var) drops legacy items with no `workspace_id` to kill cross-workspace leak; new `smartmemory retag --content X --origin seed:demo` CLI moves seed/fixture data to tier 4 in one shot (verified: 38 Alice/Atlas/Acme items retagged in dev DB). **G4 (hook scripts):** `~/.claude/hooks/smartmemory-session-start.sh` passes `workspace_id` + `include_snapshot=true`; `~/.claude/hooks/smartmemory-prompt-recall.sh` rewritten to route through the local daemon (single fix surface); `UserPromptSubmit` wired in `~/.claude/settings.json` for the first time. **G5 (integration tests):** 10 new tests in `tests/integration/test_hook_recall.py` covering no-empty-buckets, dedup, tier filter, workspace isolation, strict mode (param + env), failure-mode-empty, query mode, JSONL trace, seed origin filter — all green. 20 new unit tests + pre-existing recall_confidence + recall_flow suites green. Report: [`smart-memory-docs/docs/features/HOOK-RECALL-RELEVANCE-1/report.md`](../smart-memory-docs/docs/features/HOOK-RECALL-RELEVANCE-1/report.md).
