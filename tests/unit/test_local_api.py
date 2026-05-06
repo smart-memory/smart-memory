@@ -7,8 +7,8 @@ Tests cover:
   - GET /list — pagination envelope keys
   - GET /{id}/neighbors — response key is "neighbors" not "nodes"
   - GET /{id} — 404 when backend.get_node() returns None
-  - DELETE /{id} — 405 (read-only)
-  - DELETE /graph/nodes/{id} — 405 (read-only)
+  - DELETE /{id} — 204 on success / 404 on missing (DIST-OBSIDIAN-LITE-1 lifted prior 405 policy)
+  - DELETE /graph/nodes/{id} — 405 (read-only; entity-node ops still blocked)
 
 All tests mock _get_backend() to avoid touching the filesystem.
 """
@@ -279,17 +279,21 @@ class TestGetNeighbors:
             body = client.get("/node-1/neighbors").json()
         assert "edges" in body
 
-    def test_neighbors_are_not_flattened(self, client):
-        """get_neighbors() output is already flat via _row_to_node() — confirm passthrough."""
+    def test_neighbor_item_id_preserved(self, client):
+        """DIST-OBSIDIAN-LITE-1: handler now derives neighbors from edges,
+        but each entry still carries item_id (plus link_type and direction)."""
         flat_neighbor = _make_flat_node("node-2")
         mock_backend = MagicMock()
         mock_backend.get_neighbors.return_value = [flat_neighbor]
-        mock_backend.get_edges_for_node.return_value = []
+        mock_backend.get_edges_for_node.return_value = [
+            _make_edge("node-1", "node-2", "RELATED")
+        ]
         with patch("smartmemory_app.local_api._get_backend", return_value=mock_backend):
             body = client.get("/node-1/neighbors").json()
-        # The flat node has item_id at top level — confirm it passes through unchanged
         neighbor = body["neighbors"][0]
         assert neighbor["item_id"] == "node-2"
+        assert neighbor["link_type"] == "RELATED"
+        assert neighbor["direction"] == "outgoing"
 
 
 # ---------------------------------------------------------------------------
@@ -316,16 +320,35 @@ class TestGetMemoryItem:
 
 
 # ---------------------------------------------------------------------------
-# DELETE endpoints (Option B — 405 read-only)
+# DELETE endpoints
+# DIST-OBSIDIAN-LITE-1 lifted the prior 405 policy on memory-node delete.
+# Entity-node delete (under /graph/) stays 405.
 # ---------------------------------------------------------------------------
 
 
 class TestDeleteEndpoints:
-    def test_delete_memory_node_returns_405(self, client):
-        r = client.delete("/some-memory-id")
-        assert r.status_code == 405
+    def test_delete_memory_node_succeeds(self, client):
+        """DIST-OBSIDIAN-LITE-1: lifted from 405 → 204 on successful delete."""
+        mock_mem = MagicMock()
+        mock_mem.delete.return_value = True
+        # Avoid the RemoteMemory branch
+        with patch("smartmemory_app.local_api._get_mem", return_value=mock_mem), \
+             patch("smartmemory_app.remote_backend.RemoteMemory", new=type("Stub", (), {})):
+            r = client.delete("/some-memory-id")
+        assert r.status_code == 204
+        mock_mem.delete.assert_called_once_with("some-memory-id")
+
+    def test_delete_memory_node_404_when_missing(self, client):
+        """When SmartMemory.delete returns False, surface as 404."""
+        mock_mem = MagicMock()
+        mock_mem.delete.return_value = False
+        with patch("smartmemory_app.local_api._get_mem", return_value=mock_mem), \
+             patch("smartmemory_app.remote_backend.RemoteMemory", new=type("Stub", (), {})):
+            r = client.delete("/nonexistent-id")
+        assert r.status_code == 404
 
     def test_delete_entity_node_returns_405(self, client):
+        """Entity-node deletes under /graph/ stay read-only."""
         r = client.delete("/graph/nodes/some-entity-id")
         assert r.status_code == 405
 

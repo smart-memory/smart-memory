@@ -73,6 +73,7 @@ def _build_app() -> FastAPI:
         cfg = load_config()
         backend_ok = False
         node_count = -1
+        mem = None
         try:
             from smartmemory_app.storage import get_memory
             mem = get_memory()
@@ -98,6 +99,30 @@ def _build_app() -> FastAPI:
         except Exception:
             pass
 
+        # DIST-OBSIDIAN-LITE-1: capability block lets the Obsidian plugin (and
+        # any other client) detect lite vs remote-proxy mode + which write
+        # operations are available. `mode` is the source of truth — clients
+        # should branch on this rather than infer from llm_provider, etc.
+        from smartmemory_app.remote_backend import RemoteMemory as _RM
+        if isinstance(mem, _RM):
+            mode = "remote"
+            capabilities = {
+                "delete": False,
+                "patch": False,
+                "neighbors_direction": True,
+                "quota": False,
+                "auth": False,
+            }
+        else:
+            mode = "lite"
+            capabilities = {
+                "delete": True,
+                "patch": True,
+                "neighbors_direction": True,
+                "quota": False,
+                "auth": False,
+            }
+
         return {
             "service": "smartmemory",
             "status": "ok" if backend_ok else "degraded",
@@ -106,6 +131,8 @@ def _build_app() -> FastAPI:
             "embedding_provider": cfg.embedding_provider,
             "pid": os.getpid(),
             "async_enrichment": async_info,
+            "mode": mode,
+            "capabilities": capabilities,
         }
 
     # DIST-AGENT-HOOKS-1: Mount lifecycle API at /lifecycle on root app

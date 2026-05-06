@@ -9,10 +9,11 @@ POST /search             → /memory/search           (DAEMON-1: semantic search
 GET  /recall             → /memory/recall           (DAEMON-1: session context)
 POST /clear              → /memory/clear
 POST /reindex            → /memory/reindex          (re-embed all with current model)
-GET  /{id}/neighbors     → /memory/{id}/neighbors  (BEFORE /{id} — declaration order matters)
+GET  /{id}/neighbors     → /memory/{id}/neighbors  (BEFORE /{id} — declaration order matters; DIST-OBSIDIAN-LITE-1: each neighbor carries direction)
 GET  /{id}               → /memory/{id}
-DELETE /{id}             → /memory/{id}            (405 — local viewer is read-only)
-DELETE /graph/nodes/{id} → /memory/graph/nodes/{id} (405 — local viewer is read-only)
+PATCH /{id}              → /memory/{id}            (DIST-OBSIDIAN-LITE-1: CORE-CRUD-UPDATE-1 contract)
+DELETE /{id}             → /memory/{id}            (DIST-OBSIDIAN-LITE-1: lifted from prior 405; cascades vector via mem.delete)
+DELETE /graph/nodes/{id} → /memory/graph/nodes/{id} (405 — entity-node ops still read-only)
 
 All endpoints acquire _rw_lock for thread safety under uvicorn's thread pool.
 """
@@ -224,11 +225,21 @@ def recall_endpoint(
 
 @api.get("/{memory_id}/neighbors")
 def get_neighbors(memory_id: str) -> dict:
-    """get_neighbors() uses _row_to_node() — output is already flat, no transformation needed.
+    """Neighbors with direction-tagged link types.
 
-    Response key MUST be "neighbors", not "nodes".
-    createFetchAdapter.getNeighbors reads: const neighbors = res?.neighbors || []
-    (useGraphInteraction.js:106-107). Returning {"nodes": ...} produces an empty expansion.
+    DIST-OBSIDIAN-LITE-1: each neighbor entry now includes a `direction` field
+    ("outgoing" | "incoming") so clients can disambiguate asymmetric edges
+    (e.g. SUPERSEDES, written one-way newer→older). Mirrors the service
+    contract added in DIST-OBSIDIAN-1 (links.py:148-158).
+
+    Response shape:
+      {
+        "neighbors": [{"item_id": str, "link_type": str, "direction": "outgoing"|"incoming"}, ...],
+        "edges": [...]   # unchanged; raw edge rows
+      }
+
+    Adapter contract preserved: createFetchAdapter.getNeighbors reads
+    res?.neighbors || [] — still a list, just with richer entries.
     """
     mem = _get_mem()
     from smartmemory_app.remote_backend import RemoteMemory
@@ -236,9 +247,31 @@ def get_neighbors(memory_id: str) -> dict:
         return mem.get_neighbors(memory_id)
     with _rw_lock:
         backend = _get_backend()
-        neighbors = backend.get_neighbors(memory_id)
         edges = backend.get_edges_for_node(memory_id)
-    return {"neighbors": neighbors, "edges": edges}
+
+    # Walk edges to assign direction. The daemon's adjacency-list
+    # get_edges_for_node returns both legs in one query, so this is a single
+    # pass — simpler than the service's two-call get_neighbors approach.
+    seen: set = set()
+    formatted = []
+    for e in edges:
+        src = e.get("source_id")
+        tgt = e.get("target_id")
+        link_type = e.get("edge_type") or e.get("link_type")
+        if not link_type:
+            continue  # malformed edge — skip rather than emit link_type=None
+        if src == memory_id and tgt and tgt != memory_id:
+            direction, other = "outgoing", tgt
+        elif tgt == memory_id and src and src != memory_id:
+            direction, other = "incoming", src
+        else:
+            continue  # self-loop or malformed
+        key = (other, str(link_type), direction)
+        if key in seen:
+            continue
+        seen.add(key)
+        formatted.append({"item_id": other, "link_type": link_type, "direction": direction})
+    return {"neighbors": formatted, "edges": edges}
 
 
 @api.get("/{memory_id}")
@@ -524,6 +557,7 @@ class IngestRequest(BaseModel):
     context: Optional[dict] = None
     properties: Optional[dict] = None  # user-supplied key-value properties
     profile_name: Optional[str] = None  # accepted for service contract alignment, ignored in lite
+    extractor_name: Optional[str] = None  # DIST-OBSIDIAN-LITE-1: SDK contract; ignored in lite (env-driven tier split decides)
     cwd: Optional[str] = None  # HOOK-RECALL-RELEVANCE-1 G3.B: workspace_id derivation source
     workspace_id: Optional[str] = None  # explicit override; else derived from cwd
 
@@ -582,28 +616,100 @@ class SearchRequest(BaseModel):
     query: str
     top_k: int = 5
     filters: Optional[dict] = None  # property filters (e.g. {"project": "atlas"})
+    enable_hybrid: bool = True  # DIST-OBSIDIAN-LITE-1: SDK contract; no-op in lite (FTS5+vector always on)
+    memory_type: Optional[str] = None  # DIST-OBSIDIAN-LITE-1: SDK contract; folded into filters
 
 
 @api.post("/search")
-def search_endpoint(body: SearchRequest) -> list:
-    """Search memories. Returns bare list matching service POST /memory/search."""
+def search_endpoint(body: SearchRequest) -> dict:
+    """Search memories. Returns {items: [...]} matching post-CORE-CRUD-LIST service contract."""
     from fastapi import HTTPException
+
+    # DIST-OBSIDIAN-LITE-1: fold memory_type into filters so storage.search sees
+    # a single filter dict regardless of which contract surface the caller used.
+    filters = dict(body.filters or {})
+    if body.memory_type:
+        filters.setdefault("memory_type", body.memory_type)
 
     with _rw_lock:
         from smartmemory_app.storage import search
         try:
-            return search(body.query, body.top_k, filters=body.filters)
+            results = search(body.query, body.top_k, filters=filters or None)
         except NotImplementedError as e:
             raise HTTPException(status_code=501, detail=str(e))
+    return {"items": results}
 
 
 # recall endpoint moved above /{memory_id} to avoid wildcard route capture
 
 
-# ── Read-only boundary ─────────────────────────────────────────────────────
+# ── DIST-OBSIDIAN-LITE-1: PATCH + DELETE for SDK CRUD parity ───────────────
+
+
+class UpdateRequest(BaseModel):
+    """CORE-CRUD-UPDATE-1 contract; matches SDK MemoryAPI.update body."""
+    content: Optional[str] = None
+    metadata: Optional[dict] = None
+    properties: Optional[dict] = None
+    write_mode: Optional[str] = "merge"  # 'merge' | 'replace'
+
+
+@api.patch("/{memory_id}")
+def update_memory_item(memory_id: str, body: UpdateRequest) -> dict:
+    """Update a memory's properties. Maps to SmartMemory.update_properties.
+
+    DIST-OBSIDIAN-LITE-1: enables the Obsidian plugin's metadata-only re-ingest
+    path (PATCH instead of POST) when running against the daemon.
+    """
+    mem = _get_mem()
+    from smartmemory_app.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        # RemoteMemory has no update_node — proxy mode is out of scope for
+        # DIST-OBSIDIAN-LITE-1. Surface explicitly rather than AttributeError.
+        raise HTTPException(status_code=501, detail="PATCH not available in remote-proxy mode")
+    with _rw_lock:
+        # CORE-CRUD-UPDATE-1: properties wins over content/metadata conveniences
+        props = dict(body.properties or {})
+        if body.content is not None and "content" not in props:
+            props["content"] = body.content
+        if body.metadata is not None:
+            # Flat-merge metadata into properties; deep-merge happens on the
+            # service side, but daemon's storage is single-level by convention.
+            for k, v in body.metadata.items():
+                props.setdefault(k, v)
+        try:
+            mem.update_properties(memory_id, props, write_mode=body.write_mode or "merge")
+        except ValueError as e:
+            # smart_memory.py:2012 → memory/pipeline/stages/crud.py:409 raises
+            # ValueError("Node {item_id} not found in graph.") on missing item.
+            # Match on the message so other ValueError categories (validation
+            # failures, etc.) bubble as 500 rather than being mis-attributed
+            # to a missing item.
+            if "not found" in str(e).lower():
+                raise HTTPException(status_code=404, detail="Memory not found")
+            raise
+    return {"item_id": memory_id, "updated": True}
 
 
 @api.delete("/{memory_id}")
-def delete_node_405(memory_id: str) -> Response:
-    """Local viewer is read-only. Memory node deletes return 405."""
-    return Response(status_code=405, content="Local viewer is read-only.")
+def delete_memory_item(memory_id: str) -> Response:
+    """Delete a memory item.
+
+    DIST-OBSIDIAN-LITE-1: lifted from the prior 405 ('Local viewer is read-only')
+    policy. Single-user local deployment — no governance reason to refuse delete.
+    Plugin uses this for the 'Danger: purge Obsidian-origin memories' command and
+    for content-change re-ingest dedupe (workaround for CORE-INGEST-DEDUPE-1).
+
+    Note: graph router's DELETE /graph/nodes/{id} stays 405 — that's a different
+    surface (entity-node ops, not memory CRUD).
+    """
+    mem = _get_mem()
+    from smartmemory_app.remote_backend import RemoteMemory
+    if isinstance(mem, RemoteMemory):
+        return Response(status_code=501, content="DELETE not available in remote-proxy mode")
+    with _rw_lock:
+        # SmartMemory.delete() at smart_memory.py:2182 delegates to crud.delete()
+        # at crud.py:287, which already cascades to vector store + Vec_* nodes.
+        # Going through backend.remove_node() directly would leak vector entries.
+        ok = mem.delete(memory_id)
+    return Response(status_code=204 if ok else 404)
