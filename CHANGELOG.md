@@ -14,6 +14,12 @@
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-05-07
+
+### Changed
+
+- **Track core 0.9.1.** Pin updated from `smartmemory-core[lite]==0.9.0` to `==0.9.1`. Wrapper itself unchanged; bump pairs with the core release that lands the bounded `EventStream.read_recent(count)` API plus `read_all` deprecation (INSIGHTS-PROGRESS-MIGRATE-1 prep), CORE-EXPERTISE-1 Phase 1 (Decision schema extension), and ONTO-READER-MIGRATE-1 (`OntologyGraph` `:EntityType` → `:OntologyType` reader migration). Per `feedback_bump_wrapper_with_core` policy.
+
 ## [1.4.0] — 2026-05-04
 
 ### Changed
