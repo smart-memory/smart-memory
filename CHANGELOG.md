@@ -1,5 +1,11 @@
 # Changelog — smartmemory
 
+## [Unreleased]
+
+### Changed (CORE-EXPERTISE-1 Phase 4b, 2026-05-08)
+
+- **README "Memory Types" listing extended** with `Constraint Memory` and `Learned Memory` entries plus a new "Expertise vs knowledge" callout that explains the knowledge / expertise cohort split, points to the canonical 1-pager at `docs.smartmemory.ai/smartmemory/concepts/expertise-vs-knowledge`, and surfaces `mem.search(query, expertise=True)` for partitioned recall. No code change.
+
 ## [1.1.5] — 2026-03-24
 
 ### Fixed

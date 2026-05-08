@@ -162,7 +162,11 @@ SmartMemory implements a multi-layered memory architecture:
 - **Reasoning Memory**: Chain-of-thought traces capturing "why" decisions were made (System 2)
 - **Opinion Memory**: Beliefs with confidence scores, reinforced or contradicted over time
 - **Observation Memory**: Synthesized entity summaries from scattered facts
-- **Decision Memory**: First-class decisions with confidence tracking, provenance chains, and lifecycle management
+- **Decision Memory**: First-class decisions with confidence tracking, provenance chains, and lifecycle management. Now structured: `rejected_alternatives`, `rationale`, `constraints`. Capture: `mem.add_decision(...)`.
+- **Constraint Memory**: Hard rules — discovered or imposed. Capture: `mem.add_constraint(...)`.
+- **Learned Memory**: Lessons learned the hard way. Capture: `mem.add_learning(...)`.
+
+> **Expertise vs knowledge.** The five core types above (Pending/Semantic/Episodic/Procedural/Zettelkasten) plus Reasoning are best read as the **knowledge layer** — what's *true*. Decision/Constraint/Learned/Opinion/Observation form the **expertise layer** — what to *do*, and what *not* to do. The expertise layer is what makes an agent's memory useful for *acting*: captured choices, rejected alternatives, hard constraints, lessons learned. Recall partitioned by expertise type via `mem.search(query, expertise=True)`. See [Expertise vs Knowledge](https://docs.smartmemory.ai/smartmemory/concepts/expertise-vs-knowledge) for the full mapping.
 
 ### Storage Backends
 
