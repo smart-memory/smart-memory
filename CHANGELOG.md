@@ -1,6 +1,12 @@
 # Changelog — smartmemory
 
-## [Unreleased]
+## [1.4.2] — 2026-05-10
+
+### Added (Launch Sprint Wave 1, Stream A)
+
+- **`sm init`** — alias for `sm setup`. Same Click command registered under a second name; option/flag parity is automatic.
+- **`sm code index <path>`** — wraps `SmartMemory.ingest_code()` from the core library to index Python (and optionally TypeScript) repos into the local knowledge graph. Streams structured progress to stdout (`[code:index] phase=start|done …`). Default exclusions cover `node_modules`, virtualenvs, build artifacts, and VCS dirs. Every entity is tagged with `origin = code:index` (Tier 1 user content per `smartmemory/origin_policy.py`) — set by the indexer itself, not the wrapper. Flags: `--repo`, `--language` (repeatable, `python|typescript`), `--exclude` (repeatable), `--commit-hash`.
+- **`sm mcp install <client>`** — writes MCP config for `claude-code` (→ `~/.claude.json`), `cursor` (→ `~/.cursor/mcp.json`), or `codex` (→ `~/.codex/config.toml`). Pointer-only wrapper around the already-shipped `smartmemory-mcp` PyPI package — no new server logic. Flags: `--dry-run` prints the would-be config without touching disk; `--path` overrides the destination. Existing config files are merged (JSON) or section-replaced (TOML); malformed configs raise loudly rather than being clobbered.
 
 ### Changed (CORE-EXPERTISE-1 Phase 4b, 2026-05-08)
 

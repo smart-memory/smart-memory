@@ -18,7 +18,11 @@ def _parse_extra_props(args: list[str]) -> dict[str, str]:
     props = {}
     i = 0
     while i < len(args):
-        if args[i].startswith("--") and i + 1 < len(args) and not args[i + 1].startswith("--"):
+        if (
+            args[i].startswith("--")
+            and i + 1 < len(args)
+            and not args[i + 1].startswith("--")
+        ):
             props[args[i][2:]] = args[i + 1]
             i += 2
         else:
@@ -44,7 +48,9 @@ def _daemon_request(method: str, path: str, timeout: int = 120, **kwargs):
 
     for attempt in range(2):
         try:
-            r = httpx.request(method, f"{_daemon_url()}{path}", timeout=timeout, **kwargs)
+            r = httpx.request(
+                method, f"{_daemon_url()}{path}", timeout=timeout, **kwargs
+            )
             r.raise_for_status()
             return r.json() if r.status_code != 204 else {}
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
@@ -72,14 +78,29 @@ def cli() -> None:
 from smartmemory_app.setup import setup as _setup_cmd, uninstall as _uninstall_cmd  # noqa: E402
 
 cli.add_command(_setup_cmd, name="setup")
+# `sm init` — alias for `sm setup`. Same Click command registered under a
+# second name so option/flag parity is automatic.
+cli.add_command(_setup_cmd, name="init")
 cli.add_command(_uninstall_cmd, name="uninstall")
+
+# `sm code …` and `sm mcp …` subgroups
+from smartmemory_app.cli_code import code_group as _code_group  # noqa: E402
+from smartmemory_app.cli_mcp import mcp_group as _mcp_group  # noqa: E402
+
+cli.add_command(_code_group, name="code")
+cli.add_command(_mcp_group, name="mcp")
 
 
 # ── Daemon lifecycle ────────────────────────────────────────────────────────
 
 
 @cli.command("start")
-@click.option("--num-workers", default=1, show_default=True, help="Number of enrichment worker processes.")
+@click.option(
+    "--num-workers",
+    default=1,
+    show_default=True,
+    help="Number of enrichment worker processes.",
+)
 def start_cmd(num_workers: int) -> None:
     """Start the SmartMemory daemon and enrichment workers."""
     from smartmemory_app.daemon import start_daemon, is_running
@@ -109,7 +130,12 @@ def stop_cmd() -> None:
 
 
 @cli.command("restart")
-@click.option("--num-workers", default=1, show_default=True, help="Number of enrichment worker processes.")
+@click.option(
+    "--num-workers",
+    default=1,
+    show_default=True,
+    help="Number of enrichment worker processes.",
+)
 def restart_cmd(num_workers: int) -> None:
     """Restart the SmartMemory daemon and enrichment workers."""
     from smartmemory_app.daemon import stop_daemon, start_daemon, is_running
@@ -162,7 +188,9 @@ def viewer_cmd(port: int | None) -> None:
 
 
 @cli.command("worker")
-@click.option("--loop", is_flag=True, help="Poll continuously instead of drain-and-exit.")
+@click.option(
+    "--loop", is_flag=True, help="Poll continuously instead of drain-and-exit."
+)
 def worker_cmd(loop: bool) -> None:
     """Run the enrichment worker (Tier 2 LLM extraction).
 
@@ -180,8 +208,15 @@ def worker_cmd(loop: bool) -> None:
 # ── Memory operations ───────────────────────────────────────────────────────
 
 _VALID_MEMORY_TYPES = {
-    "pending", "semantic", "episodic", "procedural", "zettel",
-    "reasoning", "opinion", "observation", "decision",
+    "pending",
+    "semantic",
+    "episodic",
+    "procedural",
+    "zettel",
+    "reasoning",
+    "opinion",
+    "observation",
+    "decision",
 }
 
 
@@ -194,12 +229,27 @@ def _validate_memory_type(ctx, param, value: str) -> str:
     return value
 
 
-@cli.command("add", context_settings=dict(
-    ignore_unknown_options=True, allow_extra_args=True,
-))
+@cli.command(
+    "add",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.argument("text", default="-")
-@click.option("--type", "memory_type", default="episodic", show_default=True, callback=_validate_memory_type)
-@click.option("--all", "as_whole", is_flag=True, help="Add stdin as one memory instead of line-by-line.")
+@click.option(
+    "--type",
+    "memory_type",
+    default="episodic",
+    show_default=True,
+    callback=_validate_memory_type,
+)
+@click.option(
+    "--all",
+    "as_whole",
+    is_flag=True,
+    help="Add stdin as one memory instead of line-by-line.",
+)
 @click.pass_context
 def add_cmd(ctx, text: str, memory_type: str, as_whole: bool) -> None:
     """Add text as a memory. Use - or pipe stdin to read from a file.
@@ -219,11 +269,17 @@ def add_cmd(ctx, text: str, memory_type: str, as_whole: bool) -> None:
 
     if text == "-":
         if sys.stdin.isatty():
-            raise click.ClickException("No input. Pipe text or use: smartmemory add \"text\"")
+            raise click.ClickException(
+                'No input. Pipe text or use: smartmemory add "text"'
+            )
         raw = sys.stdin.read()
         if not raw.strip():
             raise click.ClickException("Content cannot be empty.")
-        chunks = [raw.strip()] if as_whole else [l.strip() for l in raw.splitlines() if l.strip()]
+        chunks = (
+            [raw.strip()]
+            if as_whole
+            else [l.strip() for l in raw.splitlines() if l.strip()]
+        )
         if not chunks:
             raise click.ClickException("Content cannot be empty.")
         props = _parse_extra_props(ctx.args)
@@ -261,14 +317,27 @@ def add_cmd(ctx, text: str, memory_type: str, as_whole: bool) -> None:
 @cli.command("recall")
 @click.option("--cwd", default=None, help="Current working directory for context.")
 @click.option("--top-k", default=10, show_default=True)
-@click.option("--query", default=None, help="Optional prompt query (UserPromptSubmit hook).")
-@click.option("--workspace", "workspace_id", default=None, help="Workspace ID override.")
-@click.option("--strict/--no-strict", default=False,
-              help="Drop legacy items without workspace_id (kills cross-workspace leak).")
-@click.option("--no-snapshot", "no_snapshot", is_flag=True, default=False,
-              help="Skip snapshot frame.")
-def recall_cmd(cwd: str, top_k: int, query: str, workspace_id: str,
-               strict: bool, no_snapshot: bool) -> None:
+@click.option(
+    "--query", default=None, help="Optional prompt query (UserPromptSubmit hook)."
+)
+@click.option(
+    "--workspace", "workspace_id", default=None, help="Workspace ID override."
+)
+@click.option(
+    "--strict/--no-strict",
+    default=False,
+    help="Drop legacy items without workspace_id (kills cross-workspace leak).",
+)
+@click.option(
+    "--no-snapshot",
+    "no_snapshot",
+    is_flag=True,
+    default=False,
+    help="Skip snapshot frame.",
+)
+def recall_cmd(
+    cwd: str, top_k: int, query: str, workspace_id: str, strict: bool, no_snapshot: bool
+) -> None:
     """Recall memories (SessionStart / UserPromptSubmit hook)."""
     params = {
         "cwd": cwd or "",
@@ -285,24 +354,42 @@ def recall_cmd(cwd: str, top_k: int, query: str, workspace_id: str,
         from smartmemory_app.storage import recall
 
         context = recall(
-            cwd, top_k,
-            query=query, workspace_id=workspace_id,
-            include_snapshot=not no_snapshot, strict=strict,
+            cwd,
+            top_k,
+            query=query,
+            workspace_id=workspace_id,
+            include_snapshot=not no_snapshot,
+            strict=strict,
         )
     if context:
         click.echo(context)
 
 
 @cli.command("retag")
-@click.option("--content", "content_substring", required=True,
-              help="Substring to match in item content (case-insensitive).")
-@click.option("--origin", "new_origin", required=True,
-              help='New origin value, e.g. "seed:demo" (tier 4, hidden from recall).')
-@click.option("--dry-run", is_flag=True, default=False,
-              help="Show items that would be retagged without modifying.")
-@click.option("--limit", default=100, show_default=True,
-              help="Max items to retag in one run.")
-def retag_cmd(content_substring: str, new_origin: str, dry_run: bool, limit: int) -> None:
+@click.option(
+    "--content",
+    "content_substring",
+    required=True,
+    help="Substring to match in item content (case-insensitive).",
+)
+@click.option(
+    "--origin",
+    "new_origin",
+    required=True,
+    help='New origin value, e.g. "seed:demo" (tier 4, hidden from recall).',
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show items that would be retagged without modifying.",
+)
+@click.option(
+    "--limit", default=100, show_default=True, help="Max items to retag in one run."
+)
+def retag_cmd(
+    content_substring: str, new_origin: str, dry_run: bool, limit: int
+) -> None:
     """Retag items by content match (HOOK-RECALL-RELEVANCE-1 G3.C).
 
     Use to clean up legacy seed/fixture data that leaks into recall:
@@ -327,7 +414,11 @@ def retag_cmd(content_substring: str, new_origin: str, dry_run: bool, limit: int
         # Content lives in `properties.content` for SQLite/FalkorDB serialize shape;
         # fall back to top-level `content` for forward-compat.
         props = raw.get("properties") or {}
-        content = (props.get("content") if isinstance(props, dict) else None) or raw.get("content") or ""
+        content = (
+            (props.get("content") if isinstance(props, dict) else None)
+            or raw.get("content")
+            or ""
+        )
         if needle not in content.lower():
             continue
         item_id = raw.get("item_id") or raw.get("id")
@@ -358,12 +449,21 @@ def retag_cmd(content_substring: str, new_origin: str, dry_run: bool, limit: int
     click.echo(f"Retagged {updated}/{len(matched)} items with origin={new_origin!r}.")
 
 
-@cli.command("search", context_settings=dict(
-    ignore_unknown_options=True, allow_extra_args=True,
-))
+@cli.command(
+    "search",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.argument("query")
 @click.option("--top-k", default=5, show_default=True)
-@click.option("--include-reference", is_flag=True, default=False, help="Include reference data in results")
+@click.option(
+    "--include-reference",
+    is_flag=True,
+    default=False,
+    help="Include reference data in results",
+)
 @click.pass_context
 def search_cmd(ctx, query: str, top_k: int, include_reference: bool) -> None:
     """Search memories by semantic similarity. Use '*' to list all.
@@ -381,7 +481,9 @@ def search_cmd(ctx, query: str, top_k: int, include_reference: bool) -> None:
         from smartmemory_app.storage import search
 
         try:
-            results = search(query, top_k, filters=props, include_reference=include_reference)
+            results = search(
+                query, top_k, filters=props, include_reference=include_reference
+            )
         except NotImplementedError as e:
             raise click.ClickException(str(e))
     if not results:
@@ -434,6 +536,7 @@ def lifecycle_group() -> None:
 def lifecycle_orient() -> None:
     """Orient phase: recall context at session start."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
     cwd = body.get("cwd")
@@ -441,7 +544,9 @@ def lifecycle_orient() -> None:
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     result = lc.orient(cwd=cwd)
     if result:
         click.echo(result)
@@ -451,6 +556,7 @@ def lifecycle_orient() -> None:
 def lifecycle_recall() -> None:
     """Recall phase: inject prompt-relevant context."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
     prompt = body.get("prompt", "")
@@ -458,7 +564,9 @@ def lifecycle_recall() -> None:
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     result = lc.recall(prompt)
     if result:
         click.echo(result)
@@ -468,13 +576,16 @@ def lifecycle_recall() -> None:
 def lifecycle_observe() -> None:
     """Observe phase: capture tool call."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
 
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     lc.observe(
         tool_name=body.get("tool_name", "unknown"),
         tool_input=body.get("tool_input", {}),
@@ -486,13 +597,16 @@ def lifecycle_observe() -> None:
 def lifecycle_distill() -> None:
     """Distill phase: pair response with stored prompt."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
 
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     lc.distill(response=body.get("last_assistant_message", ""))
 
 
@@ -500,13 +614,16 @@ def lifecycle_distill() -> None:
 def lifecycle_learn() -> None:
     """Learn phase: capture error pattern."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
 
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     lc.learn(
         tool_name=body.get("tool_name", "unknown"),
         error=body.get("error", body.get("tool_response", "")),
@@ -517,13 +634,16 @@ def lifecycle_learn() -> None:
 def lifecycle_persist() -> None:
     """Persist phase: save session summary."""
     import sys
+
     body = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
     session_id = body.get("session_id", "unknown")
 
     from smartmemory_app.lifecycle import MemoryLifecycle
     from smartmemory_app.lifecycle_config import LifecycleConfig
 
-    lc = MemoryLifecycle(session_id, LifecycleConfig.from_config(_load_lifecycle_toml()))
+    lc = MemoryLifecycle(
+        session_id, LifecycleConfig.from_config(_load_lifecycle_toml())
+    )
     lc.persist()
 
 
@@ -531,12 +651,15 @@ def lifecycle_persist() -> None:
 def lifecycle_status() -> None:
     """Show lifecycle configuration and session stats."""
     from smartmemory_app.lifecycle_config import LifecycleConfig
+
     cfg = LifecycleConfig.from_config(_load_lifecycle_toml())
     click.echo(f"Lifecycle enabled: {cfg.enabled}")
     click.echo(f"Recall strategy: {cfg.recall_strategy.value}")
     click.echo(f"Orient budget: {cfg.orient_budget} tokens")
     click.echo(f"Recall budget: {cfg.recall_budget} tokens")
-    click.echo(f"Observe: {cfg.observe_tool_calls}, Distill: {cfg.distill_turns}, Learn: {cfg.learn_from_errors}")
+    click.echo(
+        f"Observe: {cfg.observe_tool_calls}, Distill: {cfg.distill_turns}, Learn: {cfg.learn_from_errors}"
+    )
 
 
 def _load_lifecycle_toml() -> dict:
@@ -544,6 +667,7 @@ def _load_lifecycle_toml() -> dict:
     try:
         import tomllib
         from smartmemory_app.config import config_path
+
         path = config_path()
         if path.exists():
             with open(path, "rb") as f:
@@ -684,8 +808,10 @@ def config_cmd(key: str | None, value: str | None) -> None:
 
     if key is None:
         from smartmemory_app import __version__ as wrapper_version
+
         try:
             from importlib.metadata import version as _pkg_version
+
             core_version = _pkg_version("smartmemory-core")
         except Exception:
             core_version = "?"
@@ -1183,7 +1309,9 @@ def reextract_cmd() -> None:
 @cli.command("server", hidden=True)
 def server_cmd() -> None:
     """Start the SmartMemory MCP server (called by MCP clients, not users)."""
-    click.echo("MCP server is now 'smartmemory-mcp'. It's included in your installation.")
+    click.echo(
+        "MCP server is now 'smartmemory-mcp'. It's included in your installation."
+    )
     click.echo("Run: smartmemory-mcp")
 
 
