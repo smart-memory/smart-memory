@@ -168,9 +168,18 @@ def setup(mode: str | None, api_key: str | None, for_tool: str | None) -> None:
                 # TUI only selected mode — hand off to click-based remote setup
                 _setup_remote(api_key)
                 click.echo("\nSetup complete.")
+                try:
+                    from smartmemory_app.launch_metrics import emit as _lm_emit
+                    _lm_emit("setup.complete", {"mode": "remote"})
+                except Exception:
+                    pass
             else:
                 # TUI ProgressScreen already ran config + hooks + daemon
-                pass
+                try:
+                    from smartmemory_app.launch_metrics import emit as _lm_emit
+                    _lm_emit("setup.complete", {"mode": "local"})
+                except Exception:
+                    pass
             if for_tool:
                 _setup_tool_config(for_tool)
             return
@@ -196,9 +205,19 @@ def _setup_click(mode: str | None, api_key: str | None) -> None:
     if mode == "remote":
         _setup_remote(api_key)
         click.echo("\nSetup complete.")
+        try:
+            from smartmemory_app.launch_metrics import emit as _lm_emit
+            _lm_emit("setup.complete", {"mode": "remote"})
+        except Exception:
+            pass
     else:
         _setup_local()
         _start_daemon_local()
+        try:
+            from smartmemory_app.launch_metrics import emit as _lm_emit
+            _lm_emit("setup.complete", {"mode": "local"})
+        except Exception:
+            pass
 
 
 def _can_run_tui() -> bool:

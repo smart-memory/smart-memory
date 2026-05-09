@@ -1,5 +1,18 @@
 # Changelog — smartmemory
 
+## [Unreleased]
+
+### Added (LAUNCH-METRICS-1, Wave 2 Stream I, 2026-05-10)
+
+- **`smartmemory_app.launch_metrics`** module — best-effort `emit(event_type, props)` POSTing to the daemon HTTP API at `/launch/event`. Honors `SMARTMEMORY_DISABLE_LAUNCH_METRICS=1` opt-out. Failures log WARNING; never raises into a CLI command path.
+- Funnel emission wired into the three Stream A entry points:
+  - `sm setup` / `sm init` -> `setup.complete` with `{mode: local|remote}`
+  - `sm code index` -> `index.start` and `index.complete` with `{repo, files, entities, edges, elapsed_s}`
+  - `sm mcp install <client>` -> `mcp.install` with `{client, dry_run}`
+- **Daemon-side ingest** at `POST /launch/event` in `local_api.py`. Local mode appends to `launch_events.jsonl` in the data dir.
+
+Contract: `smart-memory-docs/docs/features/LAUNCH-METRICS-1/launch-event-contract.json`.
+
 ## [1.4.2] — 2026-05-10
 
 ### Added (Launch Sprint Wave 1, Stream A)

@@ -189,3 +189,9 @@ def mcp_install_cmd(client: str, dry_run: bool, override_path: str | None) -> No
         click.echo("[mcp:install] dry-run — no file written")
     else:
         click.echo(f"[mcp:install] wrote {target}")
+
+    try:
+        from smartmemory_app.launch_metrics import emit as _lm_emit
+        _lm_emit("mcp.install", {"client": client, "dry_run": bool(dry_run)})
+    except Exception:
+        pass

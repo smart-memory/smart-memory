@@ -17,8 +17,11 @@ DELETE /graph/nodes/{id} → /memory/graph/nodes/{id} (405 — entity-node ops s
 
 All endpoints acquire _rw_lock for thread safety under uvicorn's thread pool.
 """
+import logging
 import threading
 from typing import Any, Optional
+
+log = logging.getLogger(__name__)
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel
@@ -638,6 +641,38 @@ def search_endpoint(body: SearchRequest) -> dict:
         except NotImplementedError as e:
             raise HTTPException(status_code=501, detail=str(e))
     return {"items": results}
+
+
+# LAUNCH-METRICS-1: daemon-side ingest. Local mode appends to a JSONL file in
+# the data dir; remote mode forwards to the configured service. Best-effort.
+@api.post("/launch/event")
+def ingest_launch_event(body: dict) -> dict:
+    import json as _json
+    import time as _time
+    import uuid as _uuid
+
+    event_type = body.get("event_type")
+    if not event_type:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="event_type required")
+    record = {
+        "event_id": _uuid.uuid4().hex,
+        "event_type": event_type,
+        "props": body.get("props") or {},
+        "ts": _time.time(),
+    }
+    try:
+        from smartmemory_app.storage import _resolve_data_dir
+        data_path = _resolve_data_dir()
+        data_path.mkdir(parents=True, exist_ok=True)
+        path = data_path / "launch_events.jsonl"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(record) + "\n")
+    except Exception as exc:
+        log.warning("launch_metrics: daemon write failed: %s", exc)
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {"event_id": record["event_id"], "event_type": event_type}
 
 
 # recall endpoint moved above /{memory_id} to avoid wildcard route capture

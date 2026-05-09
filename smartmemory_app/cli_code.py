@@ -134,6 +134,12 @@ def code_index_cmd(
         f"langs={','.join(lang_list)} excludes={len(excludes)}"
     )
 
+    try:
+        from smartmemory_app.launch_metrics import emit as _lm_emit
+        _lm_emit("index.start", {"repo": repo_id, "languages": lang_list})
+    except Exception:
+        pass
+
     # We index against the local lite memory directly. Going through the daemon
     # HTTP API would require a new route; the indexer is heavy and runs in the
     # caller's process anyway, so direct is the simpler path.
@@ -177,6 +183,21 @@ def code_index_cmd(
         f"embeddings={result.embeddings_generated} "
         f"elapsed_s={result.elapsed_seconds or round(elapsed, 2)}"
     )
+
+    try:
+        from smartmemory_app.launch_metrics import emit as _lm_emit
+        _lm_emit(
+            "index.complete",
+            {
+                "repo": repo_id,
+                "files": result.files_parsed,
+                "entities": result.entities_created,
+                "edges": result.edges_created,
+                "elapsed_s": float(result.elapsed_seconds or round(elapsed, 2)),
+            },
+        )
+    except Exception:
+        pass
 
     if result.errors:
         # Surface (but do not fail on) parse errors — IndexResult treats them
