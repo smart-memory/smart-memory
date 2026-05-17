@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed (DEMO-WALKTHROUGH-1, lite-mode graph viewer SSE, 2026-05-17)
+
+- **Lite daemon now serves `GET /memory/progress/stream` (SSE).** `smart-memory-graph`'s `useGraphStream` migrated WS→SSE; the lite daemon only exposed the legacy `sm.v1` WebSocket on `:9015`, so the local graph viewer never connected ("Not connected to event stream", 0 nodes).
+  - `smartmemory_app/events_server.py`: SSE subscriber registry + `_to_progress_event()` reshaping raw sink items into ProgressEvent contract frames (`kind: graph.node|graph.edge`) + `_fanout_sse()` at the **single** existing `sink._q` drain point. The `ws://:9015` broadcast is byte-for-byte unchanged (SSE is an additional broadcast target, not a second queue consumer — preserves existing WS clients incl. the recorder). Cross-loop hand-off via `call_soon_threadsafe` (same bridge as `InProcessQueueSink.emit`).
+  - `smartmemory_app/local_api.py`: `GET /memory/progress/stream` `StreamingResponse` (per-connection queue, 15s keepalive, disconnect cleanup), declared before `/{memory_id}` routes.
+  - Verified: one ingest yields 6 `graph.node` + 10 `graph.edge` contract frames with `payload.data.memory_id`+`label`; legacy WS path unaffected.
+
 ### Added (LAUNCH-METRICS-1, Wave 2 Stream I, 2026-05-10)
 
 - **`smartmemory_app.launch_metrics`** module — best-effort `emit(event_type, props)` POSTing to the daemon HTTP API at `/launch/event`. Honors `SMARTMEMORY_DISABLE_LAUNCH_METRICS=1` opt-out. Failures log WARNING; never raises into a CLI command path.

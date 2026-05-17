@@ -16,6 +16,7 @@ Correctness constraints (all present):
 import asyncio
 import logging
 import threading
+import time
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +70,102 @@ _server_thread: threading.Thread | None = None
 _server_thread_lock = threading.Lock()
 _stop_event = threading.Event()
 
+# ---------------------------------------------------------------------------
+# SSE fan-out (DIST-LITE graph viewer migrated WS -> SSE).
+#
+# The graph package (smart-memory-graph) dropped its WebSocket transport;
+# useGraphStream now only consumes SSE via GET /memory/progress/stream. The
+# lite daemon still exposes this ws://:9015 server (the recorder's settled()
+# depends on it), so SSE is added as an ADDITIONAL broadcast target at the
+# single existing sink._q drain point — NOT a second queue consumer (a second
+# sink._q.get() would steal items from the WS broadcast and break settled()).
+#
+# Subscribers register an asyncio.Queue + the loop it lives on (uvicorn's
+# loop, a different thread/loop from this events-server loop). Cross-loop
+# delivery uses loop.call_soon_threadsafe — the same bridge pattern as
+# InProcessQueueSink.emit.
+# ---------------------------------------------------------------------------
+_sse_lock = threading.Lock()
+_sse_subscribers: list = []  # list of (loop, asyncio.Queue)
+_sse_seq: int = 0  # monotonic; mutated only on the single _broadcast loop
+
+
+def register_sse_subscriber(loop, queue) -> tuple:
+    """Register an SSE subscriber queue. Returns an opaque entry for unregister."""
+    entry = (loop, queue)
+    with _sse_lock:
+        _sse_subscribers.append(entry)
+    return entry
+
+
+def unregister_sse_subscriber(entry) -> None:
+    """Remove a previously registered SSE subscriber. Idempotent."""
+    with _sse_lock:
+        try:
+            _sse_subscribers.remove(entry)
+        except ValueError:
+            pass
+
+
+def _to_progress_event(item: dict, seq: int) -> dict | None:
+    """Reshape a raw sink item into a ProgressEvent contract frame.
+
+    Contract: progress-event-contract.json v1.5.0 — the shape
+    classifyProgressEvent() (useGraphStream.js) expects. Only graph
+    node/edge operations are projected (the viewer paints from these);
+    other span events are dropped to keep the lite stream lean.
+    """
+    viewer = _to_viewer_message(item)
+    op = viewer.get("operation")
+    if op == "add_node":
+        kind = "graph.node"
+    elif op == "add_edge":
+        kind = "graph.edge"
+    else:
+        return None
+    now = time.time()
+    return {
+        "run_id": "lite",
+        "scope": "workspace:local",
+        "seq": seq,
+        "ts": now,
+        "kind": kind,
+        "status": "ok",
+        # payload.data is the same dict the WS path renders from — parity by
+        # construction. original_ts drives the viewer's replay pacing.
+        "payload": {"data": viewer["data"], "original_ts": now},
+    }
+
+
+def _fanout_sse(item: dict) -> None:
+    """Push a reshaped progress frame to every registered SSE subscriber.
+
+    Called from the single _broadcast loop. Cross-loop hand-off via
+    call_soon_threadsafe; QueueFull is dropped (slow consumer, same policy
+    as InProcessQueueSink).
+    """
+    global _sse_seq
+    with _sse_lock:
+        subs = list(_sse_subscribers)
+    if not subs:
+        return
+    _sse_seq += 1
+    frame = _to_progress_event(item, _sse_seq)
+    if frame is None:
+        return
+    for sub_loop, q in subs:
+        def _push(q=q, frame=frame) -> None:
+            try:
+                q.put_nowait(frame)
+            except asyncio.QueueFull:
+                pass
+
+        try:
+            sub_loop.call_soon_threadsafe(_push)
+        except RuntimeError:
+            # Subscriber loop closed mid-flight — unregister handles cleanup.
+            pass
+
 
 async def _broadcast(sink, clients: set) -> None:
     """Send one queued event to all connected clients.
@@ -80,6 +177,10 @@ async def _broadcast(sink, clients: set) -> None:
         item = await asyncio.wait_for(sink._q.get(), timeout=1.0)
     except asyncio.TimeoutError:
         return
+
+    # SSE fan-out (graph viewer). Done at the single drain point so the WS
+    # path below still receives every event — recorder settled() unaffected.
+    _fanout_sse(item)
 
     import json
     message = json.dumps(_to_viewer_message(item))

@@ -23,7 +23,8 @@ from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
-from fastapi import APIRouter, FastAPI, HTTPException, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from smartmemory_app.config import UnconfiguredError
@@ -192,6 +193,56 @@ def list_memories(limit: int = 200, offset: int = 0) -> dict:
     nodes = [_flatten_node(n) for n in snapshot.get("nodes", [])]
     paginated = nodes[offset: offset + limit]
     return {"items": paginated, "total": len(nodes), "limit": limit, "offset": offset}
+
+
+@api.get("/progress/stream")
+async def progress_stream(request: Request):
+    """SSE progress stream for the graph viewer (lite-mode parity).
+
+    smart-memory-graph's useGraphStream migrated WS -> SSE; this is the
+    lite daemon's /memory/progress/stream. It registers a per-connection
+    queue with events_server, which fans out reshaped ProgressEvent frames
+    at the single sink drain point (the ws://:9015 broadcast is untouched,
+    so the recorder's settled() still works).
+
+    Declared BEFORE /{memory_id} routes — FastAPI matches in declaration
+    order and the bare /{memory_id} would otherwise be ambiguous.
+    """
+    import asyncio
+    import json
+
+    from smartmemory_app import events_server
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+    entry = events_server.register_sse_subscriber(loop, queue)
+
+    async def _gen():
+        try:
+            # Immediate comment so the client's onopen fires without waiting
+            # for the first graph event.
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    frame = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"  # per contract SSE keepalive
+                    continue
+                yield f"data: {json.dumps(frame)}\n\n"
+        finally:
+            events_server.unregister_sse_subscriber(entry)
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # IMPORTANT: /{memory_id}/neighbors MUST be declared BEFORE /{memory_id}.
