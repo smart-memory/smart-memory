@@ -89,7 +89,7 @@ def test_search_cmd_fallback(runner):
 
     assert result.exit_code == 0
     assert "abc12345" in result.output
-    mock_search.assert_called_once_with("test query", 5, filters={})
+    mock_search.assert_called_once_with("test query", 5, filters={}, include_reference=False)
 
 
 def test_search_cmd_no_results(runner):
@@ -100,6 +100,23 @@ def test_search_cmd_no_results(runner):
 
     assert result.exit_code == 0
     assert "No results" in result.output
+
+
+def test_search_cmd_daemon_items_contract(runner):
+    """Daemon returns the CORE-CRUD-LIST contract shape {'items': [...]}.
+    The CLI must unwrap it, not iterate the dict directly (regression:
+    `for r in results` over the dict yielded the key 'items' -> str ->
+    AttributeError: 'str' object has no attribute 'get')."""
+    payload = {"items": [
+        {"item_id": "deadbeef-0000", "content": "Acme Corp in Berlin", "memory_type": "episodic"},
+    ]}
+    with patch("smartmemory_app.cli._daemon_request", return_value=payload):
+        from smartmemory_app.cli import cli
+        result = runner.invoke(cli, ["search", "berlin"])
+
+    assert result.exit_code == 0, result.output
+    assert "deadbeef" in result.output
+    assert "Acme Corp in Berlin" in result.output
 
 
 def test_get_cmd_fallback(runner):
@@ -190,4 +207,4 @@ def test_search_cmd_with_filters(runner):
 
     assert result.exit_code == 0
     assert "abc12345" in result.output
-    mock_search.assert_called_once_with("test", 5, filters={"project": "atlas"})
+    mock_search.assert_called_once_with("test", 5, filters={"project": "atlas"}, include_reference=False)

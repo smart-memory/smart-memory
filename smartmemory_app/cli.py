@@ -486,10 +486,18 @@ def search_cmd(ctx, query: str, top_k: int, include_reference: bool) -> None:
             )
         except NotImplementedError as e:
             raise click.ClickException(str(e))
+    # The daemon returns the CORE-CRUD-LIST contract shape {"items": [...]};
+    # the storage fallback returns a bare list. Unwrap so we always iterate
+    # result dicts (iterating the dict directly yielded its keys -> "items"
+    # string -> AttributeError: 'str' object has no attribute 'get').
+    if isinstance(results, dict):
+        results = results.get("items", [])
     if not results:
         click.echo("No results.")
         return
     for r in results:
+        if not isinstance(r, dict):
+            continue
         content = r.get("content", "")[:200]
         mem_type = r.get("memory_type", "?")
         item_id = r.get("item_id", "?")

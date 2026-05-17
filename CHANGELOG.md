@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed (DEMO-WALKTHROUGH-1, `smartmemory search` CLI, 2026-05-17)
+
+- **`smartmemory search` no longer crashes with `AttributeError: 'str' object has no attribute 'get'`.** The daemon `/memory/search` returns the CORE-CRUD-LIST contract shape `{"items": [...]}`, but `cli.py search_cmd` iterated the dict directly — so `for r in results` yielded the key string `"items"` and `r.get("content")` threw. Now unwraps `results["items"]` (daemon) vs bare list (storage fallback), with a defensive non-dict skip. Regression test added (`test_search_cmd_daemon_items_contract`); fixed two stale `assert_called_once_with` expectations that predated the `include_reference` fallback kwarg.
+
 ## [1.4.3] - 2026-05-17
 
 ### Changed (lockstep relock — ships the competitive-response sprint)
