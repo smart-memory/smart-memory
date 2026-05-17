@@ -230,9 +230,13 @@ def main(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     # its graceful shutdown (drain active requests, then exit → atexit fires).
     atexit.register(_cleanup)
 
-    # Start events WebSocket server as background daemon thread
+    # Start events WebSocket server as background daemon thread.
+    # Events port tracks the API port (port+1) so a non-default daemon
+    # (e.g. an isolated demo on 9114) gets its own events server (9115)
+    # instead of colliding with the default :9015. Default 9014 -> 9015
+    # is unchanged.
     from smartmemory_app.events_server import start_background
-    start_background()
+    start_background(port + 1)
 
     # Enrichment is handled by a separate worker process (smartmemory worker --loop).
     # The ingest endpoint enqueues to a SQLite table; the worker drains it.

@@ -14,6 +14,7 @@
   - `smartmemory_app/events_server.py`: SSE subscriber registry + `_to_progress_event()` reshaping raw sink items into ProgressEvent contract frames (`kind: graph.node|graph.edge`) + `_fanout_sse()` at the **single** existing `sink._q` drain point. The `ws://:9015` broadcast is byte-for-byte unchanged (SSE is an additional broadcast target, not a second queue consumer — preserves existing WS clients incl. the recorder). Cross-loop hand-off via `call_soon_threadsafe` (same bridge as `InProcessQueueSink.emit`).
   - `smartmemory_app/local_api.py`: `GET /memory/progress/stream` `StreamingResponse` (per-connection queue, 15s keepalive, disconnect cleanup), declared before `/{memory_id}` routes.
   - Verified: one ingest yields 6 `graph.node` + 10 `graph.edge` contract frames with `payload.data.memory_id`+`label`; legacy WS path unaffected.
+- **Events server port now tracks the API port.** `smartmemory_app/viewer_server.py` starts the events WS on `port + 1` instead of a hardcoded `9015`. Default `9014 → 9015` is unchanged; a non-default daemon (e.g. an isolated demo on `9114`) now gets its own events server (`9115`) instead of colliding with the dev daemon's `:9015`. Enables running an isolated demo daemon alongside the launchd dev daemon.
 
 ### Added (LAUNCH-METRICS-1, Wave 2 Stream I, 2026-05-10)
 
