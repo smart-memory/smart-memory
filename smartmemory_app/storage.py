@@ -292,6 +292,8 @@ def search(
     top_k: int = 5,
     filters: dict[str, str] | None = None,
     include_reference: bool = False,
+    memory_type: str | None = None,
+    **search_kwargs,
 ) -> list[dict]:
     """Search memories by semantic similarity with optional property filters.
 
@@ -300,9 +302,23 @@ def search(
         top_k: Maximum results.
         filters: Optional property filters (e.g. {"project": "atlas"}).
                  Applied as post-filter on search results.
+        memory_type: Restrict to a single memory type (e.g. "decision").
+        **search_kwargs: Recall tuning forwarded to the core engine
+                 (decompose_query, channel_weights, multi_hop, max_hops,
+                 budget_ms, semantic_hops). Unknown keys are dropped so
+                 callers/contract drift never raise TypeError here.
     """
     top_k = max(1, min(top_k, 200))  # clamp to [1, 200]
     mem = get_memory()
+    # Only forward kwargs the core engine understands; silently drop the
+    # rest (e.g. MCP's enable_hybrid) so a richer caller contract degrades
+    # to plain semantic search instead of crashing.
+    _ALLOWED = ("decompose_query", "channel_weights", "multi_hop",
+                "max_hops", "budget_ms", "semantic_hops")
+    core_kwargs = {k: v for k, v in search_kwargs.items()
+                   if k in _ALLOWED and v is not None}
+    if memory_type:
+        core_kwargs["memory_type"] = memory_type
     from smartmemory_app.remote_backend import RemoteMemory
     if isinstance(mem, RemoteMemory):
         if filters:
@@ -323,18 +339,21 @@ def search(
                     for k, v in filters.items()
                 )
             ]
+        if memory_type:
+            all_items = [r for r in all_items
+                         if (r.get("memory_type") or r.get("metadata", {}).get("memory_type")) == memory_type]
         # CORE-PROPS-1 Phase 6: exclude reference data from wildcard by default
         if not include_reference:
             all_items = [r for r in all_items if not r.get("reference", False)]
         return all_items
     if not filters:
-        results = mem.search(query, top_k=top_k, include_reference=include_reference)
+        results = mem.search(query, top_k=top_k, include_reference=include_reference, **core_kwargs)
         return [r.to_dict() for r in results]
     # With filters: fetch a wider window, then post-filter. If still short,
     # widen progressively to avoid missing sparse matches.
     for multiplier in (5, 20, 50):
         fetch_k = top_k * multiplier
-        results = mem.search(query, top_k=fetch_k)
+        results = mem.search(query, top_k=fetch_k, **core_kwargs)
         items = [r.to_dict() for r in results]
         matched = [
             r for r in items

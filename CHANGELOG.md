@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed (MCP `memory_search` broken in local mode, 2026-05-18)
+
+- **MCP `memory_search` completely broken in local mode.** `storage.search()` only accepted `(query, top_k, filters, include_reference)`. The MCP server calls it with `memory_type`, `enable_hybrid`, `decompose_query`, `multi_hop`, `max_hops`, and `budget_ms` — any of those raised `TypeError: search() got an unexpected keyword argument`. Every `memory_search` call in local mode crashed. `storage.search` now accepts `memory_type` (forwarded as a post-filter) and `**search_kwargs` (allowlisted to `decompose_query`, `channel_weights`, `multi_hop`, `max_hops`, `budget_ms`, `semantic_hops`); unknown keys such as `enable_hybrid` are silently dropped instead of raising. Regression test added (`test_search_accepts_mcp_recall_kwargs`).
+
 ### Fixed (DEMO-WALKTHROUGH-1, `smartmemory search` CLI, 2026-05-17)
 
 - **`smartmemory search` no longer crashes with `AttributeError: 'str' object has no attribute 'get'`.** The daemon `/memory/search` returns the CORE-CRUD-LIST contract shape `{"items": [...]}`, but `cli.py search_cmd` iterated the dict directly — so `for r in results` yielded the key string `"items"` and `r.get("content")` threw. Now unwraps `results["items"]` (daemon) vs bare list (storage fallback), with a defensive non-dict skip. Regression test added (`test_search_cmd_daemon_items_contract`); fixed two stale `assert_called_once_with` expectations that predated the `include_reference` fallback kwarg.

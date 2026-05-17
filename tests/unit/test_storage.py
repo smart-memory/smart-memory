@@ -160,6 +160,54 @@ def test_get_remote_memory_singleton(tmp_path):
     MockRemote.assert_called_once()  # constructor called only once
 
 
+def test_search_accepts_mcp_recall_kwargs():
+    """search() must not raise TypeError when called with the exact MCP memory_search shape.
+
+    Before the fix, storage.search() only accepted (query, top_k, filters,
+    include_reference).  The MCP server calls it with memory_type, enable_hybrid,
+    decompose_query, multi_hop, max_hops, budget_ms — any of those caused a
+    TypeError and broke memory_search in local mode entirely.
+
+    Asserts:
+    - No TypeError is raised
+    - The underlying mem.search() receives memory_type in its kwargs (forwarded)
+    - The underlying mem.search() does NOT receive enable_hybrid (allowlist drop)
+    """
+    import smartmemory_app.storage as storage
+
+    received_kwargs = {}
+
+    class FakeResult:
+        def to_dict(self):
+            return {"item_id": "x", "content": "hello", "memory_type": "decision"}
+
+    class FakeMem:
+        def search(self, query, **kwargs):
+            received_kwargs.update(kwargs)
+            return [FakeResult()]
+
+    with patch("smartmemory_app.storage.get_memory", return_value=FakeMem()):
+        results = storage.search(
+            "q",
+            top_k=3,
+            memory_type="decision",
+            enable_hybrid=True,   # unknown — must be dropped
+            decompose_query=False,
+            multi_hop=False,
+            max_hops=3,
+            budget_ms=1500,
+        )
+
+    # Call must not raise — if we reach here, no TypeError occurred.
+    assert isinstance(results, list)
+
+    # memory_type forwarded into core_kwargs
+    assert received_kwargs.get("memory_type") == "decision"
+
+    # enable_hybrid is NOT in the allowlist — must be silently dropped
+    assert "enable_hybrid" not in received_kwargs
+
+
 def test_ingest_acquires_lock(tmp_path):
     """ingest() acquires FileLock before calling mem.ingest() in local mode."""
     import smartmemory_app.storage as storage
