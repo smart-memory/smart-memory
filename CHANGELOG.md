@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-05-17
+
+### Changed (lockstep relock — ships the competitive-response sprint)
+
+- **Pinned `smartmemory-core[lite]==0.9.8`** (was `==0.9.1`, 7 versions stale despite the "move in lockstep" comment). The wrapper now actually pulls the shipped sprint core: CORE-BITEMPORAL-1 transaction-time activation, CORE-ATTENTION-FUSION-1 Phase 1, APP-VAULT-SYNC-1 Phase 0, RECALL-CITATIONS-1. Without this, `pip install smartmemory` resolved core 0.9.1 — none of the differentiator. Supersedes the never-published 1.4.2 (committed but no Release was cut; wrapper publishes only on GitHub Release / workflow_dispatch).
+
 ### Fixed (DEMO-WALKTHROUGH-1, lite-mode graph viewer SSE, 2026-05-17)
 
 - **Lite daemon now serves `GET /memory/progress/stream` (SSE).** `smart-memory-graph`'s `useGraphStream` migrated WS→SSE; the lite daemon only exposed the legacy `sm.v1` WebSocket on `:9015`, so the local graph viewer never connected ("Not connected to event stream", 0 nodes).
